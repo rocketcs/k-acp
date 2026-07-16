@@ -368,8 +368,8 @@ onMounted(() => {
 <template>
   <div class="agent-page">
     <section class="intro-section">
-      <h3 class="intro-title">智能体管理</h3>
-      <p class="intro-desc text-secondary">
+      <h3 class="intro-title" tabindex="0" aria-describedby="agent-intro-desc">智能体管理</h3>
+      <p id="agent-intro-desc" class="intro-desc text-secondary">
         智能体是AI系统的核心组件,通过配置模型、工具、提示词、敏感词、技能包、MCP和知识库等多个维度,
         赋予智能体强大的感知、推理和执行能力。精心设计的智能体能够理解复杂需求、制定执行计划、
         调用外部工具、访问知识库,并以结构化的方式输出结果,真正实现从"对话助手"到"智能伙伴"的跨越。

@@ -254,8 +254,8 @@ watch([selectedHookType, keyword], () => {
 <template>
   <div class="hook-page">
     <section class="intro-section">
-      <h3 class="intro-title">钩子管理</h3>
-      <p class="intro-desc text-secondary">
+      <h3 class="intro-title" tabindex="0" aria-describedby="hook-intro-desc">钩子管理</h3>
+      <p id="hook-intro-desc" class="intro-desc text-secondary">
         钩子（Hook）是智能体执行流程中的切面扩展点，用于在关键节点插入自定义逻辑。行业实践通常在「调用前后、推理前后、工具调用前后、发生错误时」等时机挂载钩子，实现日志、鉴权、限流、审计或业务定制，而不侵入主流程代码。本模块展示已配置的钩子，便于查看与启用状态管理。
       </p>
     </section>

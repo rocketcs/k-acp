@@ -200,7 +200,7 @@ onMounted(() => {
 
 <template>
   <AuthContainer :show-back="true" back-to="/login">
-    <div class="auth-title">欢迎使用 Apboa Next 智能体平台</div>
+    <div class="auth-title">欢迎使用金智维智能体平台</div>
 
     <!-- 步骤指示器 -->
     <ASteps :current="currentStep" size="small" class="register-steps">

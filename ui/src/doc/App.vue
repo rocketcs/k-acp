@@ -47,7 +47,7 @@ const docMenus = [
       <aside class="doc-sidebar">
         <div class="doc-sidebar-header">
           <BookOutlined class="doc-sidebar-header-icon" />
-          <span class="doc-sidebar-header-title">Apboa Next 使用手册</span>
+          <span class="doc-sidebar-header-title">金智维使用手册</span>
         </div>
         <nav class="doc-nav">
           <RouterLink

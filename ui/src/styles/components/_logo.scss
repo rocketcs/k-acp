@@ -6,14 +6,15 @@
 
 .app-logo {
   .logo-icon {
-    width: 32px;
+    width: 124px;
     height: 32px;
+    flex-shrink: 0;
   }
 
-  .project-name {
-    font-size: 18px;
-    font-weight: 600;
-    color: #262626;
-    white-space: nowrap;
+  .logo-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
 }

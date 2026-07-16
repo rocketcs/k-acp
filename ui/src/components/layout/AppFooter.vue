@@ -18,11 +18,11 @@ const currentYear = new Date().getFullYear()
       </div>
 
       <div class="footer-description">
-        <p>Apboa-Next 智能体平台</p>
+        <p>金智维智能体平台</p>
       </div>
 
       <div class="footer-copyright">
-        <p>&copy; {{ currentYear }} Apboa. All rights reserved. Powered by Huxuehao</p>
+        <p>&copy; {{ currentYear }} Kingsware. All rights reserved.</p>
       </div>
     </div>
   </div>

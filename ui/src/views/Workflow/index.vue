@@ -253,8 +253,8 @@ onActivated(refreshIfDirty)
 <template>
   <div class="agent-page">
     <section class="intro-section">
-      <h3 class="intro-title">工作流</h3>
-      <p class="intro-desc text-secondary">
+      <h3 class="intro-title" tabindex="0" aria-describedby="workflow-intro-desc">工作流</h3>
+      <p id="workflow-intro-desc" class="intro-desc text-secondary">
         工作流是智能体业务编排的核心引擎，通过可视化拖拽将开始、结束、逻辑判断、数据处理等节点自由组合，
         灵活接入缓存、数据源、消息队列等外部资源，实现节点间变量的精准传递与条件路由。
         调试运行让每一步执行状态一目了然，发布后生成不可变版本并绑定路由，

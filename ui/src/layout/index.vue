@@ -23,7 +23,7 @@ const showFooter = computed(() => !route.meta.hideFooter)
 <template>
   <div class="app-layout flex flex-col">
     <header class="layout-header flex items-center">
-      <AppLogo project-name="APBOA-NEXT" />
+      <AppLogo />
       <AppMenu />
       <UserSection />
     </header>

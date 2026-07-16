@@ -229,8 +229,8 @@ onMounted(() => {
 <template>
   <div class="sensitive-page">
     <section class="intro-section">
-      <h3 class="intro-title">敏感词管理</h3>
-      <p class="intro-desc text-secondary">
+      <h3 class="intro-title" tabindex="0" aria-describedby="sensitive-intro-desc">敏感词管理</h3>
+      <p id="sensitive-intro-desc" class="intro-desc text-secondary">
         敏感词管理模块是企业级智能体应用的核心安全组件，通过系统化的关键词规则配置与实时内容扫描，在智能体交互全流程中构建多层次的内容安全防线。该机制既保障用户交互体验的流畅性，又确保所有输入输出内容符合法律法规、平台政策及企业价值观要求
       </p>
     </section>

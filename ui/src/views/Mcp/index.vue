@@ -308,8 +308,8 @@ onActivated(() => {
 <template>
   <div class="mcp-page">
     <section class="intro-section">
-      <h3 class="intro-title">MCP 管理</h3>
-      <p class="intro-desc text-secondary">
+      <h3 class="intro-title" tabindex="0" aria-describedby="mcp-intro-desc">MCP 管理</h3>
+      <p id="mcp-intro-desc" class="intro-desc text-secondary">
         启用决定这个 MCP 是否允许参与系统；连接用于校验连通性并加载工具目录；刷新工具只在当前配置基础上重新获取工具目录。
       </p>
     </section>

@@ -77,6 +77,13 @@ $small-mobile-breakpoint: 375px;
       gap: var(--spacing-xs);
     }
 
+    .chat-sidebar-logo {
+      width: 28px;
+      height: 28px;
+      object-fit: cover;
+      object-position: left center;
+    }
+
     .chat-sidebar-name {
       display: none;
     }
@@ -151,13 +158,15 @@ $small-mobile-breakpoint: 375px;
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+  flex: 1;
   min-width: 0;
 }
 
 .chat-sidebar-logo {
-  width: 28px;
+  width: 108px;
   height: 28px;
   flex-shrink: 0;
+  object-fit: contain;
 }
 
 .chat-sidebar-name {

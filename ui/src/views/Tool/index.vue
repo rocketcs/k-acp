@@ -261,8 +261,8 @@ onMounted(() => {
 <template>
   <div class="tool-page">
     <section class="intro-section">
-      <h3 class="intro-title">工具管理</h3>
-      <p class="intro-desc text-secondary">
+      <h3 class="intro-title" tabindex="0" aria-describedby="tool-intro-desc">工具管理</h3>
+      <p id="tool-intro-desc" class="intro-desc text-secondary">
         工具管理模块是智能体能力的“执行层扩展中枢”，通过将内部系统能力、外部API服务、自定义业务逻辑封装为标准化工具，赋予智能体感知环境、执行操作、处理复杂任务的能力。精心设计的工具生态能让智能体从“对话助手”升级为“行动伙伴”。
       </p>
     </section>

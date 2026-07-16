@@ -1,0 +1,40 @@
+services:
+  apboa-mysql:
+    container_name: k-acp-mysql
+
+  apboa-redis:
+    container_name: k-acp-redis
+
+  apboa-pgvector:
+    container_name: k-acp-pgvector
+
+  apboa-console:
+    container_name: k-acp-console
+    ports:
+      - "23060:3060"
+
+  apboa-runtime:
+    container_name: k-acp-runtime
+    ports:
+      - "23061:3061"
+
+  apboa-proxy:
+    container_name: k-acp-proxy
+    ports:
+      - "23062:3062"
+
+  apboa-websocket:
+    container_name: k-acp-websocket
+    environment:
+      APBOA_NODE_ID: k-acp-local-websocket
+      APBOA_HOST_NAME: k-acp-local-websocket
+      APBOA_HOST_IP: host.docker.internal
+    ports: !override
+      - "23064:3064"
+
+  apboa-frontend:
+    container_name: k-acp-frontend
+
+networks:
+  apboa_simple:
+    name: k-acp-local

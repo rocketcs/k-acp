@@ -109,7 +109,7 @@ const goToLogin = () => {
 
 <template>
   <AuthContainer :show-back="true" back-to="/login">
-    <div class="auth-title">欢迎使用 Apboa Next 智能体平台</div>
+    <div class="auth-title">欢迎使用金智维智能体平台</div>
     <AForm
       ref="formRef"
       :model="formState"

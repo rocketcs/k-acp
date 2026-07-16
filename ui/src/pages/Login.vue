@@ -282,7 +282,7 @@ const goToForgotPassword = () => {
 
       <!-- 登录表单 -->
       <div v-else key="login" class="view-wrapper">
-        <div class="auth-title">欢迎使用 Apboa Next 智能体平台</div>
+        <div class="auth-title">欢迎使用金智维智能体平台</div>
         <AForm
           ref="formRef"
           :model="formState"

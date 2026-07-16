@@ -12,16 +12,40 @@
     margin-bottom: var(--spacing-lg);
 
     .intro-title {
+      display: inline-block;
       font-size: var(--font-size-2xl);
       font-weight: 600;
       color: var(--color-text-primary);
-      margin-bottom: var(--spacing-sm);
+      margin-bottom: 0;
+      cursor: help;
     }
 
     .intro-desc {
       font-size: var(--font-size-base);
       line-height: 1.6;
       max-width: 900px;
+      max-height: 0;
+      margin: 0;
+      overflow: hidden;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-4px);
+      transition:
+        max-height 0.25s ease,
+        margin-top 0.25s ease,
+        opacity 0.2s ease,
+        transform 0.25s ease,
+        visibility 0s linear 0.25s;
+    }
+
+    .intro-title:hover + .intro-desc,
+    .intro-title:focus-visible + .intro-desc {
+      max-height: 96px;
+      margin-top: var(--spacing-sm);
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+      transition-delay: 0s;
     }
   }
 
