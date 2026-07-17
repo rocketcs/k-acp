@@ -20,6 +20,7 @@ RUNNING_APPS=()
 APPS_STOPPED=false
 WORKDIR_CREATED=false
 BUILD_OVERRIDE=""
+BUILD_BUILDER="${KACP_BUILDX_BUILDER:-${BUILDX_BUILDER:-}}"
 
 usage() {
   cat <<'USAGE'
@@ -134,6 +135,7 @@ dry_run_summary() {
   printf '  输出根目录：%s\n' "$OUTPUT_ROOT"
   printf '  最终压缩包：%s\n' "$ARCHIVE_PATH"
   printf '  构建镜像：%s\n' "$([[ "$SKIP_BUILD" == true ]] && printf '跳过' || printf '执行')"
+  printf '  Buildx builder：%s\n' "${BUILD_BUILDER:-default}"
   printf '  容器检查通过：8/8\n'
   printf 'dry-run 完成，未停止容器，未创建发布物。\n'
 }
@@ -148,6 +150,18 @@ container_is_running() {
   [[ "$state" == "true" || "$state" == "running" ]]
 }
 
+select_buildx_builder() {
+  if [[ -n "$BUILD_BUILDER" ]]; then
+    docker buildx inspect "$BUILD_BUILDER" >/dev/null 2>&1 \
+      || die "指定的 Buildx builder 不可用：$BUILD_BUILDER"
+    return
+  fi
+
+  if docker buildx inspect apboa-next-dns >/dev/null 2>&1; then
+    BUILD_BUILDER=apboa-next-dns
+  fi
+}
+
 preflight() {
   local path container
   for path in "$ENV_FILE" "$COMPOSE_BASE" "$COMPOSE_LOCAL"; do
@@ -160,6 +174,7 @@ preflight() {
   docker info >/dev/null 2>&1 || die "当前用户无法访问 Docker daemon"
   docker compose version >/dev/null 2>&1 || die "需要 Docker Compose v2"
   docker buildx version >/dev/null 2>&1 || die "需要 Docker Buildx"
+  select_buildx_builder
 
   for container in "${DB_CONTAINERS[@]}"; do
     container_is_running "$container" || die "数据库容器未运行：$container"
@@ -296,14 +311,25 @@ build_amd64_images() {
   fi
 
   printf '构建五个 linux/amd64 应用镜像...\n'
+  printf '使用 Buildx builder：%s\n' "${BUILD_BUILDER:-default}"
   write_build_override
-  DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose \
-    --env-file "$ENV_FILE" \
-    -p k-acp-amd64-build \
-    -f "$COMPOSE_BASE" \
-    -f "$COMPOSE_LOCAL" \
-    -f "$BUILD_OVERRIDE" \
-    build "${services[@]}"
+  if [[ -n "$BUILD_BUILDER" ]]; then
+    BUILDX_BUILDER="$BUILD_BUILDER" DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose \
+      --env-file "$ENV_FILE" \
+      -p k-acp-amd64-build \
+      -f "$COMPOSE_BASE" \
+      -f "$COMPOSE_LOCAL" \
+      -f "$BUILD_OVERRIDE" \
+      build "${services[@]}"
+  else
+    DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose \
+      --env-file "$ENV_FILE" \
+      -p k-acp-amd64-build \
+      -f "$COMPOSE_BASE" \
+      -f "$COMPOSE_LOCAL" \
+      -f "$BUILD_OVERRIDE" \
+      build "${services[@]}"
+  fi
 }
 
 validate_images() {

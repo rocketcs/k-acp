@@ -131,7 +131,7 @@ test_failure_restores_running_apps() {
   cat > "$fake_bin/docker" <<'FAKE_DOCKER'
 #!/usr/bin/env bash
 set -eu
-printf '%s\n' "$*" >> "$FAKE_DOCKER_LOG"
+printf 'builder=%s args=%s\n' "${BUILDX_BUILDER:-}" "$*" >> "$FAKE_DOCKER_LOG"
 case "${1:-} ${2:-}" in
   "info "|"buildx version"|"compose version") exit 0 ;;
   "inspect --format") printf 'running\n'; exit 0 ;;
@@ -150,7 +150,7 @@ FAKE_DOCKER
     "stop k-acp-console k-acp-runtime k-acp-proxy k-acp-websocket k-acp-frontend"
   assert_file_contains "失败后恢复 K-ACP 应用" "$docker_log" \
     "start k-acp-console k-acp-runtime k-acp-proxy k-acp-websocket k-acp-frontend"
-  assert_file_not_contains "不操作 apboa-next" "$docker_log" "apboa-next"
+  assert_file_not_contains "不停止 apboa-next 容器" "$docker_log" "args=stop apboa-next"
   assert_path_missing "失败后清理自有发布目录" "$output_root/k-acp-x86_64-restore-test"
 }
 
@@ -197,7 +197,7 @@ test_generates_complete_release_tree() {
   cat > "$fake_bin/docker" <<'FAKE_RELEASE_DOCKER'
 #!/usr/bin/env bash
 set -eu
-printf '%s\n' "$*" >> "$FAKE_DOCKER_LOG"
+printf 'builder=%s args=%s\n' "${BUILDX_BUILDER:-}" "$*" >> "$FAKE_DOCKER_LOG"
 case "${1:-} ${2:-}" in
   "info "|"buildx version"|"compose version") exit 0 ;;
   "inspect --format") printf 'running\n'; exit 0 ;;
@@ -247,8 +247,9 @@ FAKE_RELEASE_DOCKER
     --host-ip 10.0.0.8 \
     --tag structure-test \
     --output-dir "$output_root" \
-    --skip-build \
     --keep-workdir
+  assert_file_contains "构建使用专用 DNS/代理 builder" "$docker_log" \
+    "builder=apboa-next-dns args=compose"
   assert_path_exists "生成 compose.yml" "$release_dir/compose.yml"
   assert_path_exists "生成安装脚本" "$release_dir/scripts/install.sh"
   assert_path_exists "生成内部校验和" "$release_dir/checksums.sha256"

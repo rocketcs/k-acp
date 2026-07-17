@@ -274,6 +274,9 @@ docker/
 # 已经存在同标签的 linux/amd64 镜像时跳过构建
 ./docker/package-x86.sh --tag 20260717 --skip-build
 
+# 手工指定 Buildx builder；默认会优先使用 apboa-next-dns
+KACP_BUILDX_BUILDER=apboa-next-dns ./docker/package-x86.sh --tag 20260717
+
 # 保留压缩前的发布目录，便于检查
 ./docker/package-x86.sh --keep-workdir
 ```
