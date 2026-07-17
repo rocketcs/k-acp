@@ -246,8 +246,42 @@ docker/
 ├── start-console.sh            # 控制台节点管理脚本
 ├── start-execute.sh            # 执行节点管理脚本
 ├── start-middleware.sh         # 中间件管理脚本
+├── package-x86.sh              # 当前环境一键生成 Ubuntu x86_64 发布包
+├── tests/package-x86-test.sh   # 打包脚本自动化测试
 ├── .env.simple                 # 单机环境变量
 ├── .env.console                # 控制台环境变量
 ├── .env.execute                # 执行节点环境变量
 └── .env.middleware             # 中间件环境变量
+```
+
+## 生成 x86_64 服务器发布包
+
+默认目标地址为 `192.168.8.81`，发布物生成在仓库同级的 `releases/`，不会写入 Git 仓库：
+
+```bash
+./docker/package-x86.sh
+```
+
+常用方式：
+
+```bash
+# 先检查参数、容器和输出路径，不修改任何状态
+./docker/package-x86.sh --dry-run
+
+# 指定目标服务器和发布标签
+./docker/package-x86.sh --host-ip 192.168.8.81 --tag 20260717
+
+# 已经存在同标签的 linux/amd64 镜像时跳过构建
+./docker/package-x86.sh --tag 20260717 --skip-build
+
+# 保留压缩前的发布目录，便于检查
+./docker/package-x86.sh --keep-workdir
+```
+
+脚本会短暂停止当前 `k-acp-local` 的五个应用容器，备份 MySQL、pgvector、Redis 和 `.apboa` 后立即恢复；数据库容器不会停止。构建或打包失败时也会自动恢复原本运行的应用服务。脚本不会操作 `apboa-next` 等其他 Docker 项目。
+
+运行自动化测试：
+
+```bash
+bash docker/tests/package-x86-test.sh
 ```
