@@ -767,6 +767,17 @@ $small-mobile-breakpoint: 375px;
   }
 }
 
+.chat-welcome.has-diy-form {
+  justify-content: flex-start;
+  padding-top: 64px;
+  padding-bottom: 48px;
+
+  @media (max-width: $mobile-breakpoint) {
+    padding-top: var(--spacing-lg);
+    padding-bottom: var(--spacing-lg);
+  }
+}
+
 .chat-welcome-title {
   font-size: var(--font-size-2xl);
   font-weight: 600;

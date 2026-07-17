@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import ChatInput from './ChatInput.vue'
-import { computed } from "vue";
+import { computed, ref } from 'vue'
+import DiyWelcome from './DiyWelcome.vue'
+import type { DiyOutputFormat, DiyPageConfig } from '@/types'
 
 const props = defineProps<{
   messageSize: number
@@ -20,6 +22,7 @@ const props = defineProps<{
   sessionId?: string | null
   mentionAllowed?: boolean
   hasCodeExecutionConfig?: boolean
+  diyConfig?: DiyPageConfig | null
 }>()
 
 const needInit = computed(() => {
@@ -34,19 +37,32 @@ defineEmits<{
   (e: 'plan', value: boolean): void
   (e: 'toolProcess', value: boolean): void
   (e: 'newSession'): void
+  (e: 'quickSend', payload: { text: string; outputFormat: DiyOutputFormat }): void
 }>()
+
+const diyFormActive = ref(false)
+const resolvedHeadline = computed(() => props.diyConfig?.headline || props.headline)
+const resolvedDescription = computed(() => props.diyConfig?.description || props.description)
 </script>
 
 <template>
-  <div class="chat-welcome">
-    <h2 class="chat-welcome-title" :title="headline">{{ headline }}</h2>
-    <p v-if="description" class="chat-welcome-desc" :title="description">{{ description }}</p>
-    <div class="chat-input-outer chat-welcome-input">
+  <div class="chat-welcome" :class="{ 'has-diy-form': diyFormActive }">
+    <h2 class="chat-welcome-title" :title="resolvedHeadline">{{ resolvedHeadline }}</h2>
+    <p v-if="resolvedDescription" class="chat-welcome-desc" :title="resolvedDescription">{{ resolvedDescription }}</p>
+    <DiyWelcome
+      v-if="diyConfig"
+      :config="diyConfig"
+      :is-running="isRunning"
+      @confirm="$emit('quickSend', $event)"
+      @form-active="diyFormActive = $event"
+    />
+    <div v-if="!diyFormActive" class="chat-input-outer chat-welcome-input">
       <ChatInput
         :model-value="inputValue"
         :agent-id="agentId"
         :uploaded-files="uploadedFiles"
         :isRunning="isRunning"
+        :placeholder="diyConfig?.inputPlaceholder"
         :memory-active="memoryActive"
         :plan-active="planActive"
         :enable-memory="enableMemory"

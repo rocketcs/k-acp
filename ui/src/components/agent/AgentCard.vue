@@ -14,6 +14,7 @@ import {
   createEnableItem,
   createDeleteItem,
   createGoVisitItem,
+  createDiyItem,
   createDivider,
 } from '@/composables/useCardMenuItems'
 
@@ -35,6 +36,7 @@ const emit = defineEmits<{
   delete: [id: string]
   enable: [id: string]
   goVisit: [id: string]
+  diy: [id: string]
 }>()
 
 /**
@@ -67,6 +69,7 @@ const menuItems = computed(() => {
   return [
     createViewItem(),
     createConfigPanelItem(),
+    createDiyItem(),
     createEnableItem(props.data.enabled),
     createDivider(),
     createGoVisitItem(),
@@ -107,6 +110,9 @@ function handleMenuClick({ key }: { key: string }) {
       break
     case 'goVisit':
       emit('goVisit', id)
+      break
+    case 'diy':
+      emit('diy', id)
       break
   }
 }

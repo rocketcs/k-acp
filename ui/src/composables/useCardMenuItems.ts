@@ -13,6 +13,7 @@ import {
   DeleteOutlined,
   EditOutlined,
   EyeOutlined,
+  FormOutlined,
   HistoryOutlined,
   MessageOutlined,
   PlayCircleOutlined,
@@ -67,6 +68,13 @@ export function createDeleteItem(): CardMenuItem {
  */
 export function createGoVisitItem(): CardMenuItem {
   return { key: 'goVisit', label: '对话', icon: () => h(MessageOutlined) }
+}
+
+/**
+ * 创建「DIY 页面」菜单项
+ */
+export function createDiyItem(): CardMenuItem {
+  return { key: 'diy', label: 'DIY 页面', icon: () => h(FormOutlined) }
 }
 
 /**

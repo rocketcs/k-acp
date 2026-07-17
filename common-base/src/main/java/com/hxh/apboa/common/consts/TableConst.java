@@ -40,6 +40,7 @@ public class TableConst {
     public static final String AGENT_STUDIO = "agent_studio";
     public static final String STUDIO_CONFIG = "studio_config";
     public static final String AGENT = "agent_definition";
+    public static final String AGENT_DIY_PAGE_CONFIG = "agent_diy_page_config";
     public static final String AGENT_A2A = "agent_a2a";
     public static final String ACCOUNT = "account";
     public static final String SECRET_KEY = "secret_key";
