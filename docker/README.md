@@ -288,3 +288,22 @@ KACP_BUILDX_BUILDER=apboa-next-dns ./docker/package-x86.sh --tag 20260717
 ```bash
 bash docker/tests/package-x86-test.sh
 ```
+
+### 保留服务器数据升级
+
+服务器已经安装过 K-ACP，并且需要保留现有数据库和 `.env` 时，使用 `upgrade-x86.sh`，不要再次运行发布包中的 `install.sh`：
+
+```bash
+chmod +x upgrade-x86.sh
+./upgrade-x86.sh \
+  --package /tmp/k-acp-x86_64-202607173.tar.gz \
+  --install-dir /opt/k-acp
+```
+
+升级脚本只执行以下操作：校验发布包、导入五个应用镜像、备份旧 `compose.yml`、替换五个应用镜像标签并重建应用容器。它不会覆盖 `.env`、`data/`、MySQL、Redis、pgvector 或 `.apboa`。如果新应用启动失败，脚本会自动恢复旧 Compose 和旧应用镜像。
+
+运行升级脚本测试：
+
+```bash
+bash docker/tests/upgrade-x86-test.sh
+```
