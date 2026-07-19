@@ -45,6 +45,7 @@ build/
 .omc
 .omx
 .codex_tmp
+.worktrees/
 logs
 .m2
 
