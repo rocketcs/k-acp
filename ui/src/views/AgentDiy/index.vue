@@ -22,6 +22,30 @@ const loading = ref(false)
 const saving = ref(false)
 const publishing = ref(false)
 const publishedAt = ref<string | null>(null)
+const emojiPickerOpenId = ref<string | null>(null)
+
+const BUSINESS_EMOJI_OPTIONS = [
+  { emoji: '📊', label: '数据分析' },
+  { emoji: '📈', label: '趋势分析' },
+  { emoji: '💰', label: '销售业绩' },
+  { emoji: '📄', label: '合同管理' },
+  { emoji: '🤝', label: '客户管理' },
+  { emoji: '📁', label: '项目管理' },
+  { emoji: '📝', label: '售前支持' },
+  { emoji: '🧪', label: 'POC 验证' },
+  { emoji: '🎫', label: '工单处理' },
+  { emoji: '🧑‍💼', label: '人员分析' },
+  { emoji: '🏢', label: '部门分析' },
+  { emoji: '🕒', label: '报工统计' },
+  { emoji: '✈️', label: '出差管理' },
+  { emoji: '🧾', label: '报销管理' },
+  { emoji: '📦', label: '产品分析' },
+  { emoji: '🎯', label: '目标与 KPI' },
+  { emoji: '🏆', label: '排名对比' },
+  { emoji: '🔍', label: '明细查询' },
+  { emoji: '⚠️', label: '异常排查' },
+  { emoji: '🔗', label: '全链路分析' },
+] as const
 
 const createDefaultConfig = (): DiyPageConfig => ({
   headline: '有什么我能帮你的吗？',
@@ -36,12 +60,21 @@ function newId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+function chooseEmoji(question: DiyQuestionCard, emoji: string) {
+  question.icon = emoji
+  emojiPickerOpenId.value = null
+}
+
+function emojiLabel(emoji?: string) {
+  return BUSINESS_EMOJI_OPTIONS.find((item) => item.emoji === emoji)?.label || (emoji ? '自定义图标' : '选择业务图标')
+}
+
 function createQuestion(): DiyQuestionCard {
   return {
     id: newId(),
     title: '新快捷问题',
     description: '填写问题说明',
-    icon: '✦',
+    icon: '📊',
     template: '请查询 {{查询内容}}，时间范围为 {{时间范围}}，并以 {{输出格式}} 输出。',
     enabled: true,
     placeholders: [],
@@ -247,7 +280,43 @@ onMounted(load)
             <AForm layout="vertical">
               <div class="two-columns">
                 <AFormItem label="卡片标题" required><AInput v-model:value="question.title" /></AFormItem>
-                <AFormItem label="图标"><AInput v-model:value="question.icon" placeholder="例如：✦" /></AFormItem>
+                <AFormItem label="业务图标">
+                  <div class="emoji-picker-field">
+                    <APopover
+                      :open="emojiPickerOpenId === question.id"
+                      placement="bottomLeft"
+                      trigger="click"
+                      @update:open="(open: boolean) => { emojiPickerOpenId = open ? question.id : null }"
+                    >
+                      <template #content>
+                        <div class="emoji-picker">
+                          <button
+                            v-for="item in BUSINESS_EMOJI_OPTIONS"
+                            :key="item.emoji"
+                            type="button"
+                            class="emoji-option"
+                            :class="{ active: question.icon === item.emoji }"
+                            :title="item.label"
+                            @click="chooseEmoji(question, item.emoji)"
+                          >
+                            <span class="emoji-option-symbol">{{ item.emoji }}</span>
+                            <span class="emoji-option-label">{{ item.label }}</span>
+                          </button>
+                        </div>
+                      </template>
+                      <AButton class="emoji-picker-trigger">
+                        <span class="emoji-picker-current">{{ question.icon || '✦' }}</span>
+                        <span>{{ emojiLabel(question.icon) }}</span>
+                      </AButton>
+                    </APopover>
+                    <AButton
+                      v-if="question.icon"
+                      type="text"
+                      size="small"
+                      @click="question.icon = ''"
+                    >清除</AButton>
+                  </div>
+                </AFormItem>
               </div>
               <AFormItem label="卡片说明"><AInput v-model:value="question.description" /></AFormItem>
               <AFormItem label="问题模板" required>
@@ -310,4 +379,78 @@ onMounted(load)
 
 <style scoped lang="scss">
 @use '@/styles/agent-diy/index.scss' as *;
+
+.emoji-picker-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.emoji-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 142px;
+  height: 36px;
+  padding: 4px 10px;
+  border-color: #dfe4ea;
+  border-radius: 9px;
+  color: var(--color-text-regular);
+  text-align: left;
+}
+
+.emoji-picker-current {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.emoji-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 88px);
+  gap: 6px;
+  max-width: 390px;
+}
+
+.emoji-option {
+  display: flex;
+  min-height: 58px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 4px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--color-text-regular);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+
+  &:hover,
+  &.active {
+    border-color: #8bbcff;
+    background: #eef5ff;
+  }
+}
+
+.emoji-option-symbol {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.emoji-option-label {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 11px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .emoji-picker {
+    grid-template-columns: repeat(3, 82px);
+    max-width: 280px;
+  }
+}
 </style>

@@ -714,6 +714,10 @@ echo "部署验证通过：$public_url"
 VERIFY_EOF
 }
 
+write_upgrade_script() {
+  cp "$SCRIPT_DIR/upgrade-x86.sh" "$RELEASE_DIR/upgrade-k-acp-x86.sh"
+}
+
 write_readme() {
   cat > "$RELEASE_DIR/README.md" <<README_EOF
 # K-ACP x86_64 发布包
@@ -729,6 +733,16 @@ tar -xzf $RELEASE_NAME.tar.gz
 cd $RELEASE_NAME
 chmod 600 .env
 sudo ./scripts/install.sh
+```
+
+## 保留数据升级
+
+已有旧版本部署目录需要保留数据库和配置时，请在旧部署目录中解压，然后进入新目录执行升级脚本：
+
+```bash
+tar -xzf $RELEASE_NAME.tar.gz
+cd $RELEASE_NAME
+sudo ./upgrade-k-acp-x86.sh
 \`\`\`
 
 服务器防火墙需要允许 TCP 23080：\`sudo ufw allow 23080/tcp\`。
@@ -770,6 +784,7 @@ sha256_line() {
 write_checksums() {
   local files=(
     .env compose.yml README.md SOURCE_MANIFEST.md
+    upgrade-k-acp-x86.sh
     scripts/install.sh scripts/restore.sh scripts/verify.sh
     backups/mysql.sql.gz backups/pgvector.dump backups/redis.rdb backups/apboa-data.tar.gz
     images/k-acp-app-images.tar.gz
@@ -801,9 +816,10 @@ write_release_files() {
   write_install_script
   write_restore_script
   write_verify_script
+  write_upgrade_script
   write_readme
   write_source_manifest
-  chmod 755 "$RELEASE_DIR/scripts/"*.sh
+  chmod 755 "$RELEASE_DIR/scripts/"*.sh "$RELEASE_DIR/upgrade-k-acp-x86.sh"
   remove_build_override
   remove_macos_metadata
   write_checksums
@@ -812,7 +828,8 @@ write_release_files() {
 validate_release_tree() {
   local forbidden
   remove_macos_metadata
-  bash -n "$RELEASE_DIR/scripts/install.sh" "$RELEASE_DIR/scripts/restore.sh" "$RELEASE_DIR/scripts/verify.sh"
+  bash -n "$RELEASE_DIR/scripts/install.sh" "$RELEASE_DIR/scripts/restore.sh" "$RELEASE_DIR/scripts/verify.sh" \
+    "$RELEASE_DIR/upgrade-k-acp-x86.sh"
   docker compose --env-file "$RELEASE_DIR/.env" -f "$RELEASE_DIR/compose.yml" config --quiet
   verify_checksums
   gzip -t "$RELEASE_DIR/images/k-acp-app-images.tar.gz"

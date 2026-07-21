@@ -2,9 +2,11 @@
 set -Eeuo pipefail
 
 PACKAGE=""
-INSTALL_DIR="$(pwd)"
+INSTALL_DIR=""
+NEW_DIR=""
 FRONTEND_URL="http://127.0.0.1:23080/web"
 TEMP_DIR=""
+SOURCE_IS_TEMP=false
 BACKUP_COMPOSE=""
 UPGRADE_APPLIED=false
 COMPLETED=false
@@ -14,17 +16,24 @@ IMAGE_NAMES=(console runtime proxy websocket frontend)
 
 usage() {
   cat <<'USAGE'
-用法：./upgrade-x86.sh --package <发布包.tar.gz> --install-dir <旧部署目录> [选项]
+用法一（推荐）：
+  cd <旧部署目录>
+  tar -xzf k-acp-x86_64-*.tar.gz
+  cd k-acp-x86_64-*
+  ./upgrade-k-acp-x86.sh
+
+用法二（兼容）：
+  ./upgrade-x86.sh --package <发布包.tar.gz> --install-dir <旧部署目录> [选项]
 
 保留服务器现有 MySQL、Redis、pgvector、.apboa 和 .env，只更新五个应用镜像。
 
 参数：
-  --package <文件>       新的 k-acp-x86_64-*.tar.gz（必填）
-  --install-dir <目录>   旧版本部署目录（默认：当前目录）
+  --package <文件>       新的 k-acp-x86_64-*.tar.gz（不传时使用当前解压目录）
+  --install-dir <目录>   旧版本部署目录（不传时为当前解压目录的上一级）
   --frontend-url <URL>   更新后健康检查地址（默认：http://127.0.0.1:23080/web）
   -h, --help             显示帮助
 
-示例：
+兼容示例：
   ./upgrade-x86.sh \
     --package /tmp/k-acp-x86_64-202607173.tar.gz \
     --install-dir /opt/k-acp
@@ -79,16 +88,34 @@ select_docker() {
 }
 
 validate_inputs() {
-  [[ -n "$PACKAGE" ]] || die "必须指定 --package"
-  [[ -f "$PACKAGE" ]] || die "发布包不存在：$PACKAGE"
+  if [[ -n "$PACKAGE" ]]; then
+    [[ -f "$PACKAGE" ]] || die "发布包不存在：$PACKAGE"
+    PACKAGE="$(cd "$(dirname "$PACKAGE")" && pwd)/$(basename "$PACKAGE")"
+    gzip -t "$PACKAGE"
+    [[ -n "$INSTALL_DIR" ]] || INSTALL_DIR="$(pwd)"
+  else
+    NEW_DIR="$(pwd)"
+    [[ -n "$INSTALL_DIR" ]] || INSTALL_DIR="$(cd .. && pwd)"
+  fi
+
   [[ -d "$INSTALL_DIR" ]] || die "旧部署目录不存在：$INSTALL_DIR"
   INSTALL_DIR="$(cd "$INSTALL_DIR" && pwd)"
-  PACKAGE="$(cd "$(dirname "$PACKAGE")" && pwd)/$(basename "$PACKAGE")"
 
   [[ -f "$INSTALL_DIR/compose.yml" ]] || die "旧部署目录缺少 compose.yml"
   [[ -f "$INSTALL_DIR/.env" ]] || die "旧部署目录缺少 .env"
   [[ -d "$INSTALL_DIR/data" ]] || die "旧部署目录缺少 data/，拒绝升级"
-  gzip -t "$PACKAGE"
+
+  if [[ -z "$PACKAGE" ]]; then
+    [[ "$NEW_DIR" != "$INSTALL_DIR" ]] || die "新发布目录不能与旧部署目录相同"
+    validate_release_dir
+  fi
+}
+
+validate_release_dir() {
+  [[ -f "$NEW_DIR/compose.yml" ]] || die "新发布目录缺少 compose.yml：$NEW_DIR"
+  [[ -f "$NEW_DIR/checksums.sha256" ]] || die "新发布目录缺少 checksums.sha256：$NEW_DIR"
+  [[ -f "$NEW_DIR/images/k-acp-app-images.tar.gz" ]] || die "新发布目录缺少应用镜像归档"
+  (cd "$NEW_DIR" && sha256sum -c checksums.sha256)
 }
 
 safe_extract_package() {
@@ -104,13 +131,10 @@ safe_extract_package() {
   top_dir="$(printf '%s\n' "$listing" | awk -F/ 'NF {print $1; exit}')"
 
   TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/k-acp-upgrade.XXXXXX")"
+  SOURCE_IS_TEMP=true
   tar -xzf "$PACKAGE" -C "$TEMP_DIR"
   NEW_DIR="$TEMP_DIR/$top_dir"
-  [[ -f "$NEW_DIR/compose.yml" ]] || die "新发布包缺少 compose.yml"
-  [[ -f "$NEW_DIR/checksums.sha256" ]] || die "新发布包缺少 checksums.sha256"
-  [[ -f "$NEW_DIR/images/k-acp-app-images.tar.gz" ]] || die "新发布包缺少应用镜像归档"
-
-  (cd "$NEW_DIR" && sha256sum -c checksums.sha256)
+  validate_release_dir
 }
 
 extract_new_image_ref() {
@@ -155,7 +179,9 @@ rollback() {
     "${DOCKER[@]}" compose --env-file "$INSTALL_DIR/.env" -f "$INSTALL_DIR/compose.yml" \
       up -d --no-deps "${APP_SERVICES[@]}" >/dev/null 2>&1 || true
   fi
-  [[ -z "$TEMP_DIR" || ! -d "$TEMP_DIR" ]] || rm -rf "$TEMP_DIR"
+  if [[ "$SOURCE_IS_TEMP" == true && -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
+    rm -rf "$TEMP_DIR"
+  fi
   [[ -z "${CANDIDATE_COMPOSE:-}" || ! -f "$CANDIDATE_COMPOSE" ]] || rm -f "$CANDIDATE_COMPOSE"
   exit "$exit_code"
 }
@@ -206,7 +232,9 @@ main() {
   trap rollback EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
-  safe_extract_package
+  if [[ -n "$PACKAGE" ]]; then
+    safe_extract_package
+  fi
   perform_upgrade
 }
 

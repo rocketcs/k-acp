@@ -252,6 +252,7 @@ FAKE_RELEASE_DOCKER
     "builder=apboa-next-dns args=compose"
   assert_path_exists "生成 compose.yml" "$release_dir/compose.yml"
   assert_path_exists "生成安装脚本" "$release_dir/scripts/install.sh"
+  assert_path_exists "生成相对路径升级脚本" "$release_dir/upgrade-k-acp-x86.sh"
   assert_path_exists "生成内部校验和" "$release_dir/checksums.sha256"
   assert_path_exists "生成最终压缩包" "$archive"
 
@@ -275,6 +276,11 @@ FAKE_RELEASE_DOCKER
     listing=""
   fi
   OUTPUT="$listing"
+  if [[ "$listing" == *"/upgrade-k-acp-x86.sh"* ]]; then
+    pass "压缩包包含相对路径升级脚本"
+  else
+    fail "压缩包缺少相对路径升级脚本"
+  fi
   if [[ ! "$listing" =~ \.DS_Store|/target/|/dist/|graphify-out|build-amd64 ]]; then
     pass "压缩包不包含禁入文件"
   else

@@ -6,9 +6,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { EllipsisOutlined, ClockCircleOutlined } from '@ant-design/icons-vue'
-import agentAvatar from '@/assets/avatar/agent.png'
 import type { AgentDefinitionVO } from '@/types'
 import { useAccountStore } from '@/stores'
+import { resolveAgentAvatar } from '@/utils/agentAvatar'
 import {
   createViewItem,
   createConfigPanelItem,
@@ -124,7 +124,11 @@ function handleMenuClick({ key }: { key: string }) {
     <div class="card-header flex items-center gap-sm">
       <div class="card-avatar-wrapper">
         <div class="card-avatar flex-center" :class="{ disabled: !data.enabled }">
-          <img :src="agentAvatar" alt="agent" />
+          <img
+            :src="resolveAgentAvatar(data.avatar)"
+            :alt="`${data.name}头像`"
+            class="agent-avatar-image"
+          />
         </div>
         <span
           v-if="data?.jobInfo"
@@ -198,11 +202,12 @@ function handleMenuClick({ key }: { key: string }) {
       background-color: #e8eaf6;
       border-radius: var(--border-radius-xl);
       flex-shrink: 0;
+      overflow: hidden;
 
-      img {
-        width: 28px;
-        height: 28px;
-        object-fit: contain;
+      .agent-avatar-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
       }
     }
 
@@ -266,9 +271,9 @@ function handleMenuClick({ key }: { key: string }) {
     color: #757575 !important;
     background-color: #e7e7e7 !important;
 
-    img {
-      filter: grayscale(100%);
-      opacity: 0.5;
+    .agent-avatar-image {
+      filter: grayscale(1);
+      opacity: 0.72;
     }
   }
 }

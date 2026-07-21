@@ -14,6 +14,7 @@ import com.hxh.apboa.common.enums.AgentType;
 import com.hxh.apboa.common.enums.ModelType;
 import com.hxh.apboa.common.enums.workflow.WorkflowStatus;
 import com.hxh.apboa.common.util.BeanUtils;
+import com.hxh.apboa.common.util.AgentAvatarUtils;
 import com.hxh.apboa.common.util.JsonUtils;
 import com.hxh.apboa.common.vo.AgentDefinitionVO;
 import com.hxh.apboa.hook.service.AgentHookService;
@@ -75,6 +76,7 @@ public class AgentDefinitionServiceImpl extends ServiceImpl<AgentDefinitionMappe
         }
 
         AgentDefinitionVO vo = BeanUtils.copy(entity, AgentDefinitionVO.class);
+        vo.setAvatar(AgentAvatarUtils.avatarForAgentId(entity.getId()));
 
         vo.setHook(agentHookService.getHookIds(id));
         Long studioConfigId = agentStudioService.getStudioIdByAgentId(id);
@@ -111,6 +113,7 @@ public class AgentDefinitionServiceImpl extends ServiceImpl<AgentDefinitionMappe
         AgentDefinition agentDefinition = BeanUtils.copy(vo, AgentDefinition.class);
         save(agentDefinition);
         vo.setId(agentDefinition.getId());
+        vo.setAvatar(AgentAvatarUtils.avatarForAgentId(agentDefinition.getId()));
 
         saveSubItems(vo);
 

@@ -582,6 +582,7 @@ watch(isRunning, (running) => {
     <ChatSidebar
       :collapsed="sidebarCollapsed"
       :agent-name="agentDetail?.name"
+      :agent-avatar="agentDetail?.avatar"
       :pinned-sessions="pinnedSessions"
       :other-sessions="otherSessions"
       :current-session-id="currentSessionId"

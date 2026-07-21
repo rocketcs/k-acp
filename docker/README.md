@@ -291,11 +291,19 @@ bash docker/tests/package-x86-test.sh
 
 ### 保留服务器数据升级
 
-服务器已经安装过 K-ACP，并且需要保留现有数据库和 `.env` 时，使用 `upgrade-x86.sh`，不要再次运行发布包中的 `install.sh`：
+服务器已经安装过 K-ACP，并且需要保留现有数据库和 `.env` 时，不要再次运行发布包中的 `install.sh`。在旧部署目录解压，进入新发布目录后直接执行包内升级脚本：
 
 ```bash
-chmod +x upgrade-x86.sh
-./upgrade-x86.sh \
+cd /opt/k-acp
+tar -xzf /tmp/k-acp-x86_64-202607173.tar.gz
+cd k-acp-x86_64-202607173
+sudo ./upgrade-k-acp-x86.sh
+```
+
+脚本以当前目录作为新版本目录，自动以上一级目录作为旧部署目录。仓库脚本仍兼容显式参数：
+
+```bash
+./docker/upgrade-x86.sh \
   --package /tmp/k-acp-x86_64-202607173.tar.gz \
   --install-dir /opt/k-acp
 ```

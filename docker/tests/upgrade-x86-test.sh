@@ -144,6 +144,35 @@ test_upgrade_preserves_data() {
   assert_not_contains "不启动 pgvector 服务" "$docker_log" "apboa-pgvector"
 }
 
+test_upgrade_from_extracted_current_directory() {
+  local case_dir="$TMP_ROOT/relative" install_dir release_dir fake_bin docker_log
+  mkdir -p "$case_dir"
+  install_dir="$case_dir/install"
+  make_install_dir "$install_dir"
+  make_package "$install_dir" >/dev/null
+  release_dir="$install_dir/release-new"
+  fake_bin="$case_dir/bin"
+  docker_log="$case_dir/docker.log"
+  make_fake_docker "$fake_bin"
+
+  assert_success "解压目录内无参数升级成功" run_relative_upgrade \
+    "$release_dir" "$fake_bin" "$docker_log"
+  assert_contains "相对路径升级更新旧 Compose" "$install_dir/compose.yml" "k-acp-bundle/frontend:new-amd64"
+  assert_contains "相对路径升级保留数据库文件" "$install_dir/data/mysql/sentinel" "KEEP_DATABASE"
+  assert_contains "相对路径升级保留环境配置" "$install_dir/.env" "KEEP_ENV"
+  assert_not_contains "相对路径升级不启动数据库服务" "$docker_log" "apboa-mysql"
+  assert_not_contains "相对路径升级不启动 Redis 服务" "$docker_log" "apboa-redis"
+  assert_not_contains "相对路径升级不启动 pgvector 服务" "$docker_log" "apboa-pgvector"
+}
+
+run_relative_upgrade() {
+  local release_dir="$1" fake_bin="$2" docker_log="$3"
+  (
+    cd "$release_dir"
+    env PATH="$fake_bin:$PATH" FAKE_DOCKER_LOG="$docker_log" "$UPGRADER"
+  )
+}
+
 test_failure_rolls_back_compose() {
   local case_dir="$TMP_ROOT/rollback" install_dir package fake_bin docker_log
   mkdir -p "$case_dir"
@@ -164,6 +193,7 @@ main() {
   set -e
   test_help
   test_upgrade_preserves_data
+  test_upgrade_from_extracted_current_directory
   test_failure_rolls_back_compose
   printf '\n测试结果：%d 通过，%d 失败\n' "$PASS_COUNT" "$FAIL_COUNT"
   [[ $FAIL_COUNT -eq 0 ]]
