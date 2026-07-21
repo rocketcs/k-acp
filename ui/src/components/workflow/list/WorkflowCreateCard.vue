@@ -32,7 +32,6 @@ defineEmits<{
 
 .workflow-create-card:hover {
   border-color: var(--color-primary);
-  background: var(--color-bg-light);
   color: var(--color-primary);
 }
 

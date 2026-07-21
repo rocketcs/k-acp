@@ -244,7 +244,7 @@ onMounted(() => {
       <AInput
         v-model:value="keyword"
         placeholder="搜索敏感词配置名称"
-        style="width: 300px; border: rgba(14,14,14,0.1) solid 1px !important;"
+        style="width: 300px;"
         @pressEnter="handleSearch"
       >
         <template #suffix>

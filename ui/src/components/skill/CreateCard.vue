@@ -47,7 +47,6 @@ defineEmits<{
 
   &:hover {
     border-color: var(--color-primary);
-    background-color: var(--color-bg-light);
 
     .create-icon {
       color: var(--color-primary);

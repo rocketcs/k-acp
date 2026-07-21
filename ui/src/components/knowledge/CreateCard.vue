@@ -154,10 +154,11 @@ function handleCreate(kbType?: KbType) {
         border-radius: var(--border-radius-base);
         cursor: pointer;
         transition: background-color var(--transition-base);
-        background-color: var(--color-bg-light);
+        background-color: var(--color-bg-hover);
+
 
         &:hover {
-          background-color: var(--color-bg-hover);
+          background-color: var(--color-bg-light);
         }
 
         .type-label {

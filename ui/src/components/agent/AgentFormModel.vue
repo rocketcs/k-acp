@@ -307,7 +307,7 @@ defineExpose({
 </script>
 
 <template>
-  <ASpin :spinning="loading">
+  <ApboaSpin :spinning="loading">
     <AForm ref="formRef" :model="formData" :rules="rules" layout="vertical">
       <AFormItem label="模型配置" name="modelConfigId" required>
         <template v-if="providerOptions?.length > 0">
@@ -495,7 +495,7 @@ defineExpose({
         />
       </AFormItem>
     </AForm>
-  </ASpin>
+  </ApboaSpin>
 </template>
 
 <style scoped lang="scss">

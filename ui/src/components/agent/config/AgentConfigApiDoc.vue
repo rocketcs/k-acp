@@ -460,7 +460,7 @@ const workspaceEndpoints = [
       <div class="api-info-box success">
         <div style="margin-bottom: 8px; font-weight: 600;">外置对话入口</div>
         <div v-if="chatKeyLoading" style="padding: 12px 0;">
-          <ASpin size="small" />
+          <ApboaSpin size="small" />
           <span style="margin-left: 8px; color: var(--color-text-secondary);">加载中...</span>
         </div>
         <template v-else-if="externalChatUrl">

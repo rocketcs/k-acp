@@ -8,7 +8,7 @@
       <!-- 哎呀！<br>您访问的页面不存在。 -->
     </p>
     <div style="text-align: center;">
-      <a class="btn-back" href="/#/agent">返回</a>
+      <a class="btn-back" href="/#/dashboard">返回</a>
     </div>
     <img src="../assets/images/notfound/astronaut.svg" class="astronaut" alt="Astronaut">
     <img src="../assets/images/notfound/spaceship.svg" class="spaceship" alt="Spaceship">

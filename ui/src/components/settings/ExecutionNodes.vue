@@ -109,7 +109,7 @@ onUnmounted(() => {
           监控所有执行节点的运行状态，每个节点包含运行时、文件同步、Shell代理三个核心服务
         </div>
 
-        <ASpin :spinning="loading">
+        <ApboaSpin :spinning="loading">
           <div v-if="nodes.length === 0" class="empty-state">
             <AEmpty description="暂无执行节点，请确保 file/proxy/runtime 服务已启动并配置心跳上报" />
           </div>
@@ -193,7 +193,7 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-        </ASpin>
+        </ApboaSpin>
       </ATabPane>
 
       <!-- 消息服务 -->
@@ -203,7 +203,7 @@ onUnmounted(() => {
             监控所有消息服务运行状态，消息服务是实现 Websocket 通知的核心服务
           </div>
 
-          <ASpin :spinning="wsLoading">
+          <ApboaSpin :spinning="wsLoading">
             <div v-if="wsNodes.length === 0" class="empty-state">
               <AEmpty description="暂无消息服务节点" />
             </div>
@@ -247,7 +247,7 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-          </ASpin>
+          </ApboaSpin>
         </div>
       </ATabPane>
     </ATabs>

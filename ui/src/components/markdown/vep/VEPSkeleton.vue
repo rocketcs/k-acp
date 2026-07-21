@@ -135,7 +135,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  background: #f5f6f8;
+  background: #F5F6F8;
   border-radius: 8px;
   animation: vepFadeSlideIn 0.5s ease both;
 }
@@ -174,7 +174,7 @@
 .vep-skeleton-chart {
   height: 120px;
   padding: 12px;
-  background: #f5f6f8;
+  background: #F5F6F8;
   border-radius: 8px;
   animation: vepFadeSlideIn 0.5s ease both;
   animation-delay: 0.6s;

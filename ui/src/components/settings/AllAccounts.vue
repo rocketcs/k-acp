@@ -286,7 +286,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <ASpin :spinning="loading">
+    <ApboaSpin :spinning="loading">
       <div class="account-list">
         <div
           v-for="account in filteredAccounts"
@@ -350,7 +350,7 @@ onMounted(() => {
       </div>
 
       <AEmpty v-if="!loading && filteredAccounts.length === 0" description="暂无账户数据" />
-    </ASpin>
+    </ApboaSpin>
 
     <!-- 新增账户模态窗 -->
     <AModal

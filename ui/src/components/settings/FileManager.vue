@@ -106,7 +106,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <ASpin :spinning="loading">
+    <ApboaSpin :spinning="loading">
       <div class="file-list">
         <div
           v-for="item in dataList"
@@ -159,7 +159,7 @@ onMounted(() => {
           @change="load"
         />
       </div>
-    </ASpin>
+    </ApboaSpin>
   </div>
 </template>
 

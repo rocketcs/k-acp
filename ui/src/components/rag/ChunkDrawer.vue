@@ -154,7 +154,7 @@ function handleClose() {
     placement="right"
     @close="handleClose"
   >
-    <ASpin :spinning="loading">
+    <ApboaSpin :spinning="loading">
       <div v-if="chunks.length === 0 && !loading" class="doc-empty">
         <AEmpty  description="未找到匹配的检索结果"/>
       </div>
@@ -204,7 +204,7 @@ function handleClose() {
           </div>
         </div>
       </div>
-    </ASpin>
+    </ApboaSpin>
 
     <AModal
       v-model:open="editModalOpen"

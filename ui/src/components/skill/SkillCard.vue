@@ -5,7 +5,8 @@
  */
 <script setup lang="ts">
 import { ref, computed, defineComponent } from 'vue'
-import { EllipsisOutlined, AppstoreOutlined, PlusOutlined, ToolOutlined } from '@ant-design/icons-vue'
+import { EllipsisOutlined, PlusOutlined, ToolOutlined } from '@ant-design/icons-vue'
+import skillAvatar from '@/assets/avatar/skill.png'
 import { message } from 'ant-design-vue'
 import type { SkillPackageVO } from '@/types'
 import * as skillApi from '@/api/skill'
@@ -176,7 +177,7 @@ function handleMenuClick({ key }: { key: string }) {
     <div class="card-header flex items-center gap-sm">
       <ATooltip :title="data.tools && data.tools.length > 0 ? `已关联 ${data.tools.length} 个工具` : ''">
         <div class="card-avatar-wrapper">
-          <div class="card-avatar flex-center" :class="{ disabled: !data.enabled }"><AppstoreOutlined /></div>
+          <div class="card-avatar flex-center" :class="{ disabled: !data.enabled }"><img :src="skillAvatar" alt="skill" /></div>
           <span
             v-if="data.tools && data.tools.length > 0"
             class="avatar-corner-badge"
@@ -251,16 +252,16 @@ function handleMenuClick({ key }: { key: string }) {
 .skill-card {
   min-height: 180px;
   padding: var(--spacing-md);
-  background-color: var(--color-bg-white);
+  background-color: #FFFFFF;
   border-radius: var(--border-radius-lg);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid #ebebeb;
   transition: all var(--transition-base);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
 
   &:hover {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px -5px rgba(0, 0, 0, 0.3);
     transform: translateY(-2px);
   }
 
@@ -273,12 +274,15 @@ function handleMenuClick({ key }: { key: string }) {
     .card-avatar {
       width: 40px;
       height: 40px;
-      background-color: #f3e5f5;
-      color: #ab47bc;
+      background-color: #e8eaf6;
       border-radius: var(--border-radius-xl);
-      font-size: var(--font-size-2xl);
-      font-weight: 600;
       flex-shrink: 0;
+
+      img {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+      }
     }
 
     .avatar-corner-badge {
@@ -339,6 +343,10 @@ function handleMenuClick({ key }: { key: string }) {
   .disabled {
     color: #757575 !important;
     background-color: #e7e7e7 !important;
+    img {
+      filter: grayscale(100%);
+      opacity: 0.5;
+    }
   }
 }
 </style>

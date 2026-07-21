@@ -13,7 +13,7 @@ import { RouteNames, RoutePaths } from '@/router'
 const commonRoutes: AppRouteRecordRaw[] = [
   {
     path: RoutePaths.ROOT,
-    redirect: RoutePaths.AGENT,
+    redirect: RoutePaths.DASHBOARD,
   },
   {
     path: `${RoutePaths.CHAT_DIY}/:agentId`,
@@ -48,15 +48,6 @@ const commonRoutes: AppRouteRecordRaw[] = [
     component: () => import('@/views/Communication/index.vue'),
     meta: {
       title: '对话',
-      hidden: true,
-    },
-  },
-  {
-    path: RoutePaths.PREVIEW,
-    name: RouteNames.PREVIEW,
-    component: () => import('@/pages/AntdPreview.vue'),
-    meta: {
-      title: 'AntdPreview',
       hidden: true,
     },
   },
