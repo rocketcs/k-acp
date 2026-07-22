@@ -4,7 +4,7 @@
 
 **Goal:** Deliver and activate an application-layer high-recall tender-search workflow for `default-tender` that preserves hard filters, executes controlled multi-round retrieval, returns stable A/B/C relevance tiers, and forces verified source-link resolution for each displayed batch.
 
-**Architecture:** A new agent-only Skill produces and governs a versioned `QueryPlan`; a published K-ACP workflow uses restricted Agent nodes plus deterministic Java CODE nodes to execute, merge, deduplicate, rank, slice and continue results. A workflow-only custom tool `resolve_tender_source_urls_v2` resolves original links by `record_key`, validates identity and reachability, and falls back to validated 知了 aggregation pages. Deployment is an idempotent application-configuration package that creates new rows and changes only the `default-tender` prompt and bindings.
+**Architecture:** A new agent-only Skill produces and governs a versioned `QueryPlan`; a published K-ACP workflow sends that plan to a workflow-only application custom tool that executes pagination, merge, deduplication, ranking and continuation without putting raw pages in model context. Deterministic CODE nodes slice the current batch, while a second workflow-only custom tool `resolve_tender_source_urls_v2` resolves original links by `record_key`, validates identity and reachability, and falls back to validated 知了 aggregation pages. Deployment is an idempotent application-configuration package that creates new rows and changes only the `default-tender` prompt and bindings.
 
 **Tech Stack:** K-ACP workflow JSON, K-ACP Skill packages, K-ACP dynamic Java tools, MySQL application configuration, Java 21 HTTP client/Jackson, shell-based local deployment checks.
 
@@ -27,6 +27,8 @@
 - Create `.codex/skills/tender-high-recall-search/references/retrieval-ranking.md`: round construction, pagination, dedupe, A/B/C and correction rules.
 - Create `.codex/skills/tender-high-recall-search/references/output-continuation.md`: display projection, link state and continuation contract.
 - Create `docs/operations/commercial-tender-high-recall/TenderSourceUrlResolverV2Tool.java`: dedicated dynamic-tool implementation.
+- Create `docs/operations/commercial-tender-high-recall/TenderHighRecallSearchTool.java`: deterministic workflow-only search, pagination, dedupe and ranking implementation.
+- Create `docs/operations/commercial-tender-high-recall/CommercialTenderHighRecallWorkflowTool.java`: application-level workflow gateway that preserves agent inputs despite the current built-in WorkflowTool parameter adapter defect.
 - Create `docs/operations/commercial-tender-high-recall/fixtures/resolver-cases.json`: deterministic extraction, status and mapping cases.
 - Create `docs/operations/commercial-tender-high-recall/workflow.json`: workflow definition with forced resolver node.
 - Create `docs/operations/commercial-tender-high-recall/prompt.md`: replacement prompt for `default-tender` only.
@@ -144,14 +146,15 @@ Expected: `PASS resolver-v2 compile`.
 **Interfaces:**
 - Consumes workflow params `question`, `priorState`, `companyProfile`.
 - Produces `answer`, `queryPlan`, `resultStatus`, `continuationState`, `metrics`.
+- Internal search tool consumes `{query_plan, prior_state}` and produces `{records, metrics, failures, is_complete, correction}` without returning raw HTTP bodies.
 
 - [ ] **Step 1: Write structural workflow assertions**
 
-The verifier must assert one START and END, query-planner AGENT with structured output, plan-validation CODE, three restricted search AGENT nodes, deterministic normalization CODE, correction routing, display slicing CODE, exactly one resolver TOOL_EXECUTE node using `resolve_tender_source_urls_v2`, key-based link merge CODE, continuation CODE, and answer AGENT.
+The verifier must assert one START and END, query-planner AGENT with structured output, plan-validation CODE, exactly one deterministic search TOOL_EXECUTE node using `execute_tender_high_recall_v1`, display slicing CODE, exactly one resolver TOOL_EXECUTE node using `resolve_tender_source_urls_v2`, key-based link merge and continuation CODE, and answer AGENT.
 
 - [ ] **Step 2: Write the workflow JSON**
 
-Every search node must bind only `tender-search` and `http_request`, receive a deterministic request object, preserve hard filters, use `page_size=50`, stop at the declared total/no next page/page 100, and return only normalized JSON without fulltext. The normalization node must emit stable `record_key`, `lifecycle_key`, `tier`, `match_evidence`, `sort_key`, `needs_correction`, completion metrics and link input projection. The answer node must receive only the current maximum-20 display records and resolved links.
+The workflow-only search tool must receive the validated plan, preserve hard filters, use `page_size=50`, stop at the declared total/no next page/page 100, and return only normalized JSON without fulltext. It must emit stable `record_key`, `lifecycle_key`, `tier`, `match_evidence`, `sort_key`, correction metadata, completion metrics and failures. The answer node must receive only the current maximum-20 display records and resolved links.
 
 - [ ] **Step 3: Validate graph references locally**
 
@@ -173,7 +176,7 @@ Expected: `PASS workflow graph`, `PASS forced resolver`, `PASS answer context is
 
 **Interfaces:**
 - Consumes: running `k-acp-mysql`, existing agent code `default-tender`, existing model ID, `tender-search` Skill ID and `http_request` tool ID.
-- Produces: one new Skill package, one new custom tool, one published workflow, one workflow binding, one Skill binding and one dedicated prompt binding for `default-tender`.
+- Produces: one new Skill package, two workflow-internal custom tools, one application-level workflow gateway tool, one published workflow, one gateway-tool binding, one Skill binding and one dedicated prompt binding for `default-tender`.
 
 - [ ] **Step 1: Capture before-state and collision checks**
 
@@ -185,7 +188,7 @@ Use fixed package identifiers and idempotent `INSERT ... ON DUPLICATE KEY UPDATE
 
 - [ ] **Step 3: Publish and bind**
 
-Create a published workflow version, link it only through `agent_workflows.agent_definition_id` for `default-tender`, bind the new Skill only through `agent_skill_packages`, and bind the new dedicated prompt only by updating that agent's `system_prompt_template_id`. Do not add resolver v2 to shared `skill_tools` or another agent.
+Create a published workflow version, bind only the application workflow gateway through `agent_tools` for `default-tender`, bind the new Skill only through `agent_skill_packages`, and bind the new dedicated prompt only by updating that agent's `system_prompt_template_id`. Do not expose the workflow-internal executor or resolver through shared `skill_tools`, `agent_tools`, `agent_workflows` or another agent.
 
 - [ ] **Step 4: Provide scoped rollback**
 

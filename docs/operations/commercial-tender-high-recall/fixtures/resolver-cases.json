@@ -1,0 +1,34 @@
+{
+  "version": "resolver-v2-regression-v1",
+  "matrix": {
+    "title_variants": 20,
+    "source_patterns": 10,
+    "expected_case_count": 200,
+    "rule": "Each title variant is evaluated against every source pattern. record_key is case:{title_index}:{pattern_index}."
+  },
+  "title_variants": [
+    "广东省服务器采购项目", "深圳市服务器设备采购公告", "统一运维服务采购项目", "信息系统一体化运行维护项目",
+    "数据中心综合运维服务项目", "政务云服务器扩容采购", "医院计算资源采购项目", "学校机房服务器更新项目",
+    "企业私有云建设项目", "国产化服务器采购项目", "存储服务器采购项目", "高性能计算服务器项目",
+    "数据库服务器采购项目", "应用服务器设备采购", "云平台统一运维项目", "网络与服务器运维项目",
+    "IT基础设施运行维护项目", "信息化综合保障服务项目", "机房基础设施维保项目", "服务器租赁服务项目"
+  ],
+  "source_patterns": [
+    {"name":"explicit_source_url","input":"source_url","expected":"VERIFIED_OR_REACHABILITY_STATUS"},
+    {"name":"unicode_sourceUrl","html":"sourceUrl:\"https:\\u002F\\u002Fexample.gov.cn\\u002Fnotice\\u002FCASE\"","expected_extract":true},
+    {"name":"quoted_snake_case","html":"\"source_url\":\"https://example.gov.cn/notice/CASE\"","expected_extract":true},
+    {"name":"nested_detail_original","detail":{"data":{"notice":{"original_url":"https://example.gov.cn/notice/CASE"}}},"expected_extract":true},
+    {"name":"deleted","http_status":410,"expected":"SOURCE_DELETED"},
+    {"name":"auth_required","http_status":403,"expected":"AUTH_REQUIRED"},
+    {"name":"rate_limited","http_status":429,"expected":"RATE_LIMITED"},
+    {"name":"temporary_failure","http_status":503,"expected":"TEMP_UNREACHABLE"},
+    {"name":"private_target","url":"http://127.0.0.1/notice/CASE","expected":"INVALID_INPUT"},
+    {"name":"aggregate_fallback","aggregate_url":"https://www.zhiliaobiaoxun.com/content/CASE/b1","expected_link_type":"AGGREGATE"}
+  ],
+  "batch_invariants": [
+    {"name":"missing_record_key","expected_success":false},
+    {"name":"duplicate_record_key","expected_success":false},
+    {"name":"reordered_results","merge_key":"record_key","expected_mapping_errors":0},
+    {"name":"over_20_items","expected_success":false}
+  ]
+}

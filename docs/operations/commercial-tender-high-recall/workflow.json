@@ -1,0 +1,245 @@
+{
+  "nodes": [
+    {
+      "id": "start",
+      "type": "START",
+      "name": "检索请求",
+      "position": {"x": 0, "y": 240},
+      "config": {
+        "params": [
+          {"name": "question", "type": "String", "required": true, "value": "", "remark": "用户当前问题"},
+          {"name": "priorState", "type": "Object", "required": false, "value": {}, "remark": "上一轮 continuationState"},
+          {"name": "companyProfile", "type": "Object", "required": false, "value": {}, "remark": "可选企业画像"}
+        ]
+      },
+      "inputConfigs": [],
+      "outputConfigs": [
+        {"name": "question", "type": "String", "fromNodeId": "start"},
+        {"name": "priorState", "type": "Object", "fromNodeId": "start"},
+        {"name": "companyProfile", "type": "Object", "fromNodeId": "start"}
+      ]
+    },
+    {
+      "id": "query-planner",
+      "type": "AGENT",
+      "name": "查询计划器",
+      "position": {"x": 260, "y": 240},
+      "config": {
+        "modelConfigId": "2077681981142863873",
+        "modelParamsOverrideEnabled": false,
+        "formatterType": "STRING",
+        "systemPrompt": "你是商业标书高召回检索的查询计划器。严格遵循 tender-high-recall-search；接口字段语义以 tender-search 为准。只生成结构化 QueryPlan，不搜索、不回答。相对日期先调用当前时间工具并按北京时间换算。地区、日期、金额、阶段、采购方、中标方和截止状态是硬条件。完整短语优先，扩展词按独立必选概念组组织。若问题是继续且 priorState 有 query_plan，原样沿用；若没有则在 assumptions 说明上下文缺失并按当前问题重新计划。不要输出认证信息。",
+        "userPrompt": "当前问题：${question}\n上一轮状态：${priorState}\n企业画像：${companyProfile}\n请输出 tender-query-plan-v1。",
+        "skillPackageIds": ["2079122200000000201", "2078674849222549505"],
+        "toolIds": ["2077677543411355650"],
+        "mcps": [],
+        "maxIterations": 5,
+        "structuredOutputEnabled": true,
+        "structuredOutput": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["query_plan_version", "original_question", "subject", "hard_filters", "concept_groups", "exclude_keywords", "inherited_fields", "assumptions", "correction_allowed"],
+          "properties": {
+            "query_plan_version": {"type": "string", "enum": ["tender-query-plan-v1"]},
+            "original_question": {"type": "string"},
+            "subject": {"type": "string", "minLength": 1},
+            "hard_filters": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["provinces", "cities", "counties", "begin_date", "end_date", "bid_process", "min_money", "max_money", "caller_names", "winner_names", "deadline_status"],
+              "properties": {
+                "provinces": {"type": "array", "items": {"type": "string"}},
+                "cities": {"type": "array", "items": {"type": "string"}},
+                "counties": {"type": "array", "items": {"type": "string"}},
+                "begin_date": {"type": ["string", "null"]},
+                "end_date": {"type": ["string", "null"]},
+                "bid_process": {"type": "array", "items": {"type": "integer", "enum": [1,2,4,5,6,7,8,9,10]}},
+                "min_money": {"type": ["number", "null"], "minimum": 0},
+                "max_money": {"type": ["number", "null"], "minimum": 0},
+                "caller_names": {"type": "array", "items": {"type": "string"}},
+                "winner_names": {"type": "array", "items": {"type": "string"}},
+                "deadline_status": {"type": "string", "enum": ["all", "open"]}
+              }
+            },
+            "concept_groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "required", "original_terms", "expanded_terms"],
+                "properties": {
+                  "name": {"type": "string"},
+                  "required": {"type": "boolean"},
+                  "original_terms": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+                  "expanded_terms": {"type": "array", "items": {"type": "string"}}
+                }
+              }
+            },
+            "exclude_keywords": {"type": "array", "items": {"type": "string"}},
+            "inherited_fields": {"type": "array", "items": {"type": "string"}},
+            "assumptions": {"type": "array", "items": {"type": "string"}},
+            "correction_allowed": {"type": "boolean"}
+          }
+        }
+      },
+      "inputConfigs": [
+        {"name": "question", "sourceType": "NODE_OUTPUT", "nodeId": "start", "outputName": "question", "type": "String"},
+        {"name": "priorState", "sourceType": "NODE_OUTPUT", "nodeId": "start", "outputName": "priorState", "type": "Object"},
+        {"name": "companyProfile", "sourceType": "NODE_OUTPUT", "nodeId": "start", "outputName": "companyProfile", "type": "Object"}
+      ],
+      "outputConfigs": [
+        {"name": "output", "type": "Object", "fromNodeId": "query-planner"},
+        {"name": "text", "type": "String", "fromNodeId": "query-planner"},
+        {"name": "structured", "type": "Object", "fromNodeId": "query-planner"}
+      ]
+    },
+    {
+      "id": "validate-plan",
+      "type": "CODE",
+      "name": "计划校验与继承",
+      "position": {"x": 520, "y": 240},
+      "config": {"language": "JAVA", "codeSource": "__PLAN_VALIDATION_CODE__"},
+      "inputConfigs": [
+        {"name": "plan", "sourceType": "NODE_OUTPUT", "nodeId": "query-planner", "outputName": "output", "type": "Object"},
+        {"name": "question", "sourceType": "NODE_OUTPUT", "nodeId": "start", "outputName": "question", "type": "String"},
+        {"name": "priorState", "sourceType": "NODE_OUTPUT", "nodeId": "start", "outputName": "priorState", "type": "Object"}
+      ],
+      "outputConfigs": [{"name": "output", "type": "Object", "fromNodeId": "validate-plan"}]
+    },
+    {
+      "id": "execute-search",
+      "type": "TOOL_EXECUTE",
+      "name": "完整分页与分层",
+      "position": {"x": 780, "y": 240},
+      "config": {"toolId": "2079122200000000101"},
+      "inputConfigs": [
+        {"name": "query_plan", "sourceType": "NODE_OUTPUT", "nodeId": "validate-plan", "outputName": "output", "type": "Object"},
+        {"name": "prior_state", "sourceType": "NODE_OUTPUT", "nodeId": "start", "outputName": "priorState", "type": "Object"}
+      ],
+      "outputConfigs": [{"name": "output", "type": "Object", "fromNodeId": "execute-search"}]
+    },
+    {
+      "id": "current-batch",
+      "type": "CODE",
+      "name": "当前批次切片",
+      "position": {"x": 1040, "y": 240},
+      "config": {"language": "JAVA", "codeSource": "__CURRENT_BATCH_CODE__"},
+      "inputConfigs": [
+        {"name": "searchResult", "sourceType": "NODE_OUTPUT", "nodeId": "execute-search", "outputName": "output", "type": "Object"},
+        {"name": "priorState", "sourceType": "NODE_OUTPUT", "nodeId": "start", "outputName": "priorState", "type": "Object"},
+        {"name": "question", "sourceType": "NODE_OUTPUT", "nodeId": "start", "outputName": "question", "type": "String"},
+        {"name": "queryPlan", "sourceType": "NODE_OUTPUT", "nodeId": "validate-plan", "outputName": "output", "type": "Object"}
+      ],
+      "outputConfigs": [{"name": "output", "type": "Object", "fromNodeId": "current-batch"}]
+    },
+    {
+      "id": "link-items",
+      "type": "CODE",
+      "name": "链接输入投影",
+      "position": {"x": 1300, "y": 240},
+      "config": {"language": "JAVA", "codeSource": "__LINK_ITEMS_CODE__"},
+      "inputConfigs": [
+        {"name": "batch", "sourceType": "NODE_OUTPUT", "nodeId": "current-batch", "outputName": "output", "type": "Object"}
+      ],
+      "outputConfigs": [{"name": "output", "type": "Array", "fromNodeId": "link-items"}]
+    },
+    {
+      "id": "resolve-links",
+      "type": "TOOL_EXECUTE",
+      "name": "强制解析源链接",
+      "position": {"x": 1560, "y": 240},
+      "config": {"toolId": "2079122200000000102"},
+      "inputConfigs": [
+        {"name": "items", "sourceType": "NODE_OUTPUT", "nodeId": "link-items", "outputName": "output", "type": "Array"}
+      ],
+      "outputConfigs": [{"name": "output", "type": "Object", "fromNodeId": "resolve-links"}]
+    },
+    {
+      "id": "merge-links",
+      "type": "CODE",
+      "name": "按 record_key 合并链接",
+      "position": {"x": 1820, "y": 240},
+      "config": {"language": "JAVA", "codeSource": "__LINK_MERGE_CODE__"},
+      "inputConfigs": [
+        {"name": "batch", "sourceType": "NODE_OUTPUT", "nodeId": "current-batch", "outputName": "output", "type": "Object"},
+        {"name": "linkResult", "sourceType": "NODE_OUTPUT", "nodeId": "resolve-links", "outputName": "output", "type": "Object"}
+      ],
+      "outputConfigs": [{"name": "output", "type": "Object", "fromNodeId": "merge-links"}]
+    },
+    {
+      "id": "answer-context",
+      "type": "CODE",
+      "name": "回答上下文隔离",
+      "position": {"x": 2080, "y": 240},
+      "config": {"language": "JAVA", "codeSource": "__ANSWER_CONTEXT_CODE__"},
+      "inputConfigs": [
+        {"name": "package", "sourceType": "NODE_OUTPUT", "nodeId": "merge-links", "outputName": "output", "type": "Object"}
+      ],
+      "outputConfigs": [{"name": "output", "type": "Object", "fromNodeId": "answer-context"}]
+    },
+    {
+      "id": "answer-generator",
+      "type": "AGENT",
+      "name": "业务回答生成器",
+      "position": {"x": 2340, "y": 240},
+      "config": {
+        "modelConfigId": "2077681981142863873",
+        "modelParamsOverrideEnabled": false,
+        "formatterType": "STRING",
+        "systemPrompt": "你是商业标书智能体的结果表达器。只根据输入的当前批次结构化记录作答，不补充、不猜测、不改链接。先一句话说明地区、日期、阶段、主题口径和数据完整性。A严格匹配、B高相关进入主结果；C可能相关单独放在“可能相关（需展开核实）”。表格列为：#、项目名称、采购单位、地区、预算（万）、发布时间、报名截止、阶段、匹配理由、来源。link_type=SOURCE 时使用 display_url 并标注原文；AGGREGATE 时使用 display_url 并明确标注聚合页；NONE 时不生成链接。缺失写未获取或需核实。is_complete=false 时只说“已找到至少N条”并说明不完整原因。还有剩余时提示回复继续。不要展示接口、参数、工具、Skill、工作流、HTML或内部评分。",
+        "userPrompt": "请把以下当前批次结果整理为简洁中文业务回答：${context}",
+        "skillPackageIds": [],
+        "toolIds": [],
+        "mcps": [],
+        "maxIterations": 1,
+        "structuredOutputEnabled": false
+      },
+      "inputConfigs": [
+        {"name": "context", "sourceType": "NODE_OUTPUT", "nodeId": "answer-context", "outputName": "output", "type": "Object"}
+      ],
+      "outputConfigs": [
+        {"name": "output", "type": "String", "fromNodeId": "answer-generator"},
+        {"name": "text", "type": "String", "fromNodeId": "answer-generator"}
+      ]
+    },
+    {
+      "id": "final-result",
+      "type": "CODE",
+      "name": "状态封装",
+      "position": {"x": 2600, "y": 240},
+      "config": {"language": "JAVA", "codeSource": "__FINAL_RESULT_CODE__"},
+      "inputConfigs": [
+        {"name": "package", "sourceType": "NODE_OUTPUT", "nodeId": "merge-links", "outputName": "output", "type": "Object"},
+        {"name": "answer", "sourceType": "NODE_OUTPUT", "nodeId": "answer-generator", "outputName": "text", "type": "String"}
+      ],
+      "outputConfigs": [{"name": "output", "type": "Object", "fromNodeId": "final-result"}]
+    },
+    {
+      "id": "end",
+      "type": "END",
+      "name": "返回检索结果",
+      "position": {"x": 2860, "y": 240},
+      "config": {"formatterType": "JACKSON", "responseTemplate": "\"${result}\""},
+      "inputConfigs": [
+        {"name": "result", "sourceType": "NODE_OUTPUT", "nodeId": "final-result", "outputName": "output", "type": "Object"}
+      ],
+      "outputConfigs": [{"name": "output", "type": "Object", "fromNodeId": "end"}]
+    }
+  ],
+  "edges": [
+    {"id": "e01", "source": "start", "target": "query-planner"},
+    {"id": "e02", "source": "query-planner", "target": "validate-plan"},
+    {"id": "e03", "source": "validate-plan", "target": "execute-search"},
+    {"id": "e04", "source": "execute-search", "target": "current-batch"},
+    {"id": "e05", "source": "current-batch", "target": "link-items"},
+    {"id": "e06", "source": "link-items", "target": "resolve-links"},
+    {"id": "e07", "source": "resolve-links", "target": "merge-links"},
+    {"id": "e08", "source": "merge-links", "target": "answer-context"},
+    {"id": "e09", "source": "answer-context", "target": "answer-generator"},
+    {"id": "e10", "source": "answer-generator", "target": "final-result"},
+    {"id": "e11", "source": "final-result", "target": "end"}
+  ],
+  "variables": [],
+  "viewport": {"x": 20, "y": 160, "zoom": 0.55},
+  "metadata": {"schemaVersion": "1", "nodeVersion": "commercial-tender-high-recall-v1"}
+}

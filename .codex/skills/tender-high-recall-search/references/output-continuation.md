@@ -1,0 +1,69 @@
+# 输出投影与 ContinuationStateV1
+
+## 回答模型输入
+
+只允许传入：
+
+- 规范化后的最终 QueryPlan 摘要；
+- 当前批次最多 20 条 A/B 主结果；
+- 当前批次对应的 C 层结果，仍计入 20 条批次上限；
+- 按 `record_key` 合并后的链接字段；
+- 数量、完整性、失败范围、纠偏说明和下一批状态。
+
+禁止传入原始 API 响应、全部候选、公告全文、HTML、详情页正文、认证头、工具日志或模型推理。
+
+## 链接投影
+
+每条展示记录必须先生成：
+
+```json
+{
+  "record_key": "bid:12345678",
+  "bid_id": "12345678",
+  "uniq_key": "",
+  "title": "项目标题",
+  "aggregate_url": "https://www.zhiliaobiaoxun.com/content/12345678/b1",
+  "source_url": null
+}
+```
+
+整批一次性交给 `resolve_tender_source_urls_v2`。输出按 `record_key` 合并：
+
+- `link_type=SOURCE`：标题链接到 `display_url`，状态“原文已验证”。
+- `link_type=AGGREGATE`：标题链接到 `display_url`，状态明确写“聚合页”。
+- `link_type=NONE`：标题为普通文本并展示 `source_status`。
+- 输入与输出键集合不一致时 `link_resolution_complete=false`；缺失项只使用已校验的聚合页回退。
+
+## ContinuationStateV1
+
+```json
+{
+  "state_version": "tender-continuation-v1",
+  "query_plan_version": "tender-query-plan-v1",
+  "query_plan": {},
+  "stable_keys": ["bid:1", "bid:2"],
+  "position": 20,
+  "page_size": 20,
+  "round_pages": {"exact": 3, "expanded": 4, "fulltext": 2, "correction": 0},
+  "query_end_boundary": "2026-07-22T23:59:59+08:00",
+  "is_complete": true,
+  "failures": [],
+  "link_states": {"bid:1": {"link_type": "SOURCE", "display_url": "https://example.gov/1"}}
+}
+```
+
+状态中不得包含认证密钥、认证头、公告全文、HTML、原始响应或内部推理。`position` 指向下一条未展示记录。下一批优先按 `stable_keys[position:position+20]` 获取；若必须重新请求列表页，沿用冻结的 `query_end_boundary` 并排除已展示键。
+
+## 用户输出
+
+先用一句话说明检索口径和完整性，再输出 A/B 主结果表：
+
+| # | 项目名称 | 采购单位 | 地区 | 预算（万） | 发布时间 | 报名截止 | 阶段 | 匹配理由 | 来源 |
+|---|---|---|---|---:|---|---|---|---|---|
+
+- A、B 可以分别加小标题，但保持连续稳定序号。
+- C 使用“可能相关（需展开核实）”独立区，不进入主结果表头部排序。
+- 缺失字段写“未获取”或“需核实”，不得编造。
+- 结果超过当前批次时写明已展示、剩余和“回复继续查看下一批”。
+- `is_complete=false` 时写“已找到至少 N 条”，并说明具体的不完整原因。
+- 不展示查询参数、Skill 名称、工作流节点、工具调用或内部评分。
