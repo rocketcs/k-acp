@@ -12,6 +12,14 @@ function nextIdBig() {
   return String(lastIdBig++);
 }
 
+// 仅在模型未按商业标书追问 Skill 生成卡片时兜底。正常路径的卡片由当前
+// 项目、采购方和商机阶段动态生成；兜底不能再退回纯分页式的固定菜单。
+const TENDER_FOLLOW_UP_CARD = `下一步想推进哪件事？
+
+\`\`\`uip
+{"role":"assistant","content":"","version":"2.0","interaction":{"id":"tender-followups","type":"choice","question":"下一步想推进哪件事？","multiple":false,"allowCustom":false,"autoSubmit":true,"options":[{"value":"prioritize_current","label":"筛选当前最值得跟进的项目","description":"结合时间、预算和匹配度排出优先顺序"},{"value":"capability_match","label":"根据我的业务能力精准筛一筛当前项目","description":"找出更适合我方参与的机会"},{"value":"compare_similar","label":"再看看同类在招项目，横向对比选择","description":"扩展机会并比较采购需求与时间窗口"},{"value":"continue_next_batch","label":"继续查看下一批","description":"保留当前条件，继续展示尚未查看的结果"}]}}
+\`\`\``
+
 export function useChatStream(
   agentId: import('vue').Ref<string>,
   agentDetail: import('vue').Ref<any>,
@@ -49,6 +57,13 @@ export function useChatStream(
   const streamingMessageId = ref<string | null>(null)
   const streamingRole = ref<'user' | 'assistant' | 'system' | 'tool' | 'thinking'>('system')
   const streamingContent = ref('')
+  // 高召回工作流已经生成可直接渲染的业务答案和 UIP 卡片。外层 Agent 的
+  // 文本重写可能丢失卡片，因此在本次运行结束时优先展示该工具的原始答案。
+  const pendingHighRecallAnswer = ref<string | null>(null)
+  // 任何商业标书回答都应保留后续操作；不只限于高召回检索，也包括筛选和分析。
+  const runHasAssistantAnswer = ref(false)
+  const runHasTenderFollowups = ref(false)
+  const fallbackFollowupSaved = ref(false)
 
   // 工具调用进度
   const toolCallsInProgress = ref<
@@ -62,6 +77,10 @@ export function useChatStream(
         toolCallsInProgress.value = []
         streamingContent.value = ''
         streamingMessageId.value = null
+        pendingHighRecallAnswer.value = null
+        runHasAssistantAnswer.value = false
+        runHasTenderFollowups.value = false
+        fallbackFollowupSaved.value = false
       },
       onTextMessageStart: (e) => {
         streamingRole.value = 'assistant'
@@ -73,14 +92,21 @@ export function useChatStream(
         streamingContent.value = currentText
       },
       onTextMessageEnd: (_e, finalText) => {
+        const displayText = pendingHighRecallAnswer.value || finalText
         const sid = currentSessionId.value
-        if (sid && finalText) {
+        if (displayText) {
+          runHasAssistantAnswer.value = true
+          if (displayText.includes('```uip')) {
+            runHasTenderFollowups.value = true
+          }
+        }
+        if (sid && displayText) {
           // 纯文本保存，不再与推理打包，通过队列保证写入顺序
           onMessageSaved?.({
             id: streamingMessageId.value,
             sessionId: sid,
             role: streamingRole.value,  // 这里必须使用 streamingRole.value，不能写死 assistant
-            content: finalText,
+            content: displayText,
             parentId: '',
             path: '',
             depth: 0,
@@ -91,34 +117,17 @@ export function useChatStream(
         streamingMessageId.value = null
         streamingContent.value = ''
         streamingRole.value = 'system'
+        pendingHighRecallAnswer.value = null
       },
-      onReasoningMessageStart: (e) => {
-        streamingRole.value = 'thinking'
-        streamingContent.value = ''
-        streamingMessageId.value = e.messageId
+      onReasoningMessageStart: (_e) => {
+        // Internal reasoning is not business-facing content. Ignore it instead of
+        // creating a visible or persisted “思考过程” message.
       },
-      onReasoningMessageContent: (_e, currentText) => {
-        streamingContent.value = currentText
+      onReasoningMessageContent: (_e, _currentText) => {
+        // Intentionally ignored; only the final business answer is rendered.
       },
       onReasoningMessageEnd: () => {
-        const sid = currentSessionId.value
-        if (sid && streamingContent.value) {
-          // 推理结束时立即保存为独立消息，通过队列保证写入顺序
-          onMessageSaved?.({
-            id: streamingMessageId.value,
-            sessionId: sid,
-            role: streamingRole.value, // 这里必须使用 streamingRole.value，不能写死 thinking
-            content: streamingContent.value,
-            parentId: '',
-            path: '',
-            depth: 0,
-            createdAt: ''
-          } as ChatMessageVO)
-          // 保存完成后清除推理状态，利用 displayMessages 去重避免闪烁
-          streamingMessageId.value = null
-          streamingContent.value = ''
-          streamingRole.value = 'system'
-        }
+        // Intentionally ignored; reasoning is never added to the chat transcript.
       },
       onToolCallStart: (e) => {
         // 计划追踪：记录工具调用名称
@@ -131,23 +140,7 @@ export function useChatStream(
         ]
 
         const sid = currentSessionId.value
-        if (sid && streamingContent.value) {
-          // 推理结束时保存为独立消息，通过队列保证写入顺序
-          onMessageSaved?.({
-            id: streamingMessageId.value,
-            sessionId: sid,
-            role: streamingRole.value,
-            content: streamingContent.value,
-            parentId: '',
-            path: '',
-            depth: 0,
-            createdAt: ''
-          } as ChatMessageVO)
-          // 保存完成后清除推理状态，利用 displayMessages 去重避免闪烁
-          streamingMessageId.value = null
-          streamingContent.value = ''
-          streamingRole.value = 'system'
-        }
+        // Reasoning is not user-visible and is intentionally not persisted here.
       },
       onToolCallArgs: (_e, partialArgs) => {
         // 计划追踪：累积工具参数
@@ -163,6 +156,30 @@ export function useChatStream(
         onPlanToolResult(e.toolCallId)
 
         try {
+          if (agentDetail.value?.agentCode === 'default-tender') {
+            try {
+              const result = JSON.parse(e.content) as {
+                answer?: unknown
+                queryPlan?: unknown
+                resultStatus?: unknown
+                continuationState?: unknown
+              }
+              // 不依赖流事件中的工具名：部分模型会让结果事件先于工具名映射
+              // 到达。以下四个字段是高召回工作流的固定返回契约。
+              if (
+                typeof result.answer === 'string' &&
+                result.answer.trim() &&
+                result.queryPlan &&
+                result.resultStatus &&
+                result.continuationState
+              ) {
+                pendingHighRecallAnswer.value = result.answer
+              }
+            } catch {
+              // 工具异常时继续使用外层 Agent 的正常回复，不影响其他对话。
+            }
+          }
+
           // 判断是否开启了显示工具调用
           if (!(toolProcessActive?.value ?? true)) {
             return
@@ -196,6 +213,31 @@ export function useChatStream(
       },
       onRunFinished: (_e) => {
         agentHasResult.value = true
+        // 商业标书智能体的高召回入口已明确配置为无需人工确认。
+        // UIP 卡片点击后应立即继续查询；不要把未完成的工具状态误渲染成“允许/禁止”。
+        if (agentDetail.value?.agentCode === 'default-tender') {
+          const sid = currentSessionId.value
+          if (
+            sid &&
+            runHasAssistantAnswer.value &&
+            !runHasTenderFollowups.value &&
+            !fallbackFollowupSaved.value
+          ) {
+            fallbackFollowupSaved.value = true
+            onMessageSaved?.({
+              id: nextIdBig(),
+              sessionId: sid,
+              role: 'assistant',
+              content: TENDER_FOLLOW_UP_CARD,
+              parentId: '',
+              path: '',
+              depth: 0,
+              createdAt: ''
+            } as ChatMessageVO)
+          }
+          toolCallsInProgress.value = []
+          return
+        }
         if (toolCallsInProgress.value.length > 0) {
           toolCallsInProgress.value.forEach(item => item.needConfirm = true)
         }

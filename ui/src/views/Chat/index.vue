@@ -182,7 +182,7 @@ const displayMessages = computed<DisplayMessage[]>(() => {
   const list: DisplayMessage[] = []
   for (let i = 0; i < messagesList.value.length; i++) {
     const m = messagesList.value[i]
-    if (!m || m.role === 'system' || !m.content) continue
+    if (!m || m.role === 'system' || m.role === 'thinking' || !m.content) continue
 
     let displayId = String(m.id)
     // key 桥接：流式刚结束时，将最后一条 assistant 消息的展示 key 替换为流式 ID
@@ -202,7 +202,7 @@ const displayMessages = computed<DisplayMessage[]>(() => {
     })
   }
 
-  if (streamingMessageId.value) {
+  if (streamingMessageId.value && streamingRole.value !== 'thinking') {
     list.push({
       id: streamingMessageId.value,
       role: streamingRole.value,

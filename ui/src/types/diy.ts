@@ -1,6 +1,6 @@
 export type DiyOutputFormat = 'TEXT' | 'ECHARTS_BAR' | 'ECHARTS_PIE' | 'JSON'
 
-export type DiyPlaceholderInputType = 'INPUT' | 'SELECT'
+export type DiyPlaceholderInputType = 'INPUT' | 'TEXTAREA' | 'SELECT'
 
 export interface DiyPlaceholderConfig {
   name: string

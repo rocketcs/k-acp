@@ -337,6 +337,7 @@ onMounted(load)
                 <div class="placeholder-name">{{ field.name }}</div>
                 <ASelect v-model:value="field.inputType" style="width: 110px">
                   <ASelectOption value="INPUT">用户输入</ASelectOption>
+                  <ASelectOption value="TEXTAREA">多行输入</ASelectOption>
                   <ASelectOption value="SELECT">单选</ASelectOption>
                 </ASelect>
                 <ACheckbox v-model:checked="field.required">必填</ACheckbox>

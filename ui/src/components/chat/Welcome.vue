@@ -46,9 +46,15 @@ const resolvedDescription = computed(() => props.diyConfig?.description || props
 </script>
 
 <template>
-  <div class="chat-welcome" :class="{ 'has-diy-form': diyFormActive }">
+  <div
+    class="chat-welcome"
+    :class="{
+      'has-diy-form': diyFormActive,
+      'is-diy-welcome': Boolean(diyConfig),
+    }"
+  >
     <h2 class="chat-welcome-title" :title="resolvedHeadline">{{ resolvedHeadline }}</h2>
-    <p v-if="resolvedDescription" class="chat-welcome-desc" :title="resolvedDescription">{{ resolvedDescription }}</p>
+    <p v-if="resolvedDescription && !diyConfig" class="chat-welcome-desc" :title="resolvedDescription">{{ resolvedDescription }}</p>
     <DiyWelcome
       v-if="diyConfig"
       :config="diyConfig"

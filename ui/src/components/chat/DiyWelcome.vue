@@ -94,6 +94,12 @@ function confirm() {
             :placeholder="field.placeholder || `请输入${field.name}`"
             @pressEnter="confirm"
           />
+          <ATextarea
+            v-else-if="field.inputType === 'TEXTAREA'"
+            v-model:value="values[field.name]"
+            :placeholder="field.placeholder || `请输入${field.name}`"
+            :rows="4"
+          />
           <div v-else class="diy-option-list">
             <button
               v-for="option in field.options"
@@ -116,36 +122,40 @@ function confirm() {
 
 <style scoped lang="scss">
 .diy-welcome-content {
-  width: min(100%, 760px);
+  width: min(100%, 1280px);
   margin: 0 auto;
   text-align: left;
 }
 
 .diy-question-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px;
 }
 
 .diy-question-card {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  min-height: 88px;
-  padding: 16px 18px;
-  border: 1px solid #e6eaf0;
-  border-radius: 14px;
+  flex: 0 1 calc((100% - 36px) / 3);
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+  min-height: 136px;
+  max-width: 410px;
+  padding: 24px 28px;
+  border: 1px solid #e6ebee;
+  border-radius: 22px;
   background: #fff;
   color: var(--color-text-primary);
   text-align: left;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(31, 41, 55, 0.04);
+  box-shadow: 0 8px 22px rgba(26, 47, 55, 0.035);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 
   &:hover:not(:disabled) {
-    border-color: rgba(15, 116, 255, 0.45);
-    box-shadow: 0 8px 22px rgba(15, 116, 255, 0.1);
-    transform: translateY(-1px);
+    border-color: rgba(0, 151, 158, 0.48);
+    box-shadow: 0 14px 30px rgba(0, 121, 130, 0.1);
+    transform: translateY(-2px);
   }
 
   &:disabled {
@@ -159,11 +169,11 @@ function confirm() {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: #eef5ff;
-  font-size: 20px;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: #edf6f6;
+  font-size: 30px;
   line-height: 1;
 }
 
@@ -171,22 +181,24 @@ function confirm() {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 
   strong {
-    font-size: 15px;
+    color: #1f2a30;
+    font-size: 20px;
+    font-weight: 650;
     line-height: 1.4;
   }
 
   small {
-    color: var(--color-text-secondary);
-    font-size: 13px;
-    line-height: 1.5;
+    color: #76838a;
+    font-size: 15px;
+    line-height: 1.55;
   }
 }
 
 .diy-question-form {
-  width: min(100%, 680px);
+  width: min(100%, 1040px);
   margin: 0 auto;
   padding: 22px 24px 20px;
   border: 1px solid #e6eaf0;
@@ -248,6 +260,11 @@ function confirm() {
     border-radius: 10px;
     font-size: 14px;
   }
+
+  :deep(.ant-input-textarea textarea) {
+    min-height: 112px;
+    resize: vertical;
+  }
 }
 
 .diy-option-list {
@@ -260,7 +277,7 @@ function confirm() {
   min-height: 38px;
   padding: 7px 14px;
   border: 1px solid #dfe4ea;
-  border-radius: 9px;
+  border-radius: 999px;
   background: #fff;
   color: var(--color-text-regular);
   font-size: 14px;
@@ -269,16 +286,16 @@ function confirm() {
   transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
 
   &:hover {
-    border-color: #8bbcff;
-    color: #0f74ff;
+    border-color: #67bfc2;
+    color: #007f85;
   }
 
   &.active {
-    border-color: #0f74ff;
-    background: #eef5ff;
-    color: #0f74ff;
+    border-color: #00979e;
+    background: #edfafa;
+    color: #007f85;
     font-weight: 600;
-    box-shadow: inset 0 0 0 1px rgba(15, 116, 255, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(0, 151, 158, 0.08);
   }
 }
 
@@ -295,11 +312,42 @@ function confirm() {
     height: 40px;
     border-radius: 10px;
   }
+
+  :deep(.ant-btn-primary) {
+    border-color: #00979e;
+    background: #00979e;
+  }
 }
 
 @media (max-width: 768px) {
+  .diy-welcome-content {
+    width: 100%;
+  }
+
   .diy-question-grid {
-    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .diy-question-card {
+    flex-basis: 100%;
+    min-height: 96px;
+    padding: 16px 18px;
+    border-radius: 16px;
+  }
+
+  .diy-question-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    font-size: 23px;
+  }
+
+  .diy-question-copy strong {
+    font-size: 17px;
+  }
+
+  .diy-question-copy small {
+    font-size: 13px;
   }
 
   .diy-question-form {
@@ -322,6 +370,13 @@ function confirm() {
 
   .diy-form-footer :deep(.ant-btn) {
     flex: 1;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1140px) {
+  .diy-question-card {
+    flex-basis: calc((100% - 18px) / 2);
+    max-width: 500px;
   }
 }
 </style>

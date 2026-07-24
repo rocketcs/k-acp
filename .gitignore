@@ -52,3 +52,7 @@ logs
 # Local k-acp runtime secrets and generated Graphify artifacts
 docker/.env.kacp
 graphify-out/
+
+# Codex environment connection credentials. Commit only the accompanying
+# .env.example templates; each environment's .env is local to the operator.
+env/*/.env

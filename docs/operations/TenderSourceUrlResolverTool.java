@@ -160,7 +160,7 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
     }
 
     private static String sourceFromBidDetail(String bidId) throws Exception {
-        JsonNode profile = loadZhiliaoProfile();
+        JsonNode profile = loadWenbiaoAgentProfile();
         validateDetailProfile(profile);
         byte[] requestBody = MAPPER.writeValueAsBytes(Map.of("bid_id", bidId));
         HttpRequest.Builder builder = HttpRequest.newBuilder(DETAIL_API)
@@ -199,14 +199,14 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
         return "";
     }
 
-    private static JsonNode loadZhiliaoProfile() throws Exception {
-        Path profilePath = PROFILE_DIR.resolve("zhiliao.json").normalize();
+    private static JsonNode loadWenbiaoAgentProfile() throws Exception {
+        Path profilePath = PROFILE_DIR.resolve("wenbiao_agent.json").normalize();
         if (!profilePath.startsWith(PROFILE_DIR) || !Files.isRegularFile(profilePath)) {
-            throw new IllegalArgumentException("zhiliao auth profile is unavailable");
+            throw new IllegalArgumentException("wenbiao_agent auth profile is unavailable");
         }
         JsonNode profile = MAPPER.readTree(Files.readString(profilePath, StandardCharsets.UTF_8));
         if (profile == null || !profile.isObject()) {
-            throw new IllegalArgumentException("zhiliao auth profile is invalid");
+            throw new IllegalArgumentException("wenbiao_agent auth profile is invalid");
         }
         return profile;
     }
@@ -221,7 +221,7 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
         if (!hostAllowed(DETAIL_API.getHost(), allowedHosts)
                 || !allowedMethods.contains("POST")
                 || !profile.path("headers").isObject()) {
-            throw new IllegalArgumentException("zhiliao auth profile does not allow detail lookup");
+            throw new IllegalArgumentException("wenbiao_agent auth profile does not allow detail lookup");
         }
     }
 

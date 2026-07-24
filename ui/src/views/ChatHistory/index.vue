@@ -39,7 +39,7 @@ const {
 const displayMessages = computed<DisplayMessage[]>(() => {
   const list: DisplayMessage[] = []
   for (const m of messagesList.value) {
-    if (m.role === 'system') continue
+    if (m.role === 'system' || m.role === 'thinking') continue
     list.push({
       id: String(m.id),
       role: m.role as any,

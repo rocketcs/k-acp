@@ -1,653 +1,281 @@
 <script setup lang="ts">
 /**
- * 工作台页面（骨架屏模式）
+ * 工作台页面
  *
  * @author huxuehao
  */
-import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAccountStore } from '@/stores'
+import agentAvatar from '@/assets/avatar/agent.png'
+import workflowAvatar from '@/assets/avatar/workflow.png'
+import knowledgeAvatar from '@/assets/avatar/knowledgebase.png'
+import modelProviderAvatar from '@/assets/avatar/model-provider.png'
+import skillAvatar from '@/assets/avatar/skill.png'
+import mcpAvatar from '@/assets/avatar/mcp.png'
+import toolAvatar from '@/assets/avatar/tool.png'
+import hookAvatar from '@/assets/avatar/hook.png'
+import promptAvatar from '@/assets/avatar/prompt.png'
+import sensitiveAvatar from '@/assets/avatar/sensitive.png'
 
+interface QuickEntry {
+  label: string
+  description: string
+  avatar: string
+  path: string
+}
+
+interface EntryGroup {
+  title: string
+  description: string
+  items: QuickEntry[]
+}
+
+const router = useRouter()
 const accountStore = useAccountStore()
 
-// 彩蛋：停留超过5秒的幽默提示
-const easterEggVisible = ref(false)
-const easterEggStep = ref(0)
-let eggTimer: ReturnType<typeof setTimeout> | null = null
-let stepTimer: ReturnType<typeof setTimeout> | null = null
-
-// 幽默文案逐句揭晓
-const messages = [
-  '你盯着这页看了5秒了...还在等什么？',
-  '别看了别看了，这个页面根本没做完！',
-  '不过...好消息是总会有见面的一天的。',
-  '去忙正事吧，别在这骨架屏前发呆了~',
+const entryGroups: EntryGroup[] = [
+  {
+    title: '开发',
+    description: '构建和编排您的 AI 应用',
+    items: [
+      { label: '智能体', description: '创建、配置和发布智能体', avatar: agentAvatar, path: '/agent' },
+      { label: '工作流', description: '编排可复用的业务流程', avatar: workflowAvatar, path: '/workflow' },
+      { label: '知识库', description: '管理智能体使用的知识内容', avatar: knowledgeAvatar, path: '/knowledge' },
+    ],
+  },
+  {
+    title: '资源',
+    description: '统一管理模型、能力和安全配置',
+    items: [
+      { label: '模型', description: '配置模型供应商和模型参数', avatar: modelProviderAvatar, path: '/model' },
+      { label: '技能', description: '维护智能体可调用的技能包', avatar: skillAvatar, path: '/skill' },
+      { label: 'MCP', description: '接入和治理 MCP 服务', avatar: mcpAvatar, path: '/mcp' },
+      { label: '工具', description: '配置智能体可执行的工具', avatar: toolAvatar, path: '/tool' },
+      { label: '扩展', description: '管理运行过程中的扩展能力', avatar: hookAvatar, path: '/hook' },
+      { label: '提示词', description: '沉淀可复用的系统提示词', avatar: promptAvatar, path: '/prompt' },
+      { label: '敏感词', description: '维护内容安全过滤规则', avatar: sensitiveAvatar, path: '/sensitive' },
+    ],
+  },
 ]
 
-function showEasterEgg() {
-  easterEggVisible.value = true
-  easterEggStep.value = 0
-  stepTimer = setTimeout(() => {
-    easterEggStep.value = 1
-    stepTimer = setTimeout(() => {
-      easterEggStep.value = 2
-      stepTimer = setTimeout(() => {
-        easterEggStep.value = 3
-      }, 3000)
-    }, 3000)
-  }, 1500)
+function openEntry(item: QuickEntry) {
+  router.push(item.path)
 }
-
-function dismissEgg() {
-  easterEggVisible.value = false
-  easterEggStep.value = 0
-  if (stepTimer) clearTimeout(stepTimer)
-}
-
-onMounted(() => {
-  eggTimer = setTimeout(showEasterEgg, 5000)
-})
-
-onUnmounted(() => {
-  if (eggTimer) clearTimeout(eggTimer)
-  if (stepTimer) clearTimeout(stepTimer)
-})
 </script>
 
 <script lang="ts">
 export default {
-  name: 'DashboardView'
+  name: 'DashboardView',
 }
 </script>
 
 <template>
-  <div class="dashboard-container">
-    <!-- 欢迎信息 -->
-    <div class="welcome-section">
+  <main class="dashboard-container">
+    <section class="welcome-section">
+      <p class="welcome-eyebrow">KINGSWARE 工作台</p>
       <h1 class="welcome-title">
         欢迎回来，{{ accountStore.userInfo?.nickname || '用户' }}
       </h1>
       <p class="welcome-desc">
-        这是您的工作台，可以快速访问常用功能和查看系统状态。
+        从常用模块开始，创建并管理您的 AI 应用。
       </p>
-    </div>
+    </section>
 
-    <!-- 统计概览骨架屏 -->
-    <div class="section">
-      <div class="section-header">
-        <div class="skeleton-text skeleton-title"></div>
-        <div class="skeleton-text skeleton-link"></div>
-      </div>
-      <div class="stats-grid">
-        <div v-for="i in 9" :key="i" class="stat-card-skeleton">
-          <div class="skeleton-icon"></div>
-          <div class="stat-content-skeleton">
-            <div class="skeleton-text skeleton-value"></div>
-            <div class="skeleton-text skeleton-label"></div>
-          </div>
+    <section
+      v-for="group in entryGroups"
+      :key="group.title"
+      class="entry-section"
+    >
+      <header class="section-header">
+        <div>
+          <h2>{{ group.title }}</h2>
+          <p>{{ group.description }}</p>
         </div>
-      </div>
-    </div>
+      </header>
 
-    <!-- 快捷操作骨架屏 -->
-    <div class="section">
-      <div class="section-header">
-        <div class="skeleton-text skeleton-title"></div>
+      <div class="entry-grid">
+        <button
+          v-for="item in group.items"
+          :key="item.path"
+          type="button"
+          class="entry-card"
+          @click="openEntry(item)"
+        >
+          <span class="entry-icon">
+            <img :src="item.avatar" :alt="`${item.label}图标`">
+          </span>
+          <span class="entry-content">
+            <strong>{{ item.label }}</strong>
+            <span>{{ item.description }}</span>
+          </span>
+          <span class="entry-arrow" aria-hidden="true">→</span>
+        </button>
       </div>
-      <div class="quick-grid">
-        <div v-for="i in 4" :key="i" class="quick-card-skeleton">
-          <div class="quick-card-icon-skeleton"></div>
-          <div class="quick-card-content-skeleton">
-            <div class="skeleton-text skeleton-card-title"></div>
-            <div class="skeleton-text skeleton-card-desc"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 双栏布局：最近活动 + 数据概览 -->
-    <div class="dual-column">
-      <!-- 最近活动骨架屏 -->
-      <div class="section">
-        <div class="section-header">
-          <div class="skeleton-text skeleton-title"></div>
-          <div class="skeleton-text skeleton-link"></div>
-        </div>
-        <div class="activity-list">
-          <div v-for="i in 5" :key="i" class="activity-item-skeleton">
-            <div class="skeleton-avatar"></div>
-            <div class="activity-content-skeleton">
-              <div class="skeleton-text skeleton-activity-title"></div>
-              <div class="skeleton-text skeleton-activity-desc"></div>
-              <div class="skeleton-text skeleton-activity-time"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 数据概览骨架屏 -->
-      <div class="section">
-        <div class="section-header">
-          <div class="skeleton-text skeleton-title"></div>
-          <div class="skeleton-text skeleton-link"></div>
-        </div>
-        <div class="chart-skeleton">
-          <div class="chart-header-skeleton">
-            <div class="skeleton-text skeleton-chart-label"></div>
-            <div class="skeleton-text skeleton-chart-value"></div>
-          </div>
-          <div class="chart-bars-skeleton">
-            <div v-for="i in 7" :key="i" class="skeleton-bar" :style="{ height: (20 + Math.random() * 60) + '%' }"></div>
-          </div>
-          <div class="chart-labels-skeleton">
-            <div v-for="i in 7" :key="i" class="skeleton-text skeleton-chart-xlabel"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 系统公告骨架屏 -->
-    <div class="section">
-      <div class="section-header">
-        <div class="skeleton-text skeleton-title"></div>
-        <div class="skeleton-text skeleton-link"></div>
-      </div>
-      <div class="announcement-list">
-        <div v-for="i in 3" :key="i" class="announcement-item-skeleton">
-          <div class="announcement-badge-skeleton"></div>
-          <div class="announcement-content-skeleton">
-            <div class="skeleton-text skeleton-announcement-title"></div>
-            <div class="skeleton-text skeleton-announcement-summary"></div>
-            <div class="skeleton-text skeleton-announcement-time"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 常用资源骨架屏 -->
-    <div class="section">
-      <div class="section-header">
-        <div class="skeleton-text skeleton-title"></div>
-      </div>
-      <div class="resources-grid">
-        <div v-for="i in 6" :key="i" class="resource-card-skeleton">
-          <div class="resource-icon-skeleton"></div>
-          <div class="resource-info-skeleton">
-            <div class="skeleton-text skeleton-resource-name"></div>
-            <div class="skeleton-text skeleton-resource-type"></div>
-          </div>
-          <div class="resource-action-skeleton"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 彩蛋：5秒后弹出的幽默提示 -->
-  <Teleport to="body">
-    <Transition name="egg-slide">
-      <div v-if="easterEggVisible" class="easter-egg-container" @click="dismissEgg">
-        <div class="easter-egg-card" @click.stop>
-          <div class="easter-egg-emoji">&#x1F47B;</div>
-          <div class="easter-egg-content">
-            <p v-for="(msg, idx) in messages" :key="idx" class="easter-egg-line" :class="{ active: idx <= easterEggStep }">
-              {{ msg }}
-            </p>
-          </div>
-          <div class="easter-egg-footer">
-            <span class="easter-egg-hint">点击关闭 - 但我猜你已经看完了</span>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+    </section>
+  </main>
 </template>
 
 <style scoped lang="scss">
-/* 骨架屏动画 */
-@keyframes shimmer {
-  0% {
-    background-position: -200px 0;
-  }
-  100% {
-    background-position: calc(200px + 100%) 0;
-  }
-}
-
 .dashboard-container {
-  padding: 24px;
-  background-color: #ffffff;
   min-height: 100%;
+  padding: 32px;
+  background: #f7f8fa;
 }
 
-/* 欢迎信息 */
 .welcome-section {
-  margin-bottom: 32px;
+  padding: 32px;
+  margin-bottom: 24px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 90% 20%, rgba(71, 114, 255, 0.16), transparent 34%),
+    linear-gradient(135deg, #ffffff 0%, #f5f7ff 100%);
+  border: 1px solid #e8ebf2;
+  border-radius: 16px;
+}
+
+.welcome-eyebrow {
+  margin: 0 0 10px;
+  color: #4772ff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
 }
 
 .welcome-title {
+  margin: 0 0 8px;
+  color: #17191c;
   font-size: 28px;
   font-weight: 600;
-  color: #1a1a1a;
-  margin: 0 0 8px 0;
+  line-height: 1.3;
 }
 
 .welcome-desc {
-  font-size: 14px;
-  color: #666;
   margin: 0;
+  color: #69707d;
+  font-size: 14px;
 }
 
-/* 区块通用样式 */
-.section {
-  background: #fff;
-  border-radius: 12px;
+.entry-section {
   padding: 24px;
   margin-bottom: 24px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.01);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: #fff;
+  border: 1px solid #eceef2;
+  border-radius: 16px;
 }
 
 .section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-bottom: 20px;
+
+  h2 {
+    margin: 0 0 6px;
+    color: #202328;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  p {
+    margin: 0;
+    color: #8a909b;
+    font-size: 13px;
+  }
 }
 
-/* 骨架屏基础样式 */
-.skeleton-text {
-  background: linear-gradient(90deg, #f0f0f0 25%, #f0f0f0 50%, #f0f0f0 75%);
-  background-size: 200px 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: 4px;
-}
-
-.skeleton-title {
-  width: 120px;
-  height: 20px;
-}
-
-.skeleton-link {
-  width: 60px;
-  height: 16px;
-}
-
-/* 统计卡片骨架屏 */
-.stats-grid {
+.entry-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
 }
 
-.stat-card-skeleton {
-  background: #fff;
-  border: 1px solid #f0f0f0;
-  border-radius: 12px;
-  padding: 20px;
+.entry-card {
   display: flex;
   align-items: center;
-  gap: 16px;
+  width: 100%;
+  min-height: 92px;
+  padding: 16px;
+  color: inherit;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #e9ebef;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+
+  &:hover {
+    border-color: #b9c7ff;
+    box-shadow: 0 8px 24px rgba(38, 59, 122, 0.08);
+    transform: translateY(-2px);
+
+    .entry-arrow {
+      color: #4772ff;
+      transform: translateX(3px);
+    }
+  }
+
+  &:focus-visible {
+    outline: 3px solid rgba(71, 114, 255, 0.24);
+    outline-offset: 2px;
+  }
 }
 
-.skeleton-icon {
+.entry-icon {
+  display: grid;
+  flex: 0 0 48px;
   width: 48px;
   height: 48px;
+  margin-right: 14px;
+  background: #f4f6fb;
   border-radius: 12px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200px 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-}
+  place-items: center;
 
-.stat-content-skeleton {
-  flex: 1;
-}
-
-.skeleton-value {
-  width: 60px;
-  height: 28px;
-  margin-bottom: 8px;
-}
-
-.skeleton-label {
-  width: 40px;
-  height: 14px;
-}
-
-/* 快捷操作骨架屏 */
-.quick-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
-}
-
-.quick-card-skeleton {
-  background: #fff;
-  border: 1px solid #f0f0f0;
-  border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.quick-card-icon-skeleton {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200px 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-  flex-shrink: 0;
-}
-
-.quick-card-content-skeleton {
-  flex: 1;
-}
-
-.skeleton-card-title {
-  width: 80px;
-  height: 16px;
-  margin-bottom: 8px;
-}
-
-.skeleton-card-desc {
-  width: 140px;
-  height: 12px;
-}
-
-/* 双栏布局 */
-.dual-column {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  margin-bottom: 24px;
-
-  > .section {
-    margin-bottom: 0;
+  img {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
   }
 }
 
-/* 活动列表骨架屏 */
-.activity-list {
+.entry-content {
   display: flex;
+  flex: 1;
+  min-width: 0;
   flex-direction: column;
-  gap: 16px;
-}
+  gap: 6px;
 
-.activity-item-skeleton {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid #f5f5f5;
+  strong {
+    color: #25282e;
+    font-size: 15px;
+    font-weight: 600;
+  }
 
-  &:last-child {
-    border-bottom: none;
+  span {
+    overflow: hidden;
+    color: #7b818d;
+    font-size: 12px;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
-.skeleton-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200px 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-  flex-shrink: 0;
+.entry-arrow {
+  margin-left: 12px;
+  color: #b1b6c0;
+  font-size: 18px;
+  transition: color 0.2s ease, transform 0.2s ease;
 }
 
-.activity-content-skeleton {
-  flex: 1;
-}
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 16px;
+  }
 
-.skeleton-activity-title {
-  width: 200px;
-  height: 14px;
-  margin-bottom: 6px;
-}
+  .welcome-section,
+  .entry-section {
+    padding: 20px;
+  }
 
-.skeleton-activity-desc {
-  width: 160px;
-  height: 12px;
-  margin-bottom: 6px;
-}
-
-.skeleton-activity-time {
-  width: 80px;
-  height: 10px;
-}
-
-/* 图表骨架屏 */
-.chart-skeleton {
-  height: 200px;
-}
-
-.chart-header-skeleton {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.skeleton-chart-label {
-  width: 80px;
-  height: 14px;
-}
-
-.skeleton-chart-value {
-  width: 50px;
-  height: 20px;
-}
-
-.chart-bars-skeleton {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  height: 120px;
-  padding: 0 8px;
-}
-
-.skeleton-bar {
-  flex: 1;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200px 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: 4px 4px 0 0;
-}
-
-.chart-labels-skeleton {
-  display: flex;
-  gap: 12px;
-  padding: 8px 8px 0;
-}
-
-.skeleton-chart-xlabel {
-  flex: 1;
-  height: 10px;
-}
-
-/* 公告列表骨架屏 */
-.announcement-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.announcement-item-skeleton {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 16px;
-  background: #fafafa;
-  border-radius: 8px;
-}
-
-.announcement-badge-skeleton {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200px 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-  margin-top: 6px;
-  flex-shrink: 0;
-}
-
-.announcement-content-skeleton {
-  flex: 1;
-}
-
-.skeleton-announcement-title {
-  width: 240px;
-  height: 16px;
-  margin-bottom: 8px;
-}
-
-.skeleton-announcement-summary {
-  width: 100%;
-  height: 12px;
-  margin-bottom: 8px;
-}
-
-.skeleton-announcement-time {
-  width: 100px;
-  height: 10px;
-}
-
-/* 资源网格骨架屏 */
-.resources-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 12px;
-}
-
-.resource-card-skeleton {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  background: #fafafa;
-  border-radius: 8px;
-}
-
-.resource-icon-skeleton {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200px 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-  flex-shrink: 0;
-}
-
-.resource-info-skeleton {
-  flex: 1;
-}
-
-.skeleton-resource-name {
-  width: 120px;
-  height: 14px;
-  margin-bottom: 6px;
-}
-
-.skeleton-resource-type {
-  width: 60px;
-  height: 10px;
-}
-
-.resource-action-skeleton {
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200px 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-}
-
-/* ========== 彩蛋样式 ========== */
-.easter-egg-container {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(2px);
-}
-
-.easter-egg-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 32px 36px 24px;
-  max-width: 420px;
-  width: 90%;
-  text-align: center;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-}
-
-.easter-egg-emoji {
-  font-size: 48px;
-  margin-bottom: 16px;
-  line-height: 1;
-}
-
-.easter-egg-content {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  text-align: left;
-}
-
-.easter-egg-line {
-  font-size: 15px;
-  color: #999;
-  margin: 0;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: #f8f8f8;
-  opacity: 0.4;
-  transform: translateY(6px);
-  transition: all 0.5s ease;
-  line-height: 1.5;
-}
-
-.easter-egg-line.active {
-  color: #333;
-  opacity: 1;
-  transform: translateY(0);
-  background: #f0f7ff;
-}
-
-.easter-egg-footer {
-  margin-top: 20px;
-}
-
-.easter-egg-hint {
-  font-size: 12px;
-  color: #bbb;
-}
-
-/* 进入/离开动画 */
-.egg-slide-enter-active,
-.egg-slide-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.egg-slide-enter-active .easter-egg-card,
-.egg-slide-leave-active .easter-egg-card {
-  transition: transform 0.3s ease;
-}
-
-.egg-slide-enter-from,
-.egg-slide-leave-to {
-  opacity: 0;
-}
-
-.egg-slide-enter-from .easter-egg-card {
-  transform: scale(0.85) translateY(20px);
-}
-
-.egg-slide-leave-to .easter-egg-card {
-  transform: scale(0.85) translateY(20px);
+  .entry-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

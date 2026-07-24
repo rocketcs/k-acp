@@ -20,6 +20,7 @@ import ImportUploadForm from '@/components/skill/ImportUploadForm.vue'
 import SkillToolLinkModal from '@/components/skill/SkillToolLinkModal.vue'
 import {ApboaModalApi} from "@/components/common/ApboaModalApi.ts";
 import ApboaInfiniteLoading from '@/components/common/ApboaInfiniteLoading.vue'
+import { displaySkillName } from '@/utils/skillDisplayName'
 
 const store = useSkillStore()
 const router = useRouter()
@@ -97,7 +98,7 @@ async function handleView(id: string) {
     content: h('div', {}, [
       h('p', {}, [h('strong', '关联智能体: '), data.used?.length ? data.used.join('、') : '无']),
       h('p', {}, [h('strong', '分类: '), data.category]),
-      h('p', {}, [h('strong', '名称: '), data.name]),
+      h('p', {}, [h('strong', '名称: '), displaySkillName(data.name)]),
       h('p', {}, [h('strong', '描述: '), data.description]),
       h('p', {}, [h('strong', '是否关联工具: '), data.tools?.length ? '是' : '否']),
     ])

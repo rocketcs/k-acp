@@ -6,6 +6,17 @@
  */
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import homeAvatar from '@/assets/avatar/home.png'
+import agentAvatar from '@/assets/avatar/agent.png'
+import workflowAvatar from '@/assets/avatar/workflow.png'
+import knowledgeAvatar from '@/assets/avatar/knowledgebase.png'
+import modelProviderAvatar from '@/assets/avatar/model-provider.png'
+import skillAvatar from '@/assets/avatar/skill.png'
+import mcpAvatar from '@/assets/avatar/mcp.png'
+import toolAvatar from '@/assets/avatar/tool.png'
+import hookAvatar from '@/assets/avatar/hook.png'
+import promptAvatar from '@/assets/avatar/prompt.png'
+import sensitiveAvatar from '@/assets/avatar/sensitive.png'
 
 /**
  * Props定义
@@ -34,7 +45,7 @@ interface MenuItem {
 const menuConfig: MenuItem[] = [
   // 开发分类
   {
-    key: 'dev-category',
+    key: 'home-category',
     label: '首页',
     path: '',
     type: 'category'
@@ -43,7 +54,7 @@ const menuConfig: MenuItem[] = [
   {
     key: 'dashboard',
     label: '工作台',
-    avatar: '/src/assets/avatar/home.png',
+    avatar: homeAvatar,
     path: '/dashboard',
     type: 'menu'
   },
@@ -57,21 +68,21 @@ const menuConfig: MenuItem[] = [
   {
     key: 'agent',
     label: '智能体',
-    avatar: '/src/assets/avatar/agent.png',
+    avatar: agentAvatar,
     path: '/agent',
     type: 'menu'
   },
   {
     key: 'workflow',
     label: '工作流',
-    avatar: '/src/assets/avatar/workflow.png',
+    avatar: workflowAvatar,
     path: '/workflow',
     type: 'menu'
   },
   {
     key: 'knowledge',
     label: '知识库',
-    avatar: '/src/assets/avatar/knowledgebase.png',
+    avatar: knowledgeAvatar,
     path: '/knowledge',
     type: 'menu'
   },
@@ -85,49 +96,49 @@ const menuConfig: MenuItem[] = [
   {
     key: 'model',
     label: '模型',
-    avatar: '/src/assets/avatar/model-provider.png',
+    avatar: modelProviderAvatar,
     path: '/model',
     type: 'menu'
   },
   {
     key: 'skill',
     label: '技能',
-    avatar: '/src/assets/avatar/skill.png',
+    avatar: skillAvatar,
     path: '/skill',
     type: 'menu'
   },
   {
     key: 'mcp',
     label: 'MCP',
-    avatar: '/src/assets/avatar/mcp.png',
+    avatar: mcpAvatar,
     path: '/mcp',
     type: 'menu'
   },
   {
     key: 'tool',
     label: '工具',
-    avatar: '/src/assets/avatar/tool.png',
+    avatar: toolAvatar,
     path: '/tool',
     type: 'menu'
   },
   {
     key: 'hook',
     label: '扩展',
-    avatar: '/src/assets/avatar/hook.png',
+    avatar: hookAvatar,
     path: '/hook',
     type: 'menu'
   },
   {
     key: 'prompt',
     label: '提示词',
-    avatar: '/src/assets/avatar/prompt.png',
+    avatar: promptAvatar,
     path: '/prompt',
     type: 'menu'
   },
   {
     key: 'sensitive',
     label: '敏感词',
-    avatar: '/src/assets/avatar/sensitive.png',
+    avatar: sensitiveAvatar,
     path: '/sensitive',
     type: 'menu'
   }
