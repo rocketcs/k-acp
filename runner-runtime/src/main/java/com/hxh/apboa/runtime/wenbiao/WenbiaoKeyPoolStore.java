@@ -11,6 +11,7 @@ import java.nio.channels.FileLock;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
@@ -26,7 +27,6 @@ public final class WenbiaoKeyPoolStore {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String POOL_FILE_NAME = "wenbiao_agent-key-pool.json";
     private static final String LOCK_FILE_NAME = ".wenbiao_agent-key-pool.lock";
-    private static final Path PRODUCTION_SECRET_DIRECTORY = Path.of("/app/.apboa/secrets");
     private static final Set<PosixFilePermission> OWNER_ONLY = PosixFilePermissions.fromString("rw-------");
 
     private final Path secretDirectory;
@@ -36,37 +36,29 @@ public final class WenbiaoKeyPoolStore {
     }
 
     public static WenbiaoKeyPoolStore production() {
-        return new WenbiaoKeyPoolStore(PRODUCTION_SECRET_DIRECTORY);
+        return new WenbiaoKeyPoolStore(Paths.get(".apboa", "secrets").toAbsolutePath().normalize());
     }
 
-    static WenbiaoKeyPoolStore forDirectory(Path secretDirectory) {
+    public static WenbiaoKeyPoolStore forDirectory(Path secretDirectory) {
         return new WenbiaoKeyPoolStore(secretDirectory);
     }
 
     public void initialize(String activeKey) throws IOException {
         Files.createDirectories(secretDirectory);
-        try (FileChannel channel = FileChannel.open(lockFile(), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-             FileLock ignored = channel.lock()) {
-            ObjectNode pool = Files.exists(poolFile()) ? loadPool() : JSON.createObjectNode();
-            for (JsonNode entry : pool.withArray("keys")) {
-                if ("ACTIVE".equals(entry.path("state").asText())) {
-                    return;
-                }
-            }
-            ObjectNode active = pool.withArray("keys").addObject();
-            active.put("api_key", activeKey);
-            active.put("device_id", "");
-            active.set("context", JSON.createObjectNode());
-            active.put("registered_at", "");
-            active.put("remaining_calls", 0);
-            active.put("is_new", false);
-            active.put("registration_message", "");
-            active.put("state", "ACTIVE");
-            active.put("last_checked_at", "");
-            active.put("last_provider_status", "");
-            active.put("last_rotated_at", "");
-            writeJsonAtomically(poolFile(), pool);
-        }
+        ObjectNode pool = JSON.createObjectNode();
+        ObjectNode active = pool.putArray("keys").addObject();
+        active.put("api_key", activeKey);
+        active.put("device_id", "");
+        active.set("context", JSON.createObjectNode());
+        active.put("registered_at", "");
+        active.put("remaining_calls", 0);
+        active.put("is_new", false);
+        active.put("registration_message", "");
+        active.put("state", "ACTIVE");
+        active.put("last_checked_at", "");
+        active.put("last_provider_status", "");
+        active.put("last_rotated_at", "");
+        writeJsonAtomically(poolFile(), pool);
     }
 
     public AppendResult append(Registration registration) throws IOException {
