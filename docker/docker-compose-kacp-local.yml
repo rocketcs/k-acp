@@ -22,6 +22,8 @@ services:
       APBOA_TOOL_EXECUTION_TIMEOUT_SECONDS: "240"
     ports:
       - "23061:3061"
+    volumes:
+      - ../scripts:/app/scripts:ro
 
   apboa-proxy:
     container_name: k-acp-proxy

@@ -31,7 +31,7 @@
 Run:
 
 ```bash
-docker exec k-acp-runtime sh -lc 'python3 --version; test -f /app/scripts/generate_agent_context.py'
+docker exec --user 1001:1001 k-acp-runtime sh -lc 'python3 --version; test -f /app/scripts/generate_agent_context.py'
 ```
 
 Expected: non-zero because neither Python nor the script exists in the current runtime.
@@ -60,8 +60,8 @@ Append this under `services.apboa-runtime.volumes` in `docker/docker-compose-kac
 Run:
 
 ```bash
-docker compose -f docker/docker-compose-simple.yml -f docker/docker-compose-console.yml -f docker/docker-compose-execute.yml -f docker/docker-compose-middleware.yml -f docker/docker-compose-kacp-local.yml up -d --build --force-recreate apboa-runtime
-docker exec k-acp-runtime sh -lc 'python3 --version && test -r /app/scripts/generate_agent_context.py && test -w /app/data && python3 /app/scripts/generate_agent_context.py --number 10 --output /app/data/agent_context.json && python3 -c "import json; assert len(json.load(open('''/app/data/agent_context.json'''))) == 10"'
+docker compose --env-file docker/.env.kacp -f docker/docker-compose-simple.yml -f docker/docker-compose-kacp-local.yml up -d --build --force-recreate apboa-runtime
+docker exec --user 1001:1001 k-acp-runtime sh -lc 'python3 --version && test -r /app/scripts/generate_agent_context.py && test -w /app/data && python3 /app/scripts/generate_agent_context.py --number 10 --output /app/data/agent_context.json && python3 -c "import json; assert len(json.load(open('''/app/data/agent_context.json'''))) == 10"'
 ```
 
 Expected: exit status 0 and a ten-element array.
