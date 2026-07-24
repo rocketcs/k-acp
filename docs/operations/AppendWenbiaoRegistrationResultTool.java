@@ -19,11 +19,14 @@ public final class AppendWenbiaoRegistrationResultTool implements IDynamicAgentT
         }
 
         Map<String, Object> response = map(params.get("response"));
+        boolean hasData = response.containsKey("data");
         Object data = response.get("data");
-        if (data != null && !(data instanceof Map)) {
+        // A present data field is the provider payload, even when it is null.
+        // Only an absent data field may use the legacy top-level response shape.
+        if (hasData && !(data instanceof Map)) {
             return skipped("INVALID_REGISTRATION_RESULT");
         }
-        Map<String, Object> payload = data == null ? response : map(data);
+        Map<String, Object> payload = hasData ? map(data) : response;
         Registration registration = new Registration(
             text(payload, "api_key"), text(payload, "device_id"), map(params.get("context")),
             integer(payload.get("remaining_calls")), bool(payload.get("is_new")), text(payload, "message"));
