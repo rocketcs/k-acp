@@ -80,7 +80,7 @@ const handleNewSession = () => {
     />
     <div class="chat-sidebar-header">
       <div class="chat-sidebar-brand">
-        <img src="@/assets/images/logo/logo.png" alt="logo" class="chat-sidebar-logo" />
+        <img src="@/assets/logo/logo_1.png" alt="logo" width="30px">
         <span class="chat-sidebar-name" :title="agentName || '智能体'">{{ agentName || '智能体' }}</span>
       </div>
       <AButton type="text" class="chat-sidebar-collapse-btn" :title="collapsed ? '展开' : '折叠'" @click="$emit('toggleCollapse')">

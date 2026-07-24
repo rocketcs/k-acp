@@ -9,6 +9,7 @@ import WorkflowResourceList from './WorkflowResourceList.vue'
 import DatasourceForm from './forms/DatasourceForm.vue'
 import CacheForm from './forms/CacheForm.vue'
 import MqForm from './forms/MqForm.vue'
+import ChannelForm from './forms/ChannelForm.vue'
 import type {
   WorkflowManagedResource,
   WorkflowResourceKind,
@@ -32,7 +33,8 @@ type ResourceFormExpose = {
 const formComponents = shallowReactive<Record<WorkflowResourceKind, Component>>({
   datasource: DatasourceForm,
   cache: CacheForm,
-  mq: MqForm
+  mq: MqForm,
+  channel: ChannelForm
 })
 
 const meta = computed(() => {
@@ -51,15 +53,29 @@ const meta = computed(() => {
   }
   if (props.kind === 'cache') {
     return {
-      title: '缓存',
+      title: 'Redis 缓存',
       addText: '新增缓存',
       searchPlaceholder: '搜索名称、主机、备注',
       emptyText: '暂无缓存',
       typeOptions: [{ label: 'Redis', value: 'REDIS' }]
     }
   }
+  if (props.kind === 'channel') {
+    return {
+      title: '通知渠道',
+      addText: '新增渠道',
+      searchPlaceholder: '搜索名称、备注',
+      emptyText: '暂无渠道',
+      typeOptions: [
+        { label: '邮箱（SMTP）', value: 'EMAIL' },
+        { label: '企业微信机器人', value: 'WECOM' },
+        { label: '钉钉机器人', value: 'DINGTALK' },
+        { label: '飞书机器人', value: 'FEISHU' }
+      ]
+    }
+  }
   return {
-    title: '消息',
+    title: '消息队列',
     addText: '新增消息',
     searchPlaceholder: '搜索名称、地址、备注',
     emptyText: '暂无消息资源',
@@ -309,7 +325,7 @@ onMounted(load)
           <AEmpty :description="meta.emptyText" />
         </div>
         <div v-if="loading" class="workflow-resource-loading">
-          <ASpin />
+          <ApboaSpin :spinning="true" />
         </div>
       </div>
     </div>

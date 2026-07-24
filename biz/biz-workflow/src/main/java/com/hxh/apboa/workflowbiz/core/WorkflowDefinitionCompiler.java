@@ -27,6 +27,7 @@ public class WorkflowDefinitionCompiler {
     static {
         bind(NodeType.START, com.hxh.apboa.node.start.StartNode.class, com.hxh.apboa.node.start.Config.class);
         bind(NodeType.END, com.hxh.apboa.node.end.EndNode.class, com.hxh.apboa.node.end.Config.class);
+        bind(NodeType.NO_OPERATION, com.hxh.apboa.node.nooperation.NoOperationNode.class, com.hxh.apboa.node.nooperation.Config.class);
         bind(NodeType.CACHE_FETCH, com.hxh.apboa.node.cache.fetch.CacheFetchNode.class, com.hxh.apboa.node.cache.fetch.Config.class);
         bind(NodeType.CACHE_REFRESH, com.hxh.apboa.node.cache.refresh.CacheRefreshNode.class, com.hxh.apboa.node.cache.refresh.Config.class);
         bind(NodeType.CACHE_REMOVE, com.hxh.apboa.node.cache.remove.CacheRemoveNode.class, com.hxh.apboa.node.cache.remove.Config.class);
@@ -53,6 +54,11 @@ public class WorkflowDefinitionCompiler {
         bind(NodeType.VARIABLE_AGG, com.hxh.apboa.node.variable.agg.VariableAggNode.class, com.hxh.apboa.node.variable.agg.Config.class);
         bind(NodeType.TOOL_EXECUTE, com.hxh.apboa.node.toolexecute.ToolExecuteNode.class, com.hxh.apboa.node.toolexecute.Config.class);
         bind(NodeType.MCP_CALL, com.hxh.apboa.node.mcp.McpNode.class, com.hxh.apboa.node.mcp.Config.class);
+        bind(NodeType.EMAIL_SEND, com.hxh.apboa.node.channel.email.EmailSendNode.class, com.hxh.apboa.node.channel.email.Config.class);
+        bind(NodeType.WECOM_SEND, com.hxh.apboa.node.channel.wecom.WecomSendNode.class, com.hxh.apboa.node.channel.wecom.Config.class);
+        bind(NodeType.DINGTALK_SEND, com.hxh.apboa.node.channel.dingtalk.DingTalkSendNode.class, com.hxh.apboa.node.channel.dingtalk.Config.class);
+        bind(NodeType.FEISHU_SEND, com.hxh.apboa.node.channel.feishu.FeishuSendNode.class, com.hxh.apboa.node.channel.feishu.Config.class);
+        bind(NodeType.INTENT_RECOGNITION, com.hxh.apboa.node.intent.IntentRecognitionNode.class, com.hxh.apboa.node.intent.Config.class);
     }
 
     public static Set<NodeType> supportedTypes() {

@@ -1,7 +1,7 @@
 <!-- eslint-disable vue/multi-word-component-names -->
 <script setup lang="ts" name="RegisterPage">
 /**
- * 注册页面 — 步骤式引导：先选择组织归属方式，再填写个人信息
+ * 注册页面 -- 步骤式引导：先选择组织归属方式，再填写个人信息
  *
  * @author huxuehao
  */
@@ -199,14 +199,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <AuthContainer :show-back="true" back-to="/login">
-    <div class="auth-title">欢迎使用金智维智能体平台</div>
-
-    <!-- 步骤指示器 -->
-    <ASteps :current="currentStep" size="small" class="register-steps">
-      <AStep title="选择组织" />
-      <AStep title="填写信息" />
-    </ASteps>
+  <AuthContainer>
+    <!-- 标题区 -->
+    <div class="auth-card-header">
+      <h2 class="auth-card-title">创建账号</h2>
+    </div>
+    <p class="auth-card-subtitle">注册金智维智能体平台</p>
 
     <AForm
       ref="formRef"
@@ -243,7 +241,6 @@ onMounted(() => {
 
         <!-- 创建组织模式 -->
         <div v-if="formState.registerMode === 'create'" class="tenant-section">
-          <div class="tenant-section-title">组织信息</div>
           <AFormItem name="tenantName" class="auth-form-item">
             <AInput
               v-model:value="formState.tenantName"
@@ -269,10 +266,6 @@ onMounted(() => {
 
         <!-- 加入已有组织模式 -->
         <div v-if="formState.registerMode === 'join'" class="tenant-section join-wrapper">
-          <div class="tenant-section-title">
-            选择要加入的组织
-            <ASpin :spinning="joinLoading" size="small" class="ml-sm" />
-          </div>
           <div class="join-scroll-area">
             <div v-if="discoverableTenants.length === 0 && !joinLoading" class="empty-hint">
               暂无可加入的组织，你可以选择「创建我的组织」
@@ -297,13 +290,14 @@ onMounted(() => {
           </div>
         </div>
 
-        <AButton type="primary" size="large" block @click="nextStep">
+        <AButton type="primary" size="large" class="auth-submit-btn" @click="nextStep">
           下一步
         </AButton>
       </div>
 
       <!-- 步骤2：填写个人信息 -->
       <div v-show="currentStep === 1" class="step-content">
+        <div class="auth-form-label">昵称</div>
         <AFormItem name="nickname" class="auth-form-item">
           <AInput
             v-model:value="formState.nickname"
@@ -312,6 +306,7 @@ onMounted(() => {
           />
         </AFormItem>
 
+        <div class="auth-form-label">用户名</div>
         <AFormItem name="username" class="auth-form-item">
           <AInput
             v-model:value="formState.username"
@@ -320,6 +315,7 @@ onMounted(() => {
           />
         </AFormItem>
 
+        <div class="auth-form-label">邮箱</div>
         <AFormItem name="email" class="auth-form-item">
           <AInput
             v-model:value="formState.email"
@@ -328,6 +324,7 @@ onMounted(() => {
           />
         </AFormItem>
 
+        <div class="auth-form-label">密码</div>
         <AFormItem name="password" class="auth-form-item">
           <AInputPassword
             v-model:value="formState.password"
@@ -336,6 +333,7 @@ onMounted(() => {
           />
         </AFormItem>
 
+        <div class="auth-form-label">确认密码</div>
         <AFormItem name="confirmPassword" class="auth-form-item">
           <AInputPassword
             v-model:value="formState.confirmPassword"
@@ -351,6 +349,7 @@ onMounted(() => {
             html-type="submit"
             size="large"
             :loading="loading"
+            class="auth-submit-btn"
           >
             注册
           </AButton>
@@ -358,11 +357,9 @@ onMounted(() => {
       </div>
     </AForm>
 
-    <div class="text-center mt-md">
-      <span class="text-secondary">已有账号？</span>
-      <a @click="goToLogin" class="text-primary cursor-pointer ml-sm">
-        去登录
-      </a>
+    <div class="auth-footer-link">
+      已有账号？
+      <a @click="goToLogin">去登录</a>
     </div>
   </AuthContainer>
 </template>
@@ -407,39 +404,27 @@ onMounted(() => {
   background: #fff;
 }
 
-/* 创建组织 — 蓝色主题 */
+/* 创建组织 -- 蓝色主题 */
 .mode-create {
   &:hover {
-    border-color: #1677ff;
-    box-shadow: 0 2px 8px rgba(22, 119, 255, 0.1);
+    border-color: #4F6EF7;
   }
 
   &.active {
-    border-color: #1677ff;
-    background: #e6f4ff;
-    box-shadow: 0 2px 12px rgba(22, 119, 255, 0.15);
-
-    .mode-card-title {
-      color: #1677ff;
-    }
+    border-color: #4F6EF7;
+    background: #f0f4ff;
   }
 }
 
-/* 加入组织 — 绿色主题 */
+/* 加入组织 -- 绿色主题 */
 .mode-join {
   &:hover {
     border-color: #52c41a;
-    box-shadow: 0 2px 8px rgba(82, 196, 26, 0.1);
   }
 
   &.active {
     border-color: #52c41a;
     background: #f6ffed;
-    box-shadow: 0 2px 12px rgba(82, 196, 26, 0.15);
-
-    .mode-card-title {
-      color: #52c41a;
-    }
   }
 }
 
@@ -458,13 +443,13 @@ onMounted(() => {
 }
 
 .mode-create .mode-card-icon {
-  color: #1677ff;
-  background: rgba(22, 119, 255, 0.08);
+  color: #4F6EF7;
+  background: rgba(79, 110, 247, 0.08);
 }
 
 .mode-create.active .mode-card-icon {
   color: #fff;
-  background: #1677ff;
+  background: #4F6EF7;
 }
 
 .mode-join .mode-card-icon {
@@ -485,13 +470,6 @@ onMounted(() => {
   transition: color 0.25s ease;
 }
 
-.mode-card-desc {
-  font-size: 12px;
-  color: var(--text-tertiary, #999);
-  text-align: center;
-  line-height: 1.4;
-}
-
 .tenant-section {
   margin-bottom: 16px;
   padding: 16px;
@@ -508,15 +486,6 @@ onMounted(() => {
 .join-scroll-area {
   max-height: 210px;
   overflow-y: auto;
-}
-
-.tenant-section-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-secondary, #666);
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
 }
 
 .empty-hint {
@@ -544,13 +513,13 @@ onMounted(() => {
   background: #fff;
 
   &:hover {
-    border-color: var(--primary-color, #1677ff);
-    background: var(--primary-bg-hover, #f0f5ff);
+    border-color: #4F6EF7;
+    background: #f0f4ff;
   }
 
   &.active {
-    border-color: var(--primary-color, #1677ff);
-    background: var(--primary-bg, #e6f4ff);
+    border-color: #4F6EF7;
+    background: #eef2ff;
   }
 }
 
@@ -572,7 +541,7 @@ onMounted(() => {
 }
 
 .tenant-select-badge {
-  color: var(--primary-color, #1677ff);
+  color: #4F6EF7;
   font-size: 18px;
   flex-shrink: 0;
   margin-left: 8px;

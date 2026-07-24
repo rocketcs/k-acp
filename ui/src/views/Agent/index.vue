@@ -388,7 +388,7 @@ onMounted(() => {
         <ASelect
           v-model:value="selectedTag"
           placeholder="选择标签"
-          style="width: 200px; border: rgba(14,14,14,0.1) solid 1px !important; border-radius: 6px;"
+          style="width: 200px; border-radius: 6px;"
         >
           <ASelectOption v-for="opt in tagOptions" :key="opt.value" :value="opt.value">
             {{ opt.label }}
@@ -398,7 +398,7 @@ onMounted(() => {
         <AInput
           v-model:value="keyword"
           placeholder="搜索智能体名称"
-          style="width: 300px; border: rgba(14,14,14,0.1) solid 1px !important;"
+          style="width: 300px; "
           @pressEnter="handleSearch"
         >
           <template #suffix>

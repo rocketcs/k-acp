@@ -127,7 +127,7 @@ const handleRemove = (item: UploadedFileItem) => {
   gap: 4px;
   max-width: 280px;
   padding: 6px 10px;
-  background: #F5F7FA;
+  background: #F5F6F8;
   border-radius: var(--border-radius-md);
   font-size: var(--font-size-sm);
   transition: background-color 0.2s ease, border-color 0.2s ease;

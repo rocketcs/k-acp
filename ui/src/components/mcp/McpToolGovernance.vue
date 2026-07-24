@@ -6,6 +6,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { BugOutlined, SearchOutlined, ToolOutlined } from '@ant-design/icons-vue'
+import SimpleSwitch from '@/components/common/SimpleSwitch.vue'
 import type { McpServerVO, McpToolVO } from '@/types'
 
 const props = defineProps<{
@@ -99,7 +100,7 @@ function handleClose() {
         />
       </div>
 
-      <ASpin :spinning="loading">
+      <ApboaSpin :spinning="loading">
         <AEmpty v-if="!tools.length" description="暂无工具目录" />
         <template v-else>
           <AEmpty v-if="!filteredTools.length" description="未找到匹配的工具" />
@@ -137,19 +138,17 @@ function handleClose() {
                   <ATag v-else-if="tool.enabled" color="success" :bordered="false">全局可用</ATag>
                   <ATag v-else color="default" :bordered="false">全局禁用</ATag>
                 </div>
-                <ASwitch
+                <SimpleSwitch
                   :checked="tool.enabled"
                   :loading="togglingMap.has(tool.id)"
                   :disabled="loading || readonly || togglingMap.has(tool.id)"
-                  checked-children="开"
-                  un-checked-children="关"
                   @change="(checked: boolean) => handleToggleEnabled(tool, checked)"
                 />
               </div>
             </div>
           </div>
         </template>
-      </ASpin>
+      </ApboaSpin>
     </div>
   </ApboaModal>
 </template>

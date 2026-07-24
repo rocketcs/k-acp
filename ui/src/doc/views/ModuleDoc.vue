@@ -183,7 +183,7 @@ watch(() => route.path, async () => {
   <div class="doc-md-page">
     <!-- 加载状态 -->
     <div v-if="loading" class="doc-md-loading">
-      <ASpin size="large" tip="加载文档中..." />
+      <ApboaSpin size="large" tip="加载文档中..." />
     </div>
 
     <!-- 主内容区 -->
@@ -320,7 +320,7 @@ $doc-toc-width: 240px;
   line-height: 1.4;
 
   &:hover {
-    background-color: #f5f7fa;
+    background-color: #F5F6F8;
   }
 
   &.active {

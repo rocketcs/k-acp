@@ -250,7 +250,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <ASpin :spinning="loading">
+    <ApboaSpin :spinning="loading">
       <div class="storage-list">
         <div
           v-for="item in filteredList"
@@ -303,7 +303,7 @@ onMounted(() => {
       </div>
 
       <AEmpty v-if="!loading && filteredList.length === 0" description="暂无存储配置" />
-    </ASpin>
+    </ApboaSpin>
 
     <!-- 新增/编辑表单弹窗 -->
     <AModal

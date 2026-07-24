@@ -97,7 +97,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <ASpin :spinning="loading">
+    <ApboaSpin :spinning="loading">
       <div class="params-list">
         <div
           v-for="item in filteredList"
@@ -137,7 +137,7 @@ onMounted(() => {
                   <EditOutlined />编辑
                 </AButton>
               </div>
-              
+
             </div>
             <div class="params-value-row">
               <template v-if="editingId === item.id">
@@ -151,7 +151,7 @@ onMounted(() => {
                 />
               </template>
               <span v-else class="params-value-text">{{ item.paramValue || '-' }}</span>
-              
+
             </div>
           </div>
         </div>
@@ -161,7 +161,7 @@ onMounted(() => {
         v-if="!loading && filteredList.length === 0"
         :description="searchKeyword ? '暂无匹配的系统参数' : '暂无系统参数'"
       />
-    </ASpin>
+    </ApboaSpin>
   </div>
 </template>
 

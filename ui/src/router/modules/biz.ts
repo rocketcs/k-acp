@@ -42,6 +42,15 @@ const bizRoutes: AppRouteRecordRaw[] = [
           hidden: false
         },
       },
+      {
+        path: RoutePaths.MODEL_PROVIDER_CONFIG,
+        name: RouteNames.MODEL_PROVIDER_CONFIG,
+        component: () => import('@/views/Model/ProviderConfig.vue'),
+        meta: {
+          title: '模型配置',
+          hidden: true
+        },
+      },
 
       {
         path: RoutePaths.AGENT,
@@ -59,26 +68,6 @@ const bizRoutes: AppRouteRecordRaw[] = [
         meta: {
           title: '工作流',
           hidden: false
-        },
-      },
-      {
-        path: RoutePaths.WORKFLOW_NEW,
-        name: RouteNames.WORKFLOW_NEW,
-        component: () => import('@/views/Workflow/WorkflowEditorView.vue'),
-        meta: {
-          title: '新建工作流',
-          hidden: true,
-          hideFooter: true,
-        },
-      },
-      {
-        path: RoutePaths.WORKFLOW_EDIT,
-        name: RouteNames.WORKFLOW_EDIT,
-        component: () => import('@/views/Workflow/WorkflowEditorView.vue'),
-        meta: {
-          title: '编辑工作流',
-          hidden: true,
-          hideFooter: true,
         },
       },
       {
@@ -138,6 +127,15 @@ const bizRoutes: AppRouteRecordRaw[] = [
         },
       },
       {
+        path: RoutePaths.MCP_TOOL_GOVERNANCE,
+        name: RouteNames.MCP_TOOL_GOVERNANCE,
+        component: () => import('@/views/Mcp/ToolGovernance.vue'),
+        meta: {
+          title: '工具治理',
+          hidden: true
+        },
+      },
+      {
         path: RoutePaths.KNOWLEDGE,
         name: RouteNames.KNOWLEDGE,
         component: () => import('@/views/Knowledge/index.vue'),
@@ -145,8 +143,176 @@ const bizRoutes: AppRouteRecordRaw[] = [
           title: '知识库',
           hidden: false
         },
+      },
+      // 工作台
+      {
+        path: RoutePaths.DASHBOARD,
+        name: RouteNames.DASHBOARD,
+        component: () => import('@/views/Dashboard/index.vue'),
+        meta: {
+          title: '工作台',
+          hidden: false
+        },
+      },
+      {
+        path: RoutePaths.CHAT_CLUSTER,
+        name: RouteNames.CHAT_CLUSTER,
+        component: () => import('@/views/ChatCluster/index.vue'),
+        meta: {
+          title: '对话广场',
+          hidden: false
+        },
+      },
+      {
+        path: RoutePaths.AUTOMATION,
+        name: RouteNames.AUTOMATION,
+        component: () => import('@/views/Automation/index.vue'),
+        meta: {
+          title: '自动化',
+          hidden: false
+        },
+      },
+      {
+        path: '/automation/new',
+        name: 'AutomationNew',
+        component: () => import('@/views/Automation/Editor.vue'),
+        meta: {
+          title: '新增自动化任务',
+          hidden: true
+        },
+      },
+      {
+        path: '/automation/:id/edit',
+        name: 'AutomationEdit',
+        component: () => import('@/views/Automation/Editor.vue'),
+        meta: {
+          title: '编辑自动化任务',
+          hidden: true
+        },
+      },
+      {
+        path: '/automation/:id/records',
+        name: 'AutomationRecords',
+        component: () => import('@/views/Automation/Records.vue'),
+        meta: {
+          title: '执行记录',
+          hidden: true
+        },
+      },
+      // 设置管理
+      {
+        path: RoutePaths.SETTINGS_ACCOUNT,
+        name: RouteNames.SETTINGS_ACCOUNT,
+        component: () => import('@/views/Settings/Account.vue'),
+        meta: {
+          title: '我的账号',
+          hidden: false
+        },
+      },
+      {
+        path: RoutePaths.SETTINGS_TENANT,
+        name: RouteNames.SETTINGS_TENANT,
+        component: () => import('@/views/Settings/Tenant.vue'),
+        meta: {
+          title: '组织管理',
+          hidden: false
+        },
+      },
+      {
+        path: RoutePaths.SETTINGS_TENANT_DISCOVERY,
+        name: RouteNames.SETTINGS_TENANT_DISCOVERY,
+        component: () => import('@/views/Settings/TenantDiscovery.vue'),
+        meta: {
+          title: '发现组织',
+          hidden: false
+        },
+      },
+      {
+        path: RoutePaths.SETTINGS_SYSTEM_PARAMS,
+        name: RouteNames.SETTINGS_SYSTEM_PARAMS,
+        component: () => import('@/views/Settings/SystemParams.vue'),
+        meta: {
+          title: '系统参数',
+          hidden: false
+        },
+      },
+      {
+        path: RoutePaths.SETTINGS_SYSTEM_INTRO,
+        name: RouteNames.SETTINGS_SYSTEM_INTRO,
+        component: () => import('@/views/Settings/SystemIntro.vue'),
+        meta: {
+          title: '系统介绍',
+          hidden: false
+        },
+      },
+      {
+        path: RoutePaths.SETTINGS_API_KEYS,
+        name: RouteNames.SETTINGS_API_KEYS,
+        component: () => import('@/views/Settings/ApiKeys.vue'),
+        meta: {
+          title: 'API Keys',
+          hidden: false
+        },
+      },
+      // 运维管理
+      {
+        path: RoutePaths.OPS_MONITOR,
+        name: RouteNames.OPS_MONITOR,
+        component: () => import('@/views/Ops/Monitor.vue'),
+        meta: {
+          title: '服务监控',
+          hidden: false
+        },
+      },
+      {
+        path: RoutePaths.OPS_STORAGE,
+        name: RouteNames.OPS_STORAGE,
+        component: () => import('@/views/Ops/Storage.vue'),
+        meta: {
+          title: '存储管理',
+          hidden: false
+        },
+      },
+      // 审查管理
+      {
+        path: RoutePaths.REVIEW_AGENT,
+        name: RouteNames.REVIEW_AGENT,
+        component: () => import('@/views/Review/Agent.vue'),
+        meta: {
+          title: '审查智能体',
+          hidden: false
+        },
+      },
+      {
+        path: RoutePaths.REVIEW_WORKFLOW,
+        name: RouteNames.REVIEW_WORKFLOW,
+        component: () => import('@/views/Review/Workflow.vue'),
+        meta: {
+          title: '审查工作流',
+          hidden: false
+        },
       }
-    ]
+    ],
+  },
+  {
+    path: RoutePaths.WORKFLOW_NEW,
+    name: RouteNames.WORKFLOW_NEW,
+    component: () => import('@/views/Workflow/WorkflowEditorView.vue'),
+    meta: {
+      title: '新建工作流',
+      hidden: true,
+      hideFooter: true,
+    },
+  },
+  {
+    path: RoutePaths.WORKFLOW_EDIT,
+    name: RouteNames.WORKFLOW_EDIT,
+    component: () => import('@/views/Workflow/WorkflowEditorView.vue'),
+    meta: {
+      title: '编辑工作流',
+      hidden: true,
+      hideFooter: true,
+    },
   }
 ]
 

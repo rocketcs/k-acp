@@ -534,7 +534,7 @@ watch(isRunning, (running) => {
 </script>
 
 <template>
-  <div class="chat-page" style="background-color: #ffffff">
+  <div class="chat-page">
     <ChatSidebar
       :collapsed="sidebarCollapsed"
       :agent-name="agentDetail?.name"

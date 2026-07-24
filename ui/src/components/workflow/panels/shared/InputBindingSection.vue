@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import InputBindingEditor from '@/components/workflow/bindings/InputBindingEditor.vue'
-import PanelSection from './PanelSection.vue'
 import type { WorkflowFlowEdge, WorkflowFlowNode, WorkflowInputConfig } from '@/types/workflow'
+import PanelSection from "@/components/workflow/panels/shared/PanelSection.vue";
 
 defineProps<{
   modelValue?: WorkflowInputConfig[]
@@ -18,7 +18,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <PanelSection title="输入绑定">
+  <PanelSection title="节点输入">
     <InputBindingEditor
       :model-value="modelValue"
       :nodes="nodes"

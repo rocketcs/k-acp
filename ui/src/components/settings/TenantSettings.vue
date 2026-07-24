@@ -450,7 +450,7 @@ watch(activeTab, (tab) => {
               </div>
             </div>
 
-            <ASpin :spinning="membersLoading">
+            <ApboaSpin :spinning="membersLoading">
               <div class="account-list">
                 <div
                   v-for="member in filteredMembers"
@@ -501,7 +501,7 @@ watch(activeTab, (tab) => {
                 </div>
               </div>
               <AEmpty v-if="!membersLoading && filteredMembers.length === 0" description="暂无成员" />
-            </ASpin>
+            </ApboaSpin>
 
             <!-- 添加成员弹窗 -->
             <AModal
@@ -545,7 +545,7 @@ watch(activeTab, (tab) => {
                 />
               </div>
             </div>
-            <ASpin :spinning="joinRequestsLoading">
+            <ApboaSpin :spinning="joinRequestsLoading">
               <div class="account-list">
                 <div
                   v-for="request in filteredJoinRequests"
@@ -581,7 +581,7 @@ watch(activeTab, (tab) => {
                 </div>
               </div>
               <AEmpty v-if="!joinRequestsLoading && filteredJoinRequests.length === 0" description="暂无申请" />
-            </ASpin>
+            </ApboaSpin>
           </div>
         </ATabPane>
       </ATabs>

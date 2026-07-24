@@ -39,9 +39,11 @@ const resourceSummary = ref<WorkflowResourceSummary>({
   datasourceTotal: 0,
   cacheTotal: 0,
   mqTotal: 0,
+  channelTotal: 0,
   datasourceEnabled: 0,
   cacheEnabled: 0,
   mqEnabled: 0,
+  channelEnabled: 0,
 })
 
 /** 用于强制重建 InfiniteLoading 组件的 key */
@@ -181,7 +183,7 @@ async function removeWorkflow(record: Workflow) {
     okText: '删除',
     cancelText: '取消',
     onOk: async () => {
-      await workflowApi.workflowRemove([record.id!], 0)
+      await workflowApi.workflowRemove([record.id!], 1)
       message.success('删除成功')
       store.markListDirty()
       await refreshListFromServer()
@@ -267,7 +269,7 @@ onActivated(refreshIfDirty)
         <AInput
           v-model:value="filterName"
           allow-clear
-          style="width: 320px; border: rgba(14,14,14,0.1) solid 1px !important;"
+          style="width: 320px;"
           placeholder="搜索工作流名称"
           @pressEnter="search()"
         >
@@ -283,7 +285,7 @@ onActivated(refreshIfDirty)
           v-model:value="filterStatus"
           allow-clear
           placeholder="发布状态"
-          style="width: 140px; border: rgba(14,14,14,0.1) solid 1px !important; border-radius: 6px;"
+          style="width: 140px; border-radius: 6px;"
           :options="[
             { label: '草稿', value: 'DRAFT' },
             { label: '已发布', value: 'PUBLISHED' },
@@ -294,7 +296,7 @@ onActivated(refreshIfDirty)
           v-model:value="filterEnabled"
           allow-clear
           placeholder="启用状态"
-          style="width: 140px; border: rgba(14,14,14,0.1) solid 1px !important; border-radius: 6px;"
+          style="width: 140px; border-radius: 6px;"
           :options="[
             { label: '启用', value: true },
             { label: '禁用', value: false },

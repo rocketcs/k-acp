@@ -94,7 +94,7 @@ function startAdd() {
   adding.value = true
   editingId.value = null
   editName.value = ''
-  editType.value = 'string'
+  editType.value = 'String'
   nextTick(() => {
     scrollToBottom()
   })
@@ -149,7 +149,7 @@ function cancelEdit() {
   adding.value = false
   editingId.value = null
   editName.value = ''
-  editType.value = 'string'
+  editType.value = 'String'
 }
 
 function deleteVariable(id: string) {

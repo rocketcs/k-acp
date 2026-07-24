@@ -126,8 +126,8 @@ onMounted(() => {
       浏览已加入的组织，或发现并申请加入感兴趣的团队
     </div>
 
-    <ASpin :spinning="loading">
-      <div v-if="tenants.length === 0" class="empty-state">
+    <ApboaSpin :spinning="loading">
+      <div v-if="tenants.length === 0 && !loading" class="empty-state">
         <AEmpty description="暂无可发现的租户" />
       </div>
 
@@ -211,7 +211,7 @@ onMounted(() => {
           </div>
         </section>
       </div>
-    </ASpin>
+    </ApboaSpin>
 
     <!-- 申请加入弹窗 -->
     <AModal

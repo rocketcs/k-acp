@@ -14,6 +14,7 @@ public class TableConst {
     public static final String SENSITIVE_WORD = "sensitive_word_config";
     public static final String JOB_LOG = "quartz_job_log";
     public static final String JOB_INFO = "quartz_job_info";
+    public static final String JOB_RECORD = "quartz_job_records";
     public static final String PARAMS = "params";
     public static final String PROVIDER = "model_provider";
     public static final String MODEL = "model_config";
@@ -56,11 +57,13 @@ public class TableConst {
     public static final String CACHE = "cache";
     public static final String DATASOURCE = "datasource";
     public static final String MQ = "mq";
+    public static final String CHANNEL = "channel";
     public static final String PLUGIN = "plugin";
     public static final String WORKFLOW = "workflow";
     public static final String WORKFLOW_CACHE = "workflow_cache";
     public static final String WORKFLOW_DATASOURCE = "workflow_datasource";
     public static final String WORKFLOW_MQ = "workflow_mq";
+    public static final String WORKFLOW_CHANNEL = "workflow_channel";
     public static final String WORKFLOW_NODE_EXECUTION = "workflow_node_execution";
     public static final String WORKFLOW_PLUGIN = "workflow_plugin";
     public static final String WORKFLOW_RUN = "workflow_run";

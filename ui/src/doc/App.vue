@@ -96,7 +96,7 @@ $doc-sidebar-width: 240px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 20px 20px 16px;
+  padding: 15px 16px;
   border-bottom: 1px solid #f0f0f0;
 }
 

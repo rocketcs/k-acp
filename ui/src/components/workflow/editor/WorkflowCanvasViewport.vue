@@ -24,9 +24,12 @@ const emit = defineEmits<{
   paneClick: []
   showLibrary: [payload: { sourceNodeId: string; sourceHandle: string; x: number; y: number }]
   showLibraryFromEdge: [payload: { edgeId: string; x: number; y: number }]
+  deleteNodes: [nodeIds: string[]]
+  deleteEdges: [edgeIds: string[]]
 }>()
 
 const flow = useVueFlow()
+const { getSelectedNodes, getSelectedEdges } = flow
 const { viewport } = flow
 
 // ========== 对齐辅助线 ==========
@@ -155,6 +158,11 @@ function deduplicateGuides(guides: AlignGuide[]): AlignGuide[] {
   })
 }
 
+function onNodeDragStart({ node }: { node: GraphNode }) {
+  // if (props.readonly) return
+  // emit('selectNode', node.id)
+}
+
 function onNodeDrag({ node }: { node: GraphNode }) {
   if (props.readonly) return
   const { guides, snapX, snapY } = computeAlignment(node)
@@ -183,13 +191,31 @@ function clearGuides() {
 }
 
 // 全局安全网：捕获阶段监听，确保在 VueFlow stopPropagation 之前拦截
+function onKeyDown(event: KeyboardEvent) {
+  if (event.key !== 'Backspace' && event.key !== 'Delete') return
+  if (props.readonly) return
+  // 焦点在输入类控件时不响应，避免与文本编辑冲突
+  const active = document.activeElement as HTMLElement | null
+  const tag = active?.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || active?.isContentEditable) return
+  // 从 VueFlow 内部 store 读取真实选中状态（v-model 数组不一定同步 selected）
+  const selectedNodeIds = getSelectedNodes.value.map((n) => n.id)
+  const selectedEdgeIds = getSelectedEdges.value.map((e) => e.id)
+  if (!selectedNodeIds.length && !selectedEdgeIds.length) return
+  event.preventDefault()
+  if (selectedNodeIds.length) emit('deleteNodes', selectedNodeIds)
+  if (selectedEdgeIds.length) emit('deleteEdges', selectedEdgeIds)
+}
+
 onMounted(() => {
+  window.addEventListener('keydown', onKeyDown, true)
   window.addEventListener('mouseup', clearGuides, true)
   window.addEventListener('pointerup', clearGuides, true)
   window.addEventListener('blur', clearGuides)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', onKeyDown, true)
   window.removeEventListener('mouseup', clearGuides, true)
   window.removeEventListener('pointerup', clearGuides, true)
   window.removeEventListener('blur', clearGuides)
@@ -306,11 +332,13 @@ defineExpose({ addAtCenter, fitAll, zoomInCanvas, zoomOutCanvas, resetZoom, fitN
       :nodes-draggable="!readonly"
       :nodes-connectable="!readonly"
       :edges-updatable="!readonly"
+      :delete-key-code="[]"
       :default-edge-options="{ animated: false, type: 'workflow' }"
       @connect="onConnect"
       @node-click="onNodeClick"
       @node-context-menu="onNodeContextMenu"
       @pane-click="onPaneClick"
+      @node-drag-start="onNodeDragStart"
       @node-drag="onNodeDrag"
       @node-drag-stop="onNodeDragStop"
     >

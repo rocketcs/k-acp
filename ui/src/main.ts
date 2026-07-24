@@ -21,6 +21,7 @@ import App from './App.vue'
 import router from './router'
 import { useAccountStore } from '@/stores'
 import ApboaModal from '@/components/common/ApboaModal.vue'
+import ApboaSpin from '@/components/common/ApboaSpin.vue'
 
 const app = createApp(App)
 
@@ -30,6 +31,7 @@ app.use(pinia)
 app.use(router)
 app.use(Antd)
 app.component('ApboaModal', ApboaModal)
+app.component('ApboaSpin', ApboaSpin)
 message.config({
   top: '50px',
 })

@@ -60,7 +60,7 @@ const docNavItems = [
   <div class="doc-home">
     <!-- 欢迎区域 -->
     <section class="doc-home-hero">
-      <img src="@/assets/images/logo/logo.png" alt="logo" class="doc-home-logo" />
+      <img src="@/assets/images/logo/logo.png" alt="金智维" class="doc-home-logo" />
       <h1 class="doc-home-hero-title">金智维智能体平台</h1>
       <p class="doc-home-hero-desc">
         金智维是一款功能强大的智能体管理平台，帮助企业快速构建、部署和管理 AI 智能体应用。

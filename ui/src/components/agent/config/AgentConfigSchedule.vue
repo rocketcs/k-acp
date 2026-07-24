@@ -205,7 +205,7 @@ defineExpose({ isDirty })
 
 <template>
   <div class="config-schedule">
-    <ASpin :spinning="initialLoading">
+    <ApboaSpin :spinning="initialLoading">
       <AForm ref="formRef" :model="formData" :rules="formRules" layout="vertical" class="config-schedule-form">
         <AFormItem label="输入内容" name="input">
           <ATextarea
@@ -327,7 +327,7 @@ defineExpose({ isDirty })
         <AButton type="primary" danger :disabled="!isEdit" :loading="unbindLoading" @click="handleUnbind">解绑定时任务</AButton>
         <AButton type="primary" :loading="loading" @click="handleSubmit">保存</AButton>
       </div>
-    </ASpin>
+    </ApboaSpin>
   </div>
 </template>
 

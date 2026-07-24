@@ -126,7 +126,7 @@ function handleDelete(item: WorkflowVersion) {
         </AButton>
       </div>
 
-      <ASpin :spinning="loading">
+      <ApboaSpin :spinning="loading">
         <div v-if="hasVersions" class="version-list">
           <div v-for="item in versions" :key="item.id" class="version-item">
             <div class="version-info">
@@ -163,7 +163,7 @@ function handleDelete(item: WorkflowVersion) {
         <div v-else class="version-empty">
           <AEmpty description="暂无版本记录" />
         </div>
-      </ASpin>
+      </ApboaSpin>
     </div>
   </AModal>
 </template>

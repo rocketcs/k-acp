@@ -491,15 +491,20 @@ INSERT INTO `params` (`id`, `param_name`, `param_key`, `param_value`, `tenant_id
 
 DROP TABLE IF EXISTS `quartz_job_info`;
 CREATE TABLE `quartz_job_info` (
-  `id` varchar(64) NOT NULL COMMENT '任务身份唯一标识',
-  `type` varchar(100) DEFAULT NULL COMMENT '类型',
-  `biz_id` varchar(64) DEFAULT NULL COMMENT '关联业务ID',
-  `cron` varchar(64) DEFAULT NULL COMMENT 'cron',
-  `job_class` varchar(100) DEFAULT NULL COMMENT 'job类路径',
-  `data_map` text COMMENT '执行参数',
-  `enabled` tinyint(1) DEFAULT NULL COMMENT '状态（0停止 1启动）',
-  `tenant_id` bigint NOT NULL,
-  PRIMARY KEY (`id`)
+`id` bigint NOT NULL COMMENT '任务身份唯一标识',
+`type` enum('AGENT','WORKFLOW')  DEFAULT NULL COMMENT '类型(AGENT、WORKFLOW)',
+`biz_id` varchar(64) DEFAULT NULL COMMENT '关联业务ID',
+`cron` varchar(64) DEFAULT NULL COMMENT 'cron',
+`job_class` varchar(100) DEFAULT NULL COMMENT 'job类路径',
+`data_map` text COMMENT '执行参数',
+`enabled` tinyint(1) DEFAULT NULL COMMENT '状态（0停止 1启动）',
+`tenant_id` bigint NOT NULL,
+`created_at` datetime DEFAULT NULL,
+`updated_at` datetime DEFAULT NULL,
+`created_by` bigint DEFAULT NULL,
+`updated_by` bigint DEFAULT NULL,
+PRIMARY KEY (`id`) USING BTREE,
+KEY `idx_tenant_id` (`tenant_id`)
 ) COMMENT='quartz定时任务状态';
 
 DROP TABLE IF EXISTS `quartz_job_log`;
@@ -514,6 +519,13 @@ CREATE TABLE `quartz_job_log` (
   `tenant_id` bigint NOT NULL,
   PRIMARY KEY (`id`)
 ) COMMENT='quartz定时任务日志';
+
+DROP TABLE IF EXISTS `quartz_job_records`;
+CREATE TABLE `quartz_job_records` (
+`job_id` bigint DEFAULT NULL COMMENT '任务ID',
+`record_id` bigint DEFAULT NULL COMMENT '记录ID（chat_session_id，workflow_run_id）',
+`create_time` datetime DEFAULT NULL COMMENT '创建时间'
+) COMMENT='任务记录表';
 
 DROP TABLE IF EXISTS `rag_document`;
 CREATE TABLE `rag_document` (
@@ -870,7 +882,7 @@ CREATE TABLE `workflow_run` (
   `config` json DEFAULT NULL COMMENT 'Workflow definition used by run',
   `status` varchar(32) NOT NULL COMMENT 'Run status',
   `inputs` json DEFAULT NULL COMMENT 'Run inputs',
-  `outputs` json DEFAULT NULL COMMENT 'Run outputs',
+  `outputs` mediumtext DEFAULT NULL COMMENT 'Run outputs',
   `error` text DEFAULT NULL COMMENT 'Error message',
   `start_time` bigint DEFAULT NULL COMMENT 'Start timestamp',
   `end_time` bigint DEFAULT NULL COMMENT 'End timestamp',
@@ -987,5 +999,34 @@ KEY `idx_agent_id` (`agent_definition_id`) USING BTREE,
 KEY `idx_workflow_id` (`workflow_id`) USING BTREE,
 KEY `idx_tenant_id` (`tenant_id`)
 ) COMMENT='智能体与工具关联表';
+
+DROP TABLE IF EXISTS `channel`;
+CREATE TABLE `channel` (
+`id` bigint NOT NULL COMMENT '渠道唯一标识',
+`name` varchar(128) DEFAULT NULL COMMENT '渠道名称',
+`remark` varchar(512) DEFAULT NULL COMMENT '渠道描述',
+`type` enum('EMAIL','WECOM','DINGTALK','FEISHU') DEFAULT NULL COMMENT '渠道类型',
+`config` text COMMENT '渠道配置JSON',
+`enabled` tinyint(1) DEFAULT NULL COMMENT '状态（0禁用 1启用）',
+`health_status` enum('HEALTHY','UNHEALTHY','UNKNOWN') DEFAULT 'UNKNOWN' COMMENT '健康状态',
+`last_health_check` datetime DEFAULT NULL COMMENT '最后一次健康检查时间',
+`last_check_message` varchar(500) DEFAULT NULL COMMENT '最后一次健康检查消息',
+`tenant_id` bigint NOT NULL,
+`created_at` datetime DEFAULT NULL,
+`updated_at` datetime DEFAULT NULL,
+`created_by` bigint DEFAULT NULL,
+`updated_by` bigint DEFAULT NULL,
+PRIMARY KEY (`id`) USING BTREE,
+KEY `idx_tenant_id` (`tenant_id`),
+KEY `idx_type` (`type`)
+) COMMENT='通知渠道配置表';
+
+DROP TABLE IF EXISTS `workflow_channel`;
+CREATE TABLE `workflow_channel` (
+`workflow_id` varchar(64) NOT NULL COMMENT '工作流ID',
+`channel_id` bigint NOT NULL COMMENT '渠道ID',
+PRIMARY KEY (`workflow_id`, `channel_id`)
+) COMMENT='工作流渠道绑定表';
+
 
 SET FOREIGN_KEY_CHECKS = 1;
