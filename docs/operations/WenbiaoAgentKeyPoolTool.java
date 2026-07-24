@@ -34,10 +34,10 @@ public class WenbiaoAgentKeyPoolTool implements IDynamicAgentTool {
     private static final Path SECRET_DIR = Paths.get(".apboa", "secrets").toAbsolutePath().normalize();
     private static final Path POOL_FILE = SECRET_DIR.resolve("wenbiao_agent-key-pool.json");
     private static final Path ACTIVE_KEY_FILE = SECRET_DIR.resolve("wenbiao_agent-api-key");
-    private static final Path PROFILE_FILE = SECRET_DIR.resolve("http-profiles/zhiliao.json");
+    private static final Path PROFILE_FILE = SECRET_DIR.resolve("http-profiles/wenbiao_agent.json");
     private static final Path LOCK_FILE = SECRET_DIR.resolve(".wenbiao_agent-key-pool.lock");
     private static final URI BALANCE_URL = URI.create("https://mcp-server.zhiliaobiaoxun.com/api_v2/account/balance");
-    private static final Set<String> ROTATABLE = Set.of("AUTHENTICATION_FAILED");
+    private static final Set<String> ROTATABLE = Set.of("INSUFFICIENT_BALANCE", "QUOTA_EXCEEDED");
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
@@ -54,7 +54,7 @@ public class WenbiaoAgentKeyPoolTool implements IDynamicAgentTool {
                 if ("status".equals(action)) return status();
                 String providerStatus = text(params, "provider_status").toUpperCase(Locale.ROOT);
                 if (!ROTATABLE.contains(providerStatus)) {
-                    return error("NON_ROTATABLE_STATUS", "Only AUTHENTICATION_FAILED can change pool state");
+                    return error("NON_ROTATABLE_STATUS", "Only INSUFFICIENT_BALANCE and QUOTA_EXCEEDED can change pool state");
                 }
                 return "mark_failure".equals(action) ? markFailure(providerStatus) : rotate(providerStatus, fingerprints(params));
             }
@@ -135,8 +135,8 @@ public class WenbiaoAgentKeyPoolTool implements IDynamicAgentTool {
         selected.put("state", "ACTIVE");
         selected.put("last_provider_status", "");
         selected.put("last_rotated_at", Instant.now().toString());
-        writeProfile(nextKey);
         writeText(ACTIVE_KEY_FILE, nextKey + System.lineSeparator());
+        writeProfile(nextKey);
         writeJson(POOL_FILE, pool);
         Map<String, Object> result = ok();
         result.put("action", "rotate");
@@ -178,9 +178,9 @@ public class WenbiaoAgentKeyPoolTool implements IDynamicAgentTool {
     }
 
     private static void writeProfile(String key) throws Exception {
-        if (!Files.isRegularFile(PROFILE_FILE)) throw new IllegalStateException("zhiliao auth profile is unavailable");
+        if (!Files.isRegularFile(PROFILE_FILE)) throw new IllegalStateException("wenbiao_agent auth profile is unavailable");
         JsonNode root = JSON.readTree(Files.readString(PROFILE_FILE, StandardCharsets.UTF_8));
-        if (!(root instanceof ObjectNode)) throw new IllegalStateException("zhiliao auth profile is invalid");
+        if (!(root instanceof ObjectNode)) throw new IllegalStateException("wenbiao_agent auth profile is invalid");
         ObjectNode profile = (ObjectNode) root;
         ObjectNode headers = profile.with("headers");
         headers.put("X-API-Key", key);
