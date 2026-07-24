@@ -1,0 +1,13 @@
+{
+  "tool_id": "append_wenbiao_registration_result",
+  "input_schema": [
+    {"name": "response", "type": "object", "required": true},
+    {"name": "context", "type": "object", "required": true}
+  ],
+  "output_schema": {
+    "success": "boolean",
+    "action": "append",
+    "result": "added|duplicate|skipped",
+    "api_key_fingerprint": "string"
+  }
+}
