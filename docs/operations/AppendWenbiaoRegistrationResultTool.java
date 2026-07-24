@@ -13,63 +13,19 @@ import java.util.Map;
 public final class AppendWenbiaoRegistrationResultTool implements IDynamicAgentTool {
     @Override
     public Object execute(AgentContext context, Map<String, Object> params) {
-        if (params == null || !(params.get("response") instanceof Map)
-            || !(params.get("context") instanceof Map)) {
-            return skipped("INVALID_REGISTRATION_RESULT");
-        }
-
         Map<String, Object> response = map(params.get("response"));
-        Object data = response.get("data");
-        if (data != null && !(data instanceof Map)) {
-            return skipped("INVALID_REGISTRATION_RESULT");
-        }
-        Map<String, Object> payload = data == null ? response : map(data);
+        Map<String, Object> payload = map(response.getOrDefault("data", response));
         Registration registration = new Registration(
             text(payload, "api_key"), text(payload, "device_id"), map(params.get("context")),
             integer(payload.get("remaining_calls")), bool(payload.get("is_new")), text(payload, "message"));
         if (!bool(payload.get("success")) || registration.apiKey().isBlank() || registration.deviceId().isBlank()) {
-            return skipped("INVALID_REGISTRATION_RESULT");
+            return Map.of("success", false, "action", "append", "result", "skipped", "error_code", "INVALID_REGISTRATION_RESULT");
         }
         try {
-            return normalized(WenbiaoKeyPoolStore.production().append(registration).toMap());
+            return WenbiaoKeyPoolStore.production().append(registration).toMap();
         } catch (Exception ignored) {
-            return skipped("KEY_POOL_WRITE_FAILED");
+            return Map.of("success", false, "action", "append", "result", "skipped", "error_code", "KEY_POOL_WRITE_FAILED");
         }
-    }
-
-    /**
-     * The dynamic-tool output contract always contains exactly these eight
-     * fields. The storage helper's internal "invalid" result is exposed as a
-     * non-writing "skipped" result rather than widening the public contract.
-     */
-    private static Map<String, Object> normalized(Map<String, Object> result) {
-        String outcome = text(result, "result");
-        if (!"added".equals(outcome) && !"duplicate".equals(outcome)) {
-            return skipped("INVALID_REGISTRATION_RESULT");
-        }
-        Map<String, Object> normalized = new LinkedHashMap<>();
-        normalized.put("success", Boolean.TRUE.equals(result.get("success")));
-        normalized.put("action", "append");
-        normalized.put("result", outcome);
-        normalized.put("error_code", text(result, "error_code"));
-        normalized.put("device_id", text(result, "device_id"));
-        normalized.put("api_key_fingerprint", text(result, "api_key_fingerprint"));
-        normalized.put("pool_size", integer(result.get("pool_size")));
-        normalized.put("standby_count", integer(result.get("standby_count")));
-        return normalized;
-    }
-
-    private static Map<String, Object> skipped(String errorCode) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", false);
-        result.put("action", "append");
-        result.put("result", "skipped");
-        result.put("error_code", errorCode);
-        result.put("device_id", "");
-        result.put("api_key_fingerprint", "");
-        result.put("pool_size", 0);
-        result.put("standby_count", 0);
-        return result;
     }
 
     private static Map<String, Object> map(Object value) {
