@@ -23,7 +23,6 @@
 
 - Create runner-runtime/src/main/java/com/hxh/apboa/runtime/wenbiao/WenbiaoKeyPoolStore.java: fixed-path pool loading, import, validation, locking, and atomic writes.
 - Create runner-runtime/src/test/java/com/hxh/apboa/runtime/wenbiao/WenbiaoKeyPoolStoreTest.java: temporary-filesystem tests for import, deduplication, active preservation, and secret-safe results.
-- Modify runner-runtime/pom.xml: declare the Spring Boot test dependency for the new runtime tests.
 - Create runner-runtime/src/main/java/com/hxh/apboa/runtime/wenbiao/WenbiaoRotationPolicy.java: shared auth-only rotation policy and effective profile path.
 - Create runner-runtime/src/test/java/com/hxh/apboa/runtime/wenbiao/WenbiaoRotationPolicyTest.java: policy contract.
 - Create docs/operations/AppendWenbiaoRegistrationResultTool.java: dynamic importer source.
@@ -40,23 +39,12 @@
 
 - Create: runner-runtime/src/main/java/com/hxh/apboa/runtime/wenbiao/WenbiaoKeyPoolStore.java
 - Create: runner-runtime/src/test/java/com/hxh/apboa/runtime/wenbiao/WenbiaoKeyPoolStoreTest.java
-- Modify: runner-runtime/pom.xml
 
 **Consumes:** A JSON pool root containing keys.
 
 **Produces:** WenbiaoKeyPoolStore.append(Registration) and a map-safe AppendResult.
 
 - [ ] **Step 1: Write the failing import/deduplication test**
-
-Add the existing managed Spring Boot test dependency before adding the test source:
-
-~~~xml
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-test</artifactId>
-    <scope>test</scope>
-</dependency>
-~~~
 
 ~~~java
 @Test
@@ -144,7 +132,7 @@ mvn -pl runner-runtime -am -Dtest=WenbiaoKeyPoolStoreTest -Dsurefire.failIfNoSpe
 Expected: PASS.
 
 ~~~bash
-git add runner-runtime/pom.xml runner-runtime/src/main/java/com/hxh/apboa/runtime/wenbiao/WenbiaoKeyPoolStore.java runner-runtime/src/test/java/com/hxh/apboa/runtime/wenbiao/WenbiaoKeyPoolStoreTest.java
+git add runner-runtime/src/main/java/com/hxh/apboa/runtime/wenbiao/WenbiaoKeyPoolStore.java runner-runtime/src/test/java/com/hxh/apboa/runtime/wenbiao/WenbiaoKeyPoolStoreTest.java
 git commit -m "feat: add Wenbiao key pool storage"
 ~~~
 
@@ -358,3 +346,4 @@ graphify update .
 git add docs/operations/WenbiaoAgentKeyPoolTool.java docs/operations/TenderHighRecallSearchTool.java runner-runtime/src/main/java/com/hxh/apboa/runtime/wenbiao/WenbiaoRotationPolicy.java runner-runtime/src/test/java/com/hxh/apboa/runtime/wenbiao/WenbiaoRotationPolicyTest.java graphify-out
 git commit -m "feat: rotate tender search key after auth failure"
 ~~~
+
