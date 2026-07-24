@@ -29,6 +29,7 @@ public class CodeExecute implements CodeExecutor {
                 copy(link, record, "original_url", "aggregate_url", "display_url", "link_type",
                     "source_status", "source_domain", "resolve_method", "status_reason");
             }
+            record.put("title_markdown", titleMarkdown(record));
             display.add(record);
         }
 
@@ -61,6 +62,15 @@ public class CodeExecute implements CodeExecutor {
 
     private static void copy(Map<String, Object> source, Map<String, Object> target, String... fields) {
         for (String field : fields) target.put(field, source.get(field));
+    }
+
+    private static String titleMarkdown(Map<String, Object> record) {
+        String title = String.valueOf(record.getOrDefault("title", ""));
+        String type = String.valueOf(record.getOrDefault("link_type", "NONE"));
+        String url = String.valueOf(record.getOrDefault("display_url", ""));
+        if (!"SOURCE".equals(type) || url.isBlank() || "null".equals(url)) return title;
+        return "[" + title.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+            + "](" + url.replace(" ", "%20").replace(")", "%29") + ")";
     }
 
     @SuppressWarnings("unchecked")

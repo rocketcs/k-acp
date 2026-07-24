@@ -5,6 +5,7 @@ BASE_DIR=$(cd "$(dirname "$0")" && pwd -P)
 REPO_DIR=$(cd "$BASE_DIR/../../.." && pwd -P)
 MODE=${1:---static}
 MYSQL_CONTAINER=${KACP_MYSQL_CONTAINER:-k-acp-mysql}
+CONSOLE_CONTAINER=${KACP_CONSOLE_CONTAINER:-k-acp-console}
 API_BASE=${KACP_API_BASE:-http://127.0.0.1:23080}
 BACKUP_FILE=${KACP_BACKUP_DIR:-$HOME/.k-acp-backups}/commercial-tender-high-recall-before.json
 
@@ -67,6 +68,15 @@ workflow_checks() {
   echo 'PASS workflow graph'
   echo 'PASS forced resolver'
   echo 'PASS answer context isolation'
+  answer_prompt=$(jq -r '.nodes[]|select(.id=="answer-generator").config.systemPrompt' "$BASE_DIR/workflow.json")
+  for term in '```uip' 'tender-followups' '下一步想推进哪件事' '深扒' '采购单位' '继续查看下一批'; do
+    [[ "$answer_prompt" == *"$term"* ]] || { echo "ERROR follow-up card contract missing: $term" >&2; exit 1; }
+  done
+  grep -Fqs '已选择：继续查看下一批' "$BASE_DIR/prompt.md" || {
+    echo 'ERROR outer agent must normalize the next-batch card action' >&2
+    exit 1
+  }
+  echo 'PASS follow-up card contract'
 }
 
 static_checks() {
@@ -77,7 +87,44 @@ static_checks() {
   for term in query_plan_version hard_filters concept_groups continuationState record_key; do
     grep -Rqs "$term" "$REPO_DIR/.codex/skills/tender-high-recall-search" || { echo "ERROR skill contract missing $term" >&2; exit 1; }
   done
-  grep -qs 'commercial_tender_high_recall_search' "$BASE_DIR/prompt.md"
+  for term in commercial_tender_high_recall_search tender-search http_request continuationState search; do
+    grep -Fqs "$term" "$BASE_DIR/prompt.md" || { echo "ERROR prompt contract missing $term" >&2; exit 1; }
+  done
+  for file in "$REPO_DIR/.codex/skills/commercial-tender-followup-curator/SKILL.md" "$REPO_DIR/.codex/skills/commercial-tender-followup-curator/references/question-patterns.md"; do
+    [[ -s "$file" ]] || { echo "ERROR follow-up curator file missing: $file" >&2; exit 1; }
+  done
+  grep -Fqs 'commercial-tender-followup-curator' "$BASE_DIR/prompt.md" || {
+    echo 'ERROR prompt must route business follow-ups through the curator skill' >&2
+    exit 1
+  }
+  if grep -Eiq '(^|[^[:alnum:]_])MCP([^[:alnum:]_]|$)' "$BASE_DIR/prompt.md"; then
+    echo 'ERROR prompt must not depend on MCP' >&2
+    exit 1
+  fi
+  if grep -Eq 'api_v2/get_bid_detail|fetchDetail[[:space:]]*\(' "$BASE_DIR/TenderSourceUrlResolverV2Tool.java"; then
+    echo 'ERROR source resolver must not call the billable detail API per item' >&2
+    exit 1
+  fi
+  if grep -Fq 'originalUrl != null ? originalUrl : emptyToNull(aggregateUrl)' "$BASE_DIR/TenderSourceUrlResolverV2Tool.java"; then
+    echo 'ERROR source resolver must not expose the aggregation URL as a user-link fallback' >&2
+    exit 1
+  fi
+  grep -Fqs 'SOURCE_UNVERIFIED' "$BASE_DIR/TenderSourceUrlResolverV2Tool.java" || {
+    echo 'ERROR client-routed source URLs must be retained as pending original links' >&2
+    exit 1
+  }
+  grep -Fqs 'MAX_PAGES_PER_ROUND = 1' "$BASE_DIR/TenderHighRecallSearchTool.java" || {
+    echo 'ERROR tender search must keep a one-page-per-round billing cap' >&2
+    exit 1
+  }
+  if grep -Fq 'for (int attempt = 0; attempt < 2; attempt++)' "$BASE_DIR/TenderHighRecallSearchTool.java"; then
+    echo 'ERROR billable tender search POST must not retry automatically' >&2
+    exit 1
+  fi
+  if grep -REn '^\s*\+' "$BASE_DIR/TenderHighRecallSearchTool.java" "$BASE_DIR/TenderSourceUrlResolverV2Tool.java"; then
+    echo 'ERROR dynamic Groovy tools must not start continuation lines with +' >&2
+    exit 1
+  fi
   if grep -REn '(zlbx_[A-Za-z0-9]+|X-API-Key[[:space:]]*:[[:space:]]*[^$]|Bearer[[:space:]]+[A-Za-z0-9._-]{20,})' "$BASE_DIR"; then
     echo 'ERROR possible credential literal found' >&2
     exit 1
@@ -88,14 +135,22 @@ static_checks() {
 live_checks() {
   [[ -f "$BACKUP_FILE" ]] || { echo "ERROR backup not found: $BACKUP_FILE" >&2; exit 1; }
   [[ "$(mysql_query "SELECT COUNT(*) FROM tool_config WHERE id IN (2079122200000000101,2079122200000000102,2079122200000000103) AND enabled=1")" = 3 ]]
+  [[ "$(mysql_query "SELECT COUNT(*) FROM tool_config WHERE id=2079122200000000103 AND need_confirm=0")" = 1 ]]
   [[ "$(mysql_query "SELECT COUNT(*) FROM skill_package WHERE id=2079122200000000201 AND enabled=1")" = 1 ]]
   [[ "$(mysql_query "SELECT COUNT(*) FROM skill_file WHERE skill_id=2079122200000000201 AND enabled=1")" = 4 ]]
+  [[ "$(mysql_query "SELECT COUNT(*) FROM skill_package WHERE id=2079122200000000202 AND name='commercial-tender-followup-curator' AND enabled=1")" = 1 ]]
+  [[ "$(mysql_query "SELECT COUNT(*) FROM skill_file WHERE skill_id=2079122200000000202 AND enabled=1")" = 2 ]]
+  docker exec "$CONSOLE_CONTAINER" sh -lc 'test -s /app/.apboa/tenants/default/skills/commercial-tender-followup-curator/SKILL.md && test -s /app/.apboa/tenants/default/skills/commercial-tender-followup-curator/references/question-patterns.md'
   [[ "$(mysql_query "SELECT COUNT(*) FROM workflow WHERE id=2079122200000000401 AND status='PUBLISHED' AND enabled=1")" = 1 ]]
   [[ "$(mysql_query "SELECT COUNT(*) FROM workflow_version WHERE workflow_id='2079122200000000401'")" -ge 1 ]]
   [[ "$(mysql_query "SELECT COUNT(*) FROM agent_tools at JOIN agent_definition a ON a.id=at.agent_definition_id WHERE at.tool_id=2079122200000000103 AND a.agent_code='default-tender'")" = 1 ]]
   [[ "$(mysql_query "SELECT COUNT(*) FROM agent_tools WHERE tool_id IN (2079122200000000101,2079122200000000102)")" = 0 ]]
+  [[ "$(mysql_query "SELECT COUNT(*) FROM skill_tools WHERE tool_id=2079122200000000102")" = 0 ]]
   [[ "$(mysql_query "SELECT COUNT(*) FROM agent_workflows WHERE workflow_id=2079122200000000401")" = 0 ]]
-  [[ "$(mysql_query "SELECT COUNT(*) FROM agent_skill_packages asp JOIN agent_definition a ON a.id=asp.agent_definition_id WHERE asp.skill_package_id=2079122200000000201 AND a.agent_code='default-tender'")" = 1 ]]
+  [[ "$(mysql_query "SELECT COUNT(*) FROM agent_skill_packages asp JOIN agent_definition a ON a.id=asp.agent_definition_id WHERE asp.skill_package_id=2079122200000000201 AND a.agent_code='default-tender'")" = 0 ]]
+  [[ "$(mysql_query "SELECT COUNT(*) FROM agent_skill_packages asp JOIN agent_definition a ON a.id=asp.agent_definition_id WHERE asp.skill_package_id=2079122200000000202 AND a.agent_code='default-tender'")" = 1 ]]
+  [[ "$(mysql_query "SELECT COUNT(*) FROM tool_config WHERE id=2079011099422941185")" = 0 ]]
+  [[ "$(mysql_query "SELECT COUNT(*) FROM system_prompt_template WHERE id=2078740664437366785")" = 0 ]]
   [[ "$(mysql_query "SELECT system_prompt_template_id FROM agent_definition WHERE agent_code='default-tender' AND tenant_id=1")" = 2079122200000000301 ]]
   [[ "$(mysql_query "SELECT model_config_id FROM agent_definition WHERE agent_code='default-tender' AND tenant_id=1")" = "$(jq -r '.model_id' "$BACKUP_FILE")" ]]
   [[ "$(mysql_query "SELECT MD5(code) FROM tool_config WHERE tool_id='resolve_tender_source_urls' AND tenant_id=1")" = "$(jq -r '.old_resolver_md5' "$BACKUP_FILE")" ]]

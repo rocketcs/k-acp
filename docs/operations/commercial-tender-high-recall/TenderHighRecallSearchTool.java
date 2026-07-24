@@ -46,7 +46,7 @@ public final class TenderHighRecallSearchTool implements IDynamicAgentTool {
         ".apboa", "secrets", "http-profiles").toAbsolutePath().normalize();
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
     private static final int PAGE_SIZE = 50;
-    private static final int MAX_PAGES = 100;
+    private static final int MAX_PAGES_PER_ROUND = 1;
     private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
     private static final ZoneOffset BEIJING = ZoneOffset.ofHours(8);
     private static final Pattern PROJECT_CODE = Pattern.compile(
@@ -92,10 +92,11 @@ public final class TenderHighRecallSearchTool implements IDynamicAgentTool {
             RoundResult result = executeRound(round, profile, plan, failures);
             roundResults.add(result);
             merge(unique, result.items, round.number, plan);
+            if (hasTerminalFailure(failures)) break;
         }
 
         Correction correction = decideCorrection(unique, roundResults, failures, plan);
-        if (correction.execute) {
+        if (correction.execute && !hasTerminalFailure(failures)) {
             RoundResult result = executeRound(correction.round, profile, plan, failures);
             roundResults.add(result);
             merge(unique, result.items, correction.round.number, plan);
@@ -113,8 +114,9 @@ public final class TenderHighRecallSearchTool implements IDynamicAgentTool {
 
         boolean capped = roundResults.stream().anyMatch(result -> result.capped);
         boolean complete = failures.isEmpty() && !capped;
+        String terminalFailure = terminalFailureKind(failures);
         String incompleteReason = capped ? "API_PAGE_LIMIT"
-            : failures.stream().anyMatch(failure -> "QUOTA_EXCEEDED".equals(failure.errorKind)) ? "QUOTA_EXCEEDED"
+            : terminalFailure != null ? terminalFailure
             : failures.isEmpty() ? null : "PAGE_FAILURE";
         Map<String, Object> metrics = new LinkedHashMap<>();
         metrics.put("round_reported_total", roundResults.stream().map(result -> result.metrics()).toList());
@@ -240,7 +242,7 @@ public final class TenderHighRecallSearchTool implements IDynamicAgentTool {
         long reportedTotal = 0;
         int pagesLoaded = 0;
         boolean capped = false;
-        for (int page = 1; page <= MAX_PAGES; page++) {
+        for (int page = 1; page <= MAX_PAGES_PER_ROUND; page++) {
             ObjectNode request = round.request.deepCopy();
             request.put("page", page);
             try {
@@ -253,7 +255,7 @@ public final class TenderHighRecallSearchTool implements IDynamicAgentTool {
                 pagesLoaded = page;
                 if (reportedTotal > 0 && items.size() >= reportedTotal) break;
                 if (pageItems.size() < PAGE_SIZE) break;
-                if (page == MAX_PAGES) capped = reportedTotal > items.size();
+                if (page == MAX_PAGES_PER_ROUND) capped = reportedTotal > items.size();
             } catch (HttpStatusException e) {
                 failures.add(new Failure(round.name, page, "HTTP_" + e.statusCode));
                 break;
@@ -440,8 +442,7 @@ public final class TenderHighRecallSearchTool implements IDynamicAgentTool {
     }
 
     private static String recordText(Map<String, Object> record) {
-        return normalize(string(record.get("title")) + " "
-            + string(record.get("sm_names")) + " " + string(record.get("match_evidence")));
+        return normalize(string(record.get("title")) + " " + string(record.get("sm_names")) + " " + string(record.get("match_evidence")));
     }
 
     private static boolean passesHardFilters(Map<String, Object> record, JsonNode hard) {
@@ -478,10 +479,7 @@ public final class TenderHighRecallSearchTool implements IDynamicAgentTool {
     }
 
     private static String buildSortKey(Map<String, Object> record) {
-        return tierRank(string(record.get("tier"))) + "|"
-            + deadlineSort(record.get("deadline")) + "|"
-            + invertDate(string(record.get("pub_time"))) + "|"
-            + string(record.get("record_key"));
+        return tierRank(string(record.get("tier"))) + "|" + deadlineSort(record.get("deadline")) + "|" + invertDate(string(record.get("pub_time"))) + "|" + string(record.get("record_key"));
     }
 
     private static int tierRank(String tier) {
@@ -540,15 +538,23 @@ public final class TenderHighRecallSearchTool implements IDynamicAgentTool {
     }
 
     private static HttpResponse<InputStream> send(HttpRequest request) throws Exception {
-        IOException last = null;
-        for (int attempt = 0; attempt < 2; attempt++) {
-            try {
-                return CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            } catch (IOException e) {
-                last = e;
+        return CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
+    }
+
+    private static boolean hasTerminalFailure(List<Failure> failures) {
+        return terminalFailureKind(failures) != null;
+    }
+
+    private static String terminalFailureKind(List<Failure> failures) {
+        for (Failure failure : failures) {
+            if ("QUOTA_EXCEEDED".equals(failure.errorKind)
+                    || "INSUFFICIENT_BALANCE".equals(failure.errorKind)
+                    || "AUTHENTICATION_FAILED".equals(failure.errorKind)
+                    || "RATE_LIMITED".equals(failure.errorKind)) {
+                return failure.errorKind;
             }
         }
-        throw last == null ? new IOException("HTTP request failed") : last;
+        return null;
     }
 
     private static byte[] readBounded(InputStream body, int maxBytes) throws Exception {

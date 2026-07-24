@@ -7,9 +7,14 @@ SEARCH_TOOL_ID=2079122200000000101
 RESOLVER_TOOL_ID=2079122200000000102
 GATEWAY_TOOL_ID=2079122200000000103
 SKILL_ID=2079122200000000201
+FOLLOWUP_SKILL_ID=2079122200000000202
 PROMPT_ID=2079122200000000301
+# 这些资源已被 v2 工作流替代，且不允许再暴露给任何智能体或共享 Skill。
+LEGACY_RESOLVER_TOOL_ID=2079011099422941185
+LEGACY_PROMPT_ID=2078740664437366785
 AGENT_CODE=default-tender
 MYSQL_CONTAINER=${KACP_MYSQL_CONTAINER:-k-acp-mysql}
+CONSOLE_CONTAINER=${KACP_CONSOLE_CONTAINER:-k-acp-console}
 API_BASE=${KACP_API_BASE:-http://127.0.0.1:23080}
 BACKUP_DIR=${KACP_BACKUP_DIR:-$HOME/.k-acp-backups}
 BACKUP_FILE="$BACKUP_DIR/commercial-tender-high-recall-before.json"
@@ -37,9 +42,20 @@ fi
 collision_count=$(mysql_query "SELECT
   (SELECT COUNT(*) FROM tool_config WHERE id IN ($SEARCH_TOOL_ID,$RESOLVER_TOOL_ID,$GATEWAY_TOOL_ID) AND tool_id NOT IN ('execute_tender_high_recall_v1','resolve_tender_source_urls_v2','commercial_tender_high_recall_search')) +
   (SELECT COUNT(*) FROM skill_package WHERE id=$SKILL_ID AND name<>'tender-high-recall-search') +
+  (SELECT COUNT(*) FROM skill_package WHERE id=$FOLLOWUP_SKILL_ID AND name<>'commercial-tender-followup-curator') +
   (SELECT COUNT(*) FROM workflow WHERE id=$WORKFLOW_ID AND route_id<>'commercial-tender-high-recall-v1')")
 if [[ "$collision_count" != 0 ]]; then
   echo "ERROR package ID collision detected" >&2
+  exit 1
+fi
+
+legacy_resolver_refs=$(mysql_query "SELECT
+  (SELECT COUNT(*) FROM agent_tools WHERE tool_id=$LEGACY_RESOLVER_TOOL_ID) +
+  (SELECT COUNT(*) FROM skill_tools WHERE tool_id=$LEGACY_RESOLVER_TOOL_ID) +
+  (SELECT COUNT(*) FROM workflow WHERE tenant_id=1 AND config LIKE '%$LEGACY_RESOLVER_TOOL_ID%')")
+legacy_prompt_refs=$(mysql_query "SELECT COUNT(*) FROM agent_definition WHERE system_prompt_template_id=$LEGACY_PROMPT_ID")
+if [[ "$legacy_resolver_refs" != 0 || "$legacy_prompt_refs" != 0 ]]; then
+  echo "ERROR legacy commercial-tender resources are still referenced; refusing unsafe cleanup" >&2
   exit 1
 fi
 
@@ -86,6 +102,8 @@ SKILL_MAIN=$(b64_file "$BASE_DIR/../../../.codex/skills/tender-high-recall-searc
 SKILL_PLAN=$(b64_file "$BASE_DIR/../../../.codex/skills/tender-high-recall-search/references/query-plan.md")
 SKILL_RANK=$(b64_file "$BASE_DIR/../../../.codex/skills/tender-high-recall-search/references/retrieval-ranking.md")
 SKILL_OUTPUT=$(b64_file "$BASE_DIR/../../../.codex/skills/tender-high-recall-search/references/output-continuation.md")
+FOLLOWUP_SKILL_MAIN=$(b64_file "$BASE_DIR/../../../.codex/skills/commercial-tender-followup-curator/SKILL.md")
+FOLLOWUP_SKILL_PATTERNS=$(b64_file "$BASE_DIR/../../../.codex/skills/commercial-tender-followup-curator/references/question-patterns.md")
 SEARCH_INPUT=$(b64_text '[{"name":"query_plan","type":"object","required":true,"description":"经校验的 tender-query-plan-v1","defaultValue":"{}"},{"name":"prior_state","type":"object","required":false,"description":"上一轮 continuationState","defaultValue":"{}"}]')
 RESOLVER_INPUT=$(b64_text '[{"name":"items","type":"array","required":true,"description":"0至20条记录；每项必须含 record_key、title，可含 bid_id、uniq_key、aggregate_url、source_url","defaultValue":"[]"}]')
 GATEWAY_INPUT=$(b64_text '[{"name":"question","type":"string","required":true,"description":"用户当前的完整检索问题或连续追问","defaultValue":""},{"name":"prior_state","type":"object","required":false,"description":"上一轮工具返回的 continuationState","defaultValue":"{}"},{"name":"company_profile","type":"object","required":false,"description":"可选企业画像","defaultValue":"{}"}]')
@@ -93,11 +111,11 @@ GATEWAY_INPUT=$(b64_text '[{"name":"question","type":"string","required":true,"d
 {
   printf '%s\n' 'START TRANSACTION;'
   printf "INSERT INTO tool_config (id,name,tool_id,description,category,tool_type,input_schema,output_schema,class_path,language,code,need_confirm,enabled,version,created_by,updated_by,tenant_id,scope_type) VALUES
-    ($SEARCH_TOOL_ID,'商业标书高召回检索执行器','execute_tender_high_recall_v1','工作流专用：确定性执行多轮检索、完整分页、去重、生命周期归并和A/B/C分层。','招投标','CUSTOM',CONVERT(FROM_BASE64('$SEARCH_INPUT') USING utf8mb4),NULL,NULL,'JAVA',CONVERT(FROM_BASE64('$SEARCH_CODE') USING utf8mb4),0,1,'1.0.0',1111111111111111111,1111111111111111111,1,'TENANT')
+    ($SEARCH_TOOL_ID,'商业标书高召回检索执行器','execute_tender_high_recall_v1','工作流专用：每轮最多一次计费搜索，并在本地完成筛选、去重、生命周期归并和A/B/C分层。','招投标','CUSTOM',CONVERT(FROM_BASE64('$SEARCH_INPUT') USING utf8mb4),NULL,NULL,'JAVA',CONVERT(FROM_BASE64('$SEARCH_CODE') USING utf8mb4),0,1,'1.0.0',1111111111111111111,1111111111111111111,1,'TENANT')
     ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),input_schema=VALUES(input_schema),code=VALUES(code),enabled=1,version=VALUES(version),updated_by=VALUES(updated_by);
   "
   printf "INSERT INTO tool_config (id,name,tool_id,description,category,tool_type,input_schema,output_schema,class_path,language,code,need_confirm,enabled,version,created_by,updated_by,tenant_id,scope_type) VALUES
-    ($RESOLVER_TOOL_ID,'商业标书源链接解析 v2','resolve_tender_source_urls_v2','工作流专用：按record_key批量提取、验证原文链接并提供已校验聚合页回退。','招投标','CUSTOM',CONVERT(FROM_BASE64('$RESOLVER_INPUT') USING utf8mb4),NULL,NULL,'JAVA',CONVERT(FROM_BASE64('$RESOLVER_CODE') USING utf8mb4),0,1,'2.0.0',1111111111111111111,1111111111111111111,1,'TENANT')
+    ($RESOLVER_TOOL_ID,'商业标书源链接解析 v2','resolve_tender_source_urls_v2','工作流专用：批量抓取知了聚合页 HTML，只提取 sourceUrl、originalUrl 等结构化原文地址；不调用逐条计费详情接口。','招投标','CUSTOM',CONVERT(FROM_BASE64('$RESOLVER_INPUT') USING utf8mb4),NULL,NULL,'JAVA',CONVERT(FROM_BASE64('$RESOLVER_CODE') USING utf8mb4),0,1,'2.1.0',1111111111111111111,1111111111111111111,1,'TENANT')
     ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),input_schema=VALUES(input_schema),code=VALUES(code),enabled=1,version=VALUES(version),updated_by=VALUES(updated_by);
   "
   printf "INSERT INTO tool_config (id,name,tool_id,description,category,tool_type,input_schema,output_schema,class_path,language,code,need_confirm,enabled,version,created_by,updated_by,tenant_id,scope_type) VALUES
@@ -115,12 +133,21 @@ GATEWAY_INPUT=$(b64_text '[{"name":"question","type":"string","required":true,"d
     (2079122200000000214,$SKILL_ID,'REFERENCES','output-continuation.md','references/output-continuation.md',CONVERT(FROM_BASE64('$SKILL_OUTPUT') USING utf8mb4),30,1111111111111111111,1111111111111111111,1,1)
     ON DUPLICATE KEY UPDATE content=VALUES(content),file_path=VALUES(file_path),sort=VALUES(sort),enabled=1,updated_by=VALUES(updated_by);
   "
+  printf "INSERT INTO skill_package (id,name,description,category,enabled,created_by,updated_by,tenant_id) VALUES
+    ($FOLLOWUP_SKILL_ID,'commercial-tender-followup-curator','商业标书智能体的上下文追问精选：把当前标讯结果转化为可点击的业务推进问题。','招投标',1,1111111111111111111,1111111111111111111,1)
+    ON DUPLICATE KEY UPDATE description=VALUES(description),category=VALUES(category),enabled=1,updated_by=VALUES(updated_by);
+  "
+  printf "INSERT INTO skill_file (id,skill_id,file_type,file_name,file_path,content,sort,created_by,updated_by,enabled,tenant_id) VALUES
+    (2079122200000000221,$FOLLOWUP_SKILL_ID,'SKILL_MD','SKILL.md','SKILL.md',CONVERT(FROM_BASE64('$FOLLOWUP_SKILL_MAIN') USING utf8mb4),0,1111111111111111111,1111111111111111111,1,1),
+    (2079122200000000222,$FOLLOWUP_SKILL_ID,'REFERENCES','question-patterns.md','references/question-patterns.md',CONVERT(FROM_BASE64('$FOLLOWUP_SKILL_PATTERNS') USING utf8mb4),10,1111111111111111111,1111111111111111111,1,1)
+    ON DUPLICATE KEY UPDATE content=VALUES(content),file_path=VALUES(file_path),sort=VALUES(sort),enabled=1,updated_by=VALUES(updated_by);
+  "
   printf "INSERT INTO system_prompt_template (id,category,name,description,content,enabled,created_by,updated_by,tenant_id) VALUES
     ($PROMPT_ID,'招投标','商业标书智能体-高召回','商业标书智能体专用高召回工作流路由提示词',CONVERT(FROM_BASE64('$PROMPT_CONTENT') USING utf8mb4),1,1111111111111111111,1111111111111111111,1)
     ON DUPLICATE KEY UPDATE description=VALUES(description),content=VALUES(content),enabled=1,updated_by=VALUES(updated_by);
   "
   printf "INSERT INTO workflow (id,tenant_id,name,remark,route_id,status,version,config,locked,enabled,created_by,updated_by) VALUES
-    ($WORKFLOW_ID,1,'商业标书高召回检索','商业标书智能体专用：多轮完整分页、去重分层、当前批次链接强制解析。','commercial-tender-high-recall-v1','DRAFT','0',CONVERT(FROM_BASE64('$WORKFLOW_CONFIG') USING utf8mb4),0,1,1111111111111111111,1111111111111111111)
+    ($WORKFLOW_ID,1,'商业标书高召回检索','商业标书智能体专用：积分受控检索、本地去重分层、当前批次链接强制解析。','commercial-tender-high-recall-v1','DRAFT','0',CONVERT(FROM_BASE64('$WORKFLOW_CONFIG') USING utf8mb4),0,1,1111111111111111111,1111111111111111111)
     ON DUPLICATE KEY UPDATE name=VALUES(name),remark=VALUES(remark),route_id=VALUES(route_id),status='DRAFT',config=VALUES(config),locked=0,enabled=1,updated_by=VALUES(updated_by);
   "
   printf "DELETE FROM agent_workflows WHERE workflow_id=$WORKFLOW_ID;\n"
@@ -128,11 +155,31 @@ GATEWAY_INPUT=$(b64_text '[{"name":"question","type":"string","required":true,"d
   printf "DELETE FROM agent_tools WHERE tool_id IN ($SEARCH_TOOL_ID,$RESOLVER_TOOL_ID);\n"
   printf "DELETE FROM agent_tools WHERE tool_id=$GATEWAY_TOOL_ID;\n"
   printf "DELETE FROM agent_skill_packages WHERE skill_package_id=$SKILL_ID;\n"
+  printf "DELETE FROM agent_skill_packages WHERE skill_package_id=$FOLLOWUP_SKILL_ID;\n"
+  # v2 仅由工作流调用。移除它被误挂到共享 tender-search 后产生的外层暴露。
+  printf "DELETE FROM skill_tools WHERE tool_id=$RESOLVER_TOOL_ID;\n"
+  # 已确认零引用的旧解析器和旧提示词；只清理本应用包的固定历史资源。
+  printf "DELETE FROM agent_tools WHERE tool_id=$LEGACY_RESOLVER_TOOL_ID;\n"
+  printf "DELETE FROM skill_tools WHERE tool_id=$LEGACY_RESOLVER_TOOL_ID;\n"
+  printf "DELETE FROM tool_config WHERE id=$LEGACY_RESOLVER_TOOL_ID;\n"
+  printf "DELETE FROM system_prompt_template WHERE id=$LEGACY_PROMPT_ID;\n"
   printf "INSERT INTO agent_tools (id,agent_definition_id,tool_id,tenant_id) SELECT 2079122200000000501,id,$GATEWAY_TOOL_ID,tenant_id FROM agent_definition WHERE agent_code='$AGENT_CODE' AND tenant_id=1;\n"
-  printf "INSERT INTO agent_skill_packages (id,agent_definition_id,skill_package_id,tenant_id) SELECT 2079122200000000502,id,$SKILL_ID,tenant_id FROM agent_definition WHERE agent_code='$AGENT_CODE' AND tenant_id=1;\n"
+  printf "INSERT INTO agent_skill_packages (id,agent_definition_id,skill_package_id,tenant_id) SELECT 2079122200000000502,id,$FOLLOWUP_SKILL_ID,tenant_id FROM agent_definition WHERE agent_code='$AGENT_CODE' AND tenant_id=1;\n"
+  # QueryPlan is an internal workflow capability. Do not attach its detailed schema to
+  # the user-facing agent, otherwise the outer model may narrate it in chat.
   printf "UPDATE agent_definition SET system_prompt_template_id=$PROMPT_ID,follow_template=1,updated_by=1111111111111111111 WHERE agent_code='$AGENT_CODE' AND tenant_id=1;\n"
   printf '%s\n' 'COMMIT;'
 } | docker exec -i "$MYSQL_CONTAINER" sh -lc 'mysql --default-character-set=utf8mb4 -uroot -p"$MYSQL_ROOT_PASSWORD" apboa_next' >/dev/null
+
+# 技能包编辑器的文件树以 console 容器中的租户目录为准；仅写数据库会让
+# Skill 已绑定但编辑页看起来为空。把同一份入库内容同步到该目录，运行时
+# 与编辑器因此读取到完全一致的正文和题库。
+EDITOR_SKILL_DIR="/app/.apboa/tenants/default/skills/commercial-tender-followup-curator"
+docker exec "$CONSOLE_CONTAINER" mkdir -p "$EDITOR_SKILL_DIR/references"
+docker cp "$BASE_DIR/../../../.codex/skills/commercial-tender-followup-curator/SKILL.md" \
+  "$CONSOLE_CONTAINER:$EDITOR_SKILL_DIR/SKILL.md"
+docker cp "$BASE_DIR/../../../.codex/skills/commercial-tender-followup-curator/references/question-patterns.md" \
+  "$CONSOLE_CONTAINER:$EDITOR_SKILL_DIR/references/question-patterns.md"
 
 admin_hash=$(mysql_query "SELECT password FROM account WHERE username='admin' LIMIT 1")
 login_payload=$(jq -nc --arg password "$admin_hash" '{username:"admin",password:$password,tenantId:1}')

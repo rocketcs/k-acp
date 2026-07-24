@@ -33,12 +33,14 @@
 
 每次只能做一项：放宽一个过窄扩展词、加入一个明确上下位词、加入一个高频噪声排除词、纠正一个匹配字段。必须返回 `correction_reason` 和 `changed_field`；地区、日期、金额、主体角色和明确阶段永不改变。
 
-## 完整分页
+## 积分安全与本地处理
 
-- `page_size=50`，从 `page=1` 开始。
-- 每页读取 `total`、当前页和返回条数；累计条数达到 `total` 或接口明确无下一页时结束。
-- 最大 `page=100`。声明总数超过可遍历上限时设置 `is_complete=false`、`incomplete_reason=API_PAGE_LIMIT`。
-- 任一页失败，记录 `{round,page,error_kind}`，保留已取结果，并设置 `is_complete=false`。
+- 每轮固定 `page_size=50`、`page=1`，不继续请求后续页；三轮基础查询最多消耗 3 次搜索调用，只有满足纠偏条件时才增加 1 次。
+- 每次返回的整页结果在 K-ACP 本地完成标准化、硬条件复核、证据提取、跨轮去重、生命周期关联、A/B/C 分层和稳定排序。
+- 不得为单条结果调用 `get_bid_detail` 或其他计费详情接口。原文链接优先读取搜索结果显式字段，否则在本地访问知了聚合页并解析公开页面数据；聚合页只作解析输入，绝不作为用户结果中的可点击链接。
+- 对带 `#` 的政府平台前端路由，保留从受控字段提取到的完整原文 URL。只要提取到受控原文字段，项目名称直接链接该 URL；只有未提取到原文 URL 时显示“原文暂未解析”。
+- 计费型 POST 禁止自动重试。余额不足、认证失败或限流时立即停止后续轮次；其他失败记录 `{round,page,error_kind}` 后保留已取结果。
+- 每轮读取 `total`。`total` 大于该轮已加载数量时设置 `is_complete=false`、`incomplete_reason=API_PAGE_LIMIT`，不得声称全量。
 - 数量口径必须同时输出 `round_reported_total`、`unique_loaded_count`、`displayed_count`。只有 `is_complete=true` 时才能称“共找到 N 条”，否则写“已找到至少 N 条”。
 
 ## 标准化

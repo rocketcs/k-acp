@@ -11,9 +11,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,10 +37,6 @@ public final class TenderSourceUrlResolverV2Tool implements IDynamicAgentTool {
     private static final double TITLE_SIMILARITY_THRESHOLD = 0.72d;
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final URI DETAIL_API = URI.create(
-        "https://mcp-server.zhiliaobiaoxun.com/api_v2/get_bid_detail");
-    private static final Path PROFILE_DIR = Paths.get(
-        ".apboa", "secrets", "http-profiles").toAbsolutePath().normalize();
     private static final HttpClient CLIENT = HttpClient.newBuilder()
         .connectTimeout(REQUEST_TIMEOUT)
         .followRedirects(HttpClient.Redirect.NEVER)
@@ -54,7 +47,7 @@ public final class TenderSourceUrlResolverV2Tool implements IDynamicAgentTool {
         "sourcelink", "source_link", "originallink", "original_link",
         "noticeurl", "notice_url", "announcementurl", "announcement_url");
     private static final Pattern STRUCTURED_SOURCE = Pattern.compile(
-        "(?is)[\\\"']?(sourceUrl|source_url|originalUrl|original_url|sourceLink|source_link|originalLink|original_link|noticeUrl|notice_url|announcementUrl|announcement_url)[\\\"']?\\s*[:=]\\s*[\\\"']((?:\\\\.|(?![\\\"']).)+?)[\\\"']");
+        "(?is)[\\\"']?(sourceUrl|source_url|originalUrl|original_url|sourceLink|source_link|originalLink|original_link|noticeUrl|notice_url|announcementUrl|announcement_url)[\\\"']?\\s*[:=]\\s*(?:\\\\)?[\\\"']((?:\\\\.|(?![\\\"']).)+?)(?:\\\\)?[\\\"']");
     private static final Pattern CONTROLLED_CONTEXT = Pattern.compile(
         "(?is)(?:原文|来源|公告地址|原公告|source|original)[^<>\\n]{0,240}?(https?(?::|\\\\u003[aA])(?:\\\\u002[fF]|/){2}[^\\s\\\"'<>]+)");
     private static final Pattern HTML_HREF = Pattern.compile(
@@ -109,10 +102,13 @@ public final class TenderSourceUrlResolverV2Tool implements IDynamicAgentTool {
         boolean mappingComplete = results.size() == items.size()
             && inputKeys.equals(outputKeys) && outputKeys.size() == results.size();
         long resolved = results.stream()
-            .filter(item -> "VERIFIED".equals(item.get("source_status")))
+            .filter(TenderSourceUrlResolverV2Tool::hasDisplayableSource)
             .count();
+        boolean linksComplete = mappingComplete && resolved == results.size();
+        String error = !mappingComplete ? "record_key mapping mismatch"
+            : linksComplete ? "" : "some source URLs could not be verified or extracted";
         return batchResponse(mappingComplete, results.size(), resolved,
-            mappingComplete, mappingComplete ? "" : "record_key mapping mismatch", results);
+            linksComplete, error, results);
     }
 
     private static String validateBatch(JsonNode items) {
@@ -141,27 +137,14 @@ public final class TenderSourceUrlResolverV2Tool implements IDynamicAgentTool {
         collectControlledFields(item, "", "INPUT_EXPLICIT", true, candidates);
         candidates.removeIf(candidate -> isAggregateHost(candidate.url));
 
-        String detailFailure = "";
-        if (candidates.isEmpty() && (!bidId.isBlank() || !uniqKey.isBlank() || !aggregateUrl.isBlank())) {
-            try {
-                JsonNode detail = fetchDetail(bidId, uniqKey, aggregateUrl);
-                collectControlledFields(detail, "", "DETAIL_EXPLICIT", true, candidates);
-                candidates.removeIf(candidate -> isAggregateHost(candidate.url));
-            } catch (HttpStatusException e) {
-                detailFailure = statusForHttp(e.statusCode);
-            } catch (Exception e) {
-                detailFailure = "TEMP_UNREACHABLE";
-            }
-        }
-
         String aggregateFailure = "";
         if (candidates.isEmpty() && !aggregateUrl.isBlank()) {
             try {
                 FetchResult page = fetchPage(URI.create(aggregateUrl), MAX_PAGE_BYTES);
-                if (page.statusCode >= 200 && page.statusCode < 300) {
-                    candidates.addAll(extractFromAggregatePage(page.body, page.finalUri));
+                if (page.getStatusCode() >= 200 && page.getStatusCode() < 300) {
+                    candidates.addAll(extractFromAggregatePage(page.getBody(), page.getFinalUri()));
                 } else {
-                    aggregateFailure = statusForHttp(page.statusCode);
+                    aggregateFailure = statusForHttp(page.getStatusCode());
                 }
             } catch (Exception e) {
                 aggregateFailure = "TEMP_UNREACHABLE";
@@ -181,138 +164,113 @@ public final class TenderSourceUrlResolverV2Tool implements IDynamicAgentTool {
 
         if (unique.isEmpty()) {
             String status = !candidates.isEmpty() ? "INVALID_INPUT"
-                : firstNonblank(detailFailure, aggregateFailure, "NOT_FOUND");
+                : firstNonblank(aggregateFailure, "NOT_FOUND");
             return itemResult(recordKey, bidId, title, null, aggregateUrl,
                 status, "NONE", "", "NO_VALID_CANDIDATE",
                 reasonForStatus(status));
         }
 
-        CandidateOutcome best = null;
-        for (Candidate candidate : unique.values()) {
-            CandidateOutcome outcome = evaluateCandidate(candidate, title, bidId, uniqKey);
-            if (best == null || statusPriority(outcome.status) < statusPriority(best.status)) {
-                best = outcome;
-            }
-            if ("VERIFIED".equals(outcome.status)) break;
-        }
-        if (best == null) {
+        // sourceUrl is the structured original URL provided by the aggregation page.
+        // Do not make its visibility depend on probing a third-party site: those sites
+        // commonly require JavaScript, cookies, or authentication and a failed probe must
+        // not replace a valid extracted URL with an unrelated page link.
+        Candidate selected = unique.values().iterator().next();
+        URI sourceUri;
+        try {
+            sourceUri = validateSourceUri(selected.url);
+        } catch (Exception e) {
             return itemResult(recordKey, bidId, title, null, aggregateUrl,
-                "NOT_FOUND", "NONE", "", "NO_VALID_CANDIDATE",
-                reasonForStatus("NOT_FOUND"));
+                "INVALID_INPUT", "NONE", "", selected.method,
+                safeMessage(e, reasonForStatus("INVALID_INPUT")));
         }
-
-        String original = "VERIFIED".equals(best.status) ? best.finalUrl : null;
-        String display = original != null ? original : emptyToNull(aggregateUrl);
-        String linkType = original != null ? "SOURCE"
-            : display != null ? "AGGREGATE" : "NONE";
+        String original = normalizeUrl(sourceUri);
         return itemResult(recordKey, bidId, title, original, aggregateUrl,
-            best.status, linkType, best.domain, best.method,
-            best.reason, display);
+            "EXTRACTED", "SOURCE", lower(sourceUri.getHost()), selected.method,
+            "Original URL extracted from a structured source field", original);
     }
 
     private static CandidateOutcome evaluateCandidate(
             Candidate candidate, String expectedTitle, String bidId, String uniqKey) {
         try {
             URI uri = validateSourceUri(candidate.url);
+            boolean structuredAggregateSource = isStructuredAggregateSource(candidate);
+            if (usesClientSideRoute(uri)) {
+                return new CandidateOutcome("EXTRACTED_CLIENT_ROUTE", normalizeUrl(uri),
+                    lower(uri.getHost()), candidate.method,
+                    "Source URL was extracted from a controlled field but uses a client-side route");
+            }
             ProbeResult probe = probe(uri);
-            String status = statusForHttp(probe.statusCode);
+            String status = statusForHttp(probe.getStatusCode());
             if (!"REACHABLE".equals(status)) {
-                return new CandidateOutcome(status, probe.finalUri.toString(),
-                    lower(probe.finalUri.getHost()), candidate.method,
+                if (structuredAggregateSource && !"SOURCE_DELETED".equals(status)) {
+                    return extractedUnverified(candidate, uri,
+                        "Structured source URL could not be fully verified: " + status);
+                }
+                return new CandidateOutcome(status, probe.getFinalUri().toString(),
+                    lower(probe.getFinalUri().getHost()), candidate.method,
                     reasonForStatus(status));
             }
-            String body = probe.bodyPrefix == null ? "" : probe.bodyPrefix;
+            String body = probe.getBodyPrefix();
             String pageTitle = extractPageTitle(body);
             String combined = pageTitle + " " + stripMarkup(body);
-            if (looksLikeLogin(probe.finalUri, pageTitle, body)) {
-                return new CandidateOutcome("AUTH_REQUIRED", probe.finalUri.toString(),
-                    lower(probe.finalUri.getHost()), candidate.method,
+            if (looksLikeLogin(probe.getFinalUri(), pageTitle, body)) {
+                if (structuredAggregateSource) {
+                    return extractedUnverified(candidate, uri,
+                        "Structured source URL requires authentication to validate");
+                }
+                return new CandidateOutcome("AUTH_REQUIRED", probe.getFinalUri().toString(),
+                    lower(probe.getFinalUri().getHost()), candidate.method,
                     reasonForStatus("AUTH_REQUIRED"));
             }
             if (looksLikeError(pageTitle, body)) {
-                return new CandidateOutcome("REACHABLE_UNCONFIRMED", probe.finalUri.toString(),
-                    lower(probe.finalUri.getHost()), candidate.method,
+                if (structuredAggregateSource) {
+                    return extractedUnverified(candidate, uri,
+                        "Structured source URL returned an error-like page during validation");
+                }
+                return new CandidateOutcome("REACHABLE_UNCONFIRMED", probe.getFinalUri().toString(),
+                    lower(probe.getFinalUri().getHost()), candidate.method,
                     "Reachable page looks like an error page");
             }
             boolean identityMatch = exactIdentifierMatch(expectedTitle, bidId, uniqKey,
-                    probe.finalUri.toString() + " " + combined)
+                    probe.getFinalUri().toString() + " " + combined)
                 || titleSimilarity(expectedTitle, pageTitle) >= TITLE_SIMILARITY_THRESHOLD;
-            boolean obviousHomepage = isHomepage(probe.finalUri)
+            boolean obviousHomepage = isHomepage(probe.getFinalUri())
                 && titleSimilarity(expectedTitle, pageTitle) < TITLE_SIMILARITY_THRESHOLD;
             if (candidate.explicit && !obviousHomepage) identityMatch = true;
             if (!identityMatch) {
-                return new CandidateOutcome("REACHABLE_UNCONFIRMED", probe.finalUri.toString(),
-                    lower(probe.finalUri.getHost()), candidate.method,
+                if (structuredAggregateSource) {
+                    return extractedUnverified(candidate, uri,
+                        "Structured source URL is reachable but its tender identity could not be confirmed");
+                }
+                return new CandidateOutcome("REACHABLE_UNCONFIRMED", probe.getFinalUri().toString(),
+                    lower(probe.getFinalUri().getHost()), candidate.method,
                     "Reachable source identity did not match the tender record");
             }
-            return new CandidateOutcome("VERIFIED", probe.finalUri.toString(),
-                lower(probe.finalUri.getHost()), candidate.method, "");
+            return new CandidateOutcome("VERIFIED", probe.getFinalUri().toString(),
+                lower(probe.getFinalUri().getHost()), candidate.method, "");
         } catch (IllegalArgumentException e) {
             return new CandidateOutcome("INVALID_INPUT", null, "", candidate.method,
                 safeMessage(e, reasonForStatus("INVALID_INPUT")));
         } catch (Exception e) {
+            if (isStructuredAggregateSource(candidate)) {
+                return new CandidateOutcome("EXTRACTED_SOURCE_UNVERIFIED", candidate.url,
+                    "", candidate.method,
+                    "Structured source URL could not be reached during validation: " + safeMessage(e, "temporary error"));
+            }
             return new CandidateOutcome("TEMP_UNREACHABLE", null, "", candidate.method,
                 safeMessage(e, reasonForStatus("TEMP_UNREACHABLE")));
         }
     }
 
-    private static JsonNode fetchDetail(String bidId, String uniqKey, String aggregateUrl)
-            throws Exception {
-        JsonNode profile = loadZhiliaoProfile();
-        validateDetailProfile(profile);
-        Map<String, String> requestData = new LinkedHashMap<>();
-        if (!bidId.isBlank()) requestData.put("bid_id", bidId);
-        else if (!uniqKey.isBlank()) requestData.put("uniq_key", uniqKey);
-        else requestData.put("bid_url", aggregateUrl);
-        byte[] requestBody = MAPPER.writeValueAsBytes(requestData);
-        HttpRequest.Builder builder = HttpRequest.newBuilder(DETAIL_API)
-            .timeout(REQUEST_TIMEOUT)
-            .header("Accept", "application/json")
-            .header("Content-Type", "application/json")
-            .header("User-Agent", "K-ACP-Tender-Source-Resolver/2.0")
-            .POST(HttpRequest.BodyPublishers.ofByteArray(requestBody));
-        Iterator<Map.Entry<String, JsonNode>> fields = profile.path("headers").fields();
-        while (fields.hasNext()) {
-            Map.Entry<String, JsonNode> field = fields.next();
-            String name = field.getKey();
-            String value = field.getValue().asText("");
-            if (!name.isBlank() && !containsHeaderBreak(value)) builder.header(name, value);
-        }
-        HttpResponse<InputStream> response = send(builder.build());
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            closeBody(response.body());
-            throw new HttpStatusException(response.statusCode());
-        }
-        byte[] bytes = readBounded(response.body(), MAX_PAGE_BYTES);
-        JsonNode root = MAPPER.readTree(bytes);
-        if (!root.path("success").asBoolean(false)) return MAPPER.createObjectNode();
-        return root.path("data");
+    private static CandidateOutcome extractedUnverified(Candidate candidate, URI sourceUri,
+            String reason) {
+        return new CandidateOutcome("EXTRACTED_SOURCE_UNVERIFIED", candidate.url,
+            lower(sourceUri.getHost()), candidate.method, reason);
     }
 
-    private static JsonNode loadZhiliaoProfile() throws Exception {
-        Path profilePath = PROFILE_DIR.resolve("zhiliao.json").normalize();
-        if (!profilePath.startsWith(PROFILE_DIR) || !Files.isRegularFile(profilePath)) {
-            throw new IllegalArgumentException("zhiliao auth profile is unavailable");
-        }
-        JsonNode profile = MAPPER.readTree(Files.readString(profilePath, StandardCharsets.UTF_8));
-        if (profile == null || !profile.isObject()) {
-            throw new IllegalArgumentException("zhiliao auth profile is invalid");
-        }
-        return profile;
-    }
-
-    private static void validateDetailProfile(JsonNode profile) {
-        Set<String> allowedHosts = new HashSet<>();
-        profile.path("allowed_hosts").forEach(node ->
-            allowedHosts.add(node.asText("").toLowerCase(Locale.ROOT)));
-        Set<String> allowedMethods = new HashSet<>();
-        profile.path("allowed_methods").forEach(node ->
-            allowedMethods.add(node.asText("").toUpperCase(Locale.ROOT)));
-        if (!hostAllowed(DETAIL_API.getHost(), allowedHosts)
-                || !allowedMethods.contains("POST")
-                || !profile.path("headers").isObject()) {
-            throw new IllegalArgumentException("zhiliao auth profile does not allow detail lookup");
-        }
+    private static boolean isStructuredAggregateSource(Candidate candidate) {
+        return candidate != null && candidate.method != null
+            && candidate.method.startsWith("AGGREGATE_STRUCTURED:");
     }
 
     private static void collectControlledFields(
@@ -345,22 +303,6 @@ public final class TenderSourceUrlResolverV2Tool implements IDynamicAgentTool {
             String field = structured.group(1);
             for (String url : urlsFromValue(structured.group(2), baseUri)) {
                 results.add(new Candidate(url, "AGGREGATE_STRUCTURED:" + field, false));
-            }
-        }
-        Matcher context = CONTROLLED_CONTEXT.matcher(html);
-        while (context.find()) {
-            for (String url : urlsFromValue(context.group(1), baseUri)) {
-                results.add(new Candidate(url, "AGGREGATE_CONTEXT", false));
-            }
-        }
-        Matcher href = HTML_HREF.matcher(html);
-        while (href.find()) {
-            int start = Math.max(0, href.start() - 180);
-            String nearby = stripMarkup(html.substring(start, href.start()));
-            if (nearby.matches("(?is).*(原文|来源|公告地址|原公告|source|original).*")) {
-                for (String url : urlsFromValue(href.group(1), baseUri)) {
-                    results.add(new Candidate(url, "AGGREGATE_CONTROLLED_HREF", false));
-                }
             }
         }
         return results;
@@ -416,12 +358,12 @@ public final class TenderSourceUrlResolverV2Tool implements IDynamicAgentTool {
 
     private static ProbeResult probe(URI uri) throws Exception {
         ProbeResult head = probeMethod(uri, "HEAD", 0);
-        if (head.statusCode >= 200 && head.statusCode < 400) {
-            if (isDocumentContent(head.contentType)) return head;
-            return probeMethod(head.finalUri, "GET", MAX_PROBE_BYTES);
+        if (head.getStatusCode() >= 200 && head.getStatusCode() < 400) {
+            if (isDocumentContent(head.getContentType())) return head;
+            return probeMethod(head.getFinalUri(), "GET", MAX_PROBE_BYTES);
         }
-        if (needsGetFallback(head.statusCode)) {
-            return probeMethod(head.finalUri, "GET", MAX_PROBE_BYTES);
+        if (needsGetFallback(head.getStatusCode())) {
+            return probeMethod(head.getFinalUri(), "GET", MAX_PROBE_BYTES);
         }
         return head;
     }
@@ -643,8 +585,7 @@ public final class TenderSourceUrlResolverV2Tool implements IDynamicAgentTool {
     }
 
     private static boolean looksLikeLogin(URI uri, String title, String body) {
-        String sample = uri.toString() + " " + title + " "
-            + body.substring(0, Math.min(body.length(), 8192));
+        String sample = uri.toString() + " " + title + " " + body.substring(0, Math.min(body.length(), 8192));
         return LOGIN_PAGE.matcher(sample).find();
     }
 
@@ -662,7 +603,7 @@ public final class TenderSourceUrlResolverV2Tool implements IDynamicAgentTool {
     private static boolean isAggregateHost(String value) {
         try {
             String host = lower(new URI(value).getHost());
-            return "zhiliaobiaoxun.com".equals(host) || "www.zhiliaobiaoxun.com".equals(host);
+            return "zhiliaobiaoxun.com".equals(host) || host.endsWith(".zhiliaobiaoxun.com");
         } catch (Exception ignored) {
             return false;
         }
@@ -671,10 +612,25 @@ public final class TenderSourceUrlResolverV2Tool implements IDynamicAgentTool {
     private static String normalizeUrl(URI uri) {
         try {
             return new URI(lower(uri.getScheme()), null, lower(uri.getHost()), uri.getPort(),
-                uri.getPath(), uri.getQuery(), null).normalize().toString();
+                uri.getPath(), uri.getQuery(), uri.getFragment()).normalize().toString();
         } catch (Exception ignored) {
             return uri.toString();
         }
+    }
+
+    private static boolean usesClientSideRoute(URI uri) {
+        return uri != null && uri.getRawFragment() != null && !uri.getRawFragment().isBlank();
+    }
+
+    private static boolean hasDisplayableSource(Map<String, Object> item) {
+        String type = stringValue(item.get("link_type"));
+        return "SOURCE".equals(type) || "SOURCE_UNVERIFIED".equals(type);
+    }
+
+    private static boolean isDisplayableOriginalStatus(String status) {
+        return "VERIFIED".equals(status)
+            || "EXTRACTED_CLIENT_ROUTE".equals(status)
+            || "EXTRACTED_SOURCE_UNVERIFIED".equals(status);
     }
 
     private static String normalizeTitle(String value) {
@@ -754,7 +710,7 @@ public final class TenderSourceUrlResolverV2Tool implements IDynamicAgentTool {
             String recordKey, String bidId, String title, String originalUrl,
             String aggregateUrl, String sourceStatus, String linkType,
             String sourceDomain, String resolveMethod, String reason) {
-        String display = originalUrl != null ? originalUrl : emptyToNull(aggregateUrl);
+        String display = originalUrl;
         return itemResult(recordKey, bidId, title, originalUrl, aggregateUrl,
             sourceStatus, linkType, sourceDomain, resolveMethod, reason, display);
     }
@@ -881,6 +837,11 @@ public final class TenderSourceUrlResolverV2Tool implements IDynamicAgentTool {
             this.contentType = contentType == null ? "" : contentType;
             this.bodyPrefix = bodyPrefix == null ? "" : bodyPrefix;
         }
+
+        private int getStatusCode() { return statusCode; }
+        private URI getFinalUri() { return finalUri; }
+        private String getContentType() { return contentType; }
+        private String getBodyPrefix() { return bodyPrefix; }
     }
 
     private static final class FetchResult {
@@ -893,6 +854,10 @@ public final class TenderSourceUrlResolverV2Tool implements IDynamicAgentTool {
             this.body = body;
             this.finalUri = finalUri;
         }
+
+        private int getStatusCode() { return statusCode; }
+        private String getBody() { return body; }
+        private URI getFinalUri() { return finalUri; }
     }
 
     private static final class HttpStatusException extends Exception {
