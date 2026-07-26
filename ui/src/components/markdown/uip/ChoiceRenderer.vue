@@ -91,11 +91,7 @@ const canSubmit = computed(() => {
   return selectedValues.value.length > 0 || customInput.value.trim().length > 0
 })
 
-// 商业标书的追问卡片在旧会话中没有 autoSubmit 字段；按固定交互 ID
-// 兼容这些已生成的卡片，确保点选即查询。
-const autoSubmit = computed(() =>
-  props.interaction.autoSubmit === true || props.interaction.id === 'tender-followups'
-)
+const autoSubmit = computed(() => props.interaction.autoSubmit === true)
 
 const submittedSummary = computed(() => {
   const parts = [...selectedValues.value]
