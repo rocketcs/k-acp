@@ -8,11 +8,171 @@
 
 import type { UIPMessage, InteractionSubmitPayload, FormInteraction, ChoiceInteraction } from '@/components/markdown/uip/types'
 
+export type UIPPolicy = 'default' | 'tenderStrict'
+
+export interface UIPValidationResult {
+  message: UIPMessage | null
+  reason?: string
+}
+
+export interface NormalizedUIPContent {
+  content: string
+  validBlocks: UIPMessage[]
+  invalidReasons: string[]
+}
+
 /** uip 代码块的 HTML 正则（renderMarkdown 后 `<pre><code class="language-uip">`） */
 const UIP_HTML_REGEX = /<pre[^>]*>\s*<code[^>]*class="[^"]*language-uip[^"]*"[^>]*>([\s\S]*?)<\/code>\s*<\/pre>/gi
 /** 原始 markdown 中的 ```uip 匹配（兜底）
  *  使用 \s* 替代 \n 以兼容 LLM 输出可能缺少尾部换行的情况 */
 const UIP_MD_REGEX = /```uip\s*\n([\s\S]*?)\s*```/g
+const UIP_BLOCK_START_REGEX = /```uip[ \t]*\r?\n/gi
+const UIP_BLOCK_END_REGEX = /\r?\n```[ \t]*(?=\r?\n|$)/g
+const SUPPORTED_FIELD_TYPES = new Set([
+  'text', 'textarea', 'number', 'select', 'radio', 'checkbox',
+  'checkbox-group', 'switch', 'date', 'datetime', 'email', 'tel',
+])
+const OPTION_FIELD_TYPES = new Set(['select', 'radio', 'checkbox-group'])
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function areValidOptions(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length === 0) return false
+  const values = new Set<string>()
+
+  return value.every((option) => {
+    if (!isRecord(option) || !isNonEmptyString(option.label)) return false
+    if (!isNonEmptyString(option.value)) return false
+    if (values.has(option.value)) return false
+    values.add(option.value)
+    return true
+  })
+}
+
+/**
+ * 校验当前前端能够完整渲染的 UIP。它不尝试修复模型输出，失败只返回原因码。
+ */
+export function validateUIP(code: string, policy: UIPPolicy = 'default'): UIPValidationResult {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(code)
+  } catch {
+    return { message: null, reason: 'json_parse_failed' }
+  }
+
+  if (!isRecord(parsed)) return { message: null, reason: 'invalid_root' }
+  if (policy === 'tenderStrict' && typeof parsed.content !== 'string') {
+    return { message: null, reason: 'invalid_content' }
+  }
+  if (!isRecord(parsed.interaction)) return { message: null, reason: 'invalid_interaction' }
+
+  const interaction = parsed.interaction
+  if (!isNonEmptyString(interaction.id)) return { message: null, reason: 'invalid_interaction_id' }
+  if (!isNonEmptyString(interaction.type)) return { message: null, reason: 'unknown_interaction_type' }
+
+  switch (interaction.type) {
+    case 'choice':
+      if (!isNonEmptyString(interaction.question)) {
+        return { message: null, reason: 'invalid_choice_question' }
+      }
+      if (!areValidOptions(interaction.options)) {
+        return { message: null, reason: 'invalid_choice_options' }
+      }
+      break
+    case 'form': {
+      if (!Array.isArray(interaction.fields) || interaction.fields.length === 0) {
+        return { message: null, reason: 'invalid_form_fields' }
+      }
+      const names = new Set<string>()
+      for (const field of interaction.fields) {
+        if (!isRecord(field) || !isNonEmptyString(field.name) || !isNonEmptyString(field.label)) {
+          return { message: null, reason: 'invalid_form_field' }
+        }
+        if (!isNonEmptyString(field.type) || !SUPPORTED_FIELD_TYPES.has(field.type)) {
+          return { message: null, reason: 'unsupported_form_field_type' }
+        }
+        if (names.has(field.name)) return { message: null, reason: 'duplicate_form_field_name' }
+        names.add(field.name)
+        if (OPTION_FIELD_TYPES.has(field.type) && !areValidOptions(field.options)) {
+          return { message: null, reason: 'invalid_form_field_options' }
+        }
+        if (field.options !== undefined && !areValidOptions(field.options)) {
+          return { message: null, reason: 'invalid_form_field_options' }
+        }
+      }
+      break
+    }
+    case 'confirm':
+      if (!isNonEmptyString(interaction.message)) {
+        return { message: null, reason: 'invalid_confirm_message' }
+      }
+      break
+    default:
+      return { message: null, reason: 'unknown_interaction_type' }
+  }
+
+  return { message: parsed as unknown as UIPMessage }
+}
+
+/**
+ * 规范化原始 Markdown 中的 UIP 块：只保留当前前端可完整渲染的卡片。
+ * 未闭合的 UIP 围栏在终态会被作为无效块删除至文本末尾，避免泄露截断 JSON。
+ */
+export function normalizeUIPContent(content: string, policy: UIPPolicy = 'default'): NormalizedUIPContent {
+  const validBlocks: UIPMessage[] = []
+  const invalidReasons: string[] = []
+  const keptParts: string[] = []
+  const startRegex = new RegExp(UIP_BLOCK_START_REGEX.source, UIP_BLOCK_START_REGEX.flags)
+  let cursor = 0
+  let match: RegExpExecArray | null
+
+  while ((match = startRegex.exec(content)) !== null) {
+    keptParts.push(content.slice(cursor, match.index))
+    const codeStart = startRegex.lastIndex
+    const endRegex = new RegExp(UIP_BLOCK_END_REGEX.source, UIP_BLOCK_END_REGEX.flags)
+    endRegex.lastIndex = codeStart
+    const endMatch = endRegex.exec(content)
+
+    if (!endMatch) {
+      invalidReasons.push('unclosed')
+      cursor = content.length
+      break
+    }
+
+    const code = content.slice(codeStart, endMatch.index).trim()
+    const validation = validateUIP(code, policy)
+    if (validation.message && (policy !== 'tenderStrict' || validBlocks.length === 0)) {
+      keptParts.push(content.slice(match.index, endMatch.index + endMatch[0].length))
+      validBlocks.push(validation.message)
+    } else if (validation.message) {
+      invalidReasons.push('duplicate_tender_card')
+    } else {
+      invalidReasons.push(validation.reason || 'invalid_uip')
+    }
+
+    cursor = endMatch.index + endMatch[0].length
+    startRegex.lastIndex = cursor
+  }
+
+  keptParts.push(content.slice(cursor))
+  return {
+    content: keptParts.join('').trim(),
+    validBlocks,
+    invalidReasons,
+  }
+}
+
+/** 仅有损坏 UIP 也表示模型尝试请求用户交互，问标助手应改用稳定默认卡。 */
+export function needsTenderFallback(normalized: NormalizedUIPContent): boolean {
+  return normalized.validBlocks.length === 0
+    && (normalized.content.trim().length > 0 || normalized.invalidReasons.length > 0)
+}
 
 /** HTML 实体解码 */
 function decodeHtmlEntities(str: string): string {

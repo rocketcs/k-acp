@@ -3,6 +3,7 @@ import { message } from 'ant-design-vue'
 import { useAgentClient } from '@/composables/useAgentClient'
 import { usePlanTracking } from '@/composables/chat/usePlanTracking'
 import { buildToolCallsContent } from '@/utils/chat/format'
+import { needsTenderFallback, normalizeUIPContent } from '@/utils/chat/uip'
 import type {ChatMessageVO, RawEvent} from '@/types'
 import { useAccountStore } from '@/stores'
 import { stopRun } from '@/api/agui'
@@ -65,6 +66,75 @@ export function useChatStream(
   const runHasTenderFollowups = ref(false)
   const fallbackFollowupSaved = ref(false)
 
+  const isTenderAgent = () => agentDetail.value?.agentCode === 'default-tender'
+
+  function saveNormalizedAssistantContent(
+    rawContent: string,
+    messageId: string | null,
+    role: ChatMessageVO['role'],
+  ) {
+    const normalized = normalizeUIPContent(rawContent, isTenderAgent() ? 'tenderStrict' : 'default')
+    const displayText = normalized.content
+
+    if (displayText || (isTenderAgent() && needsTenderFallback(normalized))) {
+      runHasAssistantAnswer.value = true
+      if (isTenderAgent() && normalized.validBlocks.length > 0) {
+        runHasTenderFollowups.value = true
+      }
+    }
+
+    if (displayText) {
+      const sid = currentSessionId.value
+      if (sid) {
+        onMessageSaved?.({
+          id: messageId,
+          sessionId: sid,
+          role,
+          content: displayText,
+          parentId: '',
+          path: '',
+          depth: 0,
+          createdAt: ''
+        } as ChatMessageVO)
+      }
+    }
+  }
+
+  function clearStreamingMessage() {
+    streamingMessageId.value = null
+    streamingContent.value = ''
+    streamingRole.value = 'system'
+    pendingHighRecallAnswer.value = null
+  }
+
+  function finalizeStreamingMessage() {
+    const displayText = pendingHighRecallAnswer.value || streamingContent.value
+    if (displayText) {
+      saveNormalizedAssistantContent(displayText, streamingMessageId.value, streamingRole.value)
+    }
+    clearStreamingMessage()
+  }
+
+  function appendTenderFallbackIfNeeded() {
+    if (!isTenderAgent()) return
+    const sid = currentSessionId.value
+    if (!sid || !runHasAssistantAnswer.value || runHasTenderFollowups.value || fallbackFollowupSaved.value) {
+      return
+    }
+
+    fallbackFollowupSaved.value = true
+    onMessageSaved?.({
+      id: nextIdBig(),
+      sessionId: sid,
+      role: 'assistant',
+      content: TENDER_FOLLOW_UP_CARD,
+      parentId: '',
+      path: '',
+      depth: 0,
+      createdAt: ''
+    } as ChatMessageVO)
+  }
+
   // 工具调用进度
   const toolCallsInProgress = ref<
     Array<{ id: string; name: string; args: string; result?: string; startTime: number; elapsed?: number, needConfirm?: boolean }>
@@ -93,31 +163,8 @@ export function useChatStream(
       },
       onTextMessageEnd: (_e, finalText) => {
         const displayText = pendingHighRecallAnswer.value || finalText
-        const sid = currentSessionId.value
-        if (displayText) {
-          runHasAssistantAnswer.value = true
-          if (displayText.includes('```uip')) {
-            runHasTenderFollowups.value = true
-          }
-        }
-        if (sid && displayText) {
-          // 纯文本保存，不再与推理打包，通过队列保证写入顺序
-          onMessageSaved?.({
-            id: streamingMessageId.value,
-            sessionId: sid,
-            role: streamingRole.value,  // 这里必须使用 streamingRole.value，不能写死 assistant
-            content: displayText,
-            parentId: '',
-            path: '',
-            depth: 0,
-            createdAt: ''
-          } as ChatMessageVO)
-        }
-        // 无论是否回放，都清除流式状态
-        streamingMessageId.value = null
-        streamingContent.value = ''
-        streamingRole.value = 'system'
-        pendingHighRecallAnswer.value = null
+        saveNormalizedAssistantContent(displayText, streamingMessageId.value, streamingRole.value)
+        clearStreamingMessage()
       },
       onReasoningMessageStart: (_e) => {
         // Internal reasoning is not business-facing content. Ignore it instead of
@@ -213,28 +260,11 @@ export function useChatStream(
       },
       onRunFinished: (_e) => {
         agentHasResult.value = true
+        finalizeStreamingMessage()
         // 商业标书智能体的高召回入口已明确配置为无需人工确认。
         // UIP 卡片点击后应立即继续查询；不要把未完成的工具状态误渲染成“允许/禁止”。
-        if (agentDetail.value?.agentCode === 'default-tender') {
-          const sid = currentSessionId.value
-          if (
-            sid &&
-            runHasAssistantAnswer.value &&
-            !runHasTenderFollowups.value &&
-            !fallbackFollowupSaved.value
-          ) {
-            fallbackFollowupSaved.value = true
-            onMessageSaved?.({
-              id: nextIdBig(),
-              sessionId: sid,
-              role: 'assistant',
-              content: TENDER_FOLLOW_UP_CARD,
-              parentId: '',
-              path: '',
-              depth: 0,
-              createdAt: ''
-            } as ChatMessageVO)
-          }
+        if (isTenderAgent()) {
+          appendTenderFallbackIfNeeded()
           toolCallsInProgress.value = []
           return
         }
@@ -266,8 +296,14 @@ export function useChatStream(
             streamingContent.value = ''
             streamingRole.value = 'system'
           }
-        }
-     }
+       }
+      },
+      onRunError: () => {
+        agentHasResult.value = true
+        finalizeStreamingMessage()
+        appendTenderFallbackIfNeeded()
+        toolCallsInProgress.value = []
+      }
     }
   })
 
@@ -320,6 +356,8 @@ export function useChatStream(
     // 重置计划状态
     resetPlan()
 
+    finalizeStreamingMessage()
+
     if (sid) {
       // 保存工具调用消息，通过队列保证写入顺序
       if (toolCallsInProgress.value.length > 0) {
@@ -337,29 +375,11 @@ export function useChatStream(
           } as ChatMessageVO)
         }
       }
-      // 保存AI回复消息
-      else {
-        if (streamingContent.value) {
-          onMessageSaved?.({
-            id: streamingMessageId.value,
-            sessionId: sid,
-            role: streamingRole.value,
-            content: streamingContent.value,
-            parentId: '',
-            path: '',
-            depth: 0,
-            createdAt: ''
-          } as ChatMessageVO)
-        }
-      }
-
       toolCallsInProgress.value = []
-      streamingMessageId.value = null
-      streamingContent.value = ''
-      streamingRole.value = 'system'
       isRunning.value = false
-
     }
+
+    appendTenderFallbackIfNeeded()
 
   }
 
