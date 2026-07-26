@@ -91,6 +91,7 @@ const canSubmit = computed(() => {
   return selectedValues.value.length > 0 || customInput.value.trim().length > 0
 })
 
+const autoSubmit = computed(() => props.interaction.autoSubmit === true)
 const submittedSummary = computed(() => {
   const parts = [...selectedValues.value]
   if (customInput.value) parts.push(customInput.value)
@@ -99,6 +100,9 @@ const submittedSummary = computed(() => {
 
 function onSingleChange(val: unknown) {
   selectedValues.value = val ? [val as string] : []
+  if (autoSubmit.value) {
+    void handleSubmit()
+  }
 }
 
 function onMultiChange(val: unknown[]) {
