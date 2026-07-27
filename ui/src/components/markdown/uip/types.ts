@@ -31,6 +31,8 @@ export interface ChoiceInteraction {
   question: string
   multiple?: boolean
   allowCustom?: boolean
+  /** 单选后立即提交，适用于无需额外确认的快捷追问 */
+  autoSubmit?: boolean
   options: ChoiceOption[]
   /** 提交后回填的用户数据 */
   submittedData?: { values: string[]; customInput?: string }
