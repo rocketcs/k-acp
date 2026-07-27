@@ -78,6 +78,14 @@ public class JacksonTemplateFormatter implements TemplateFormatter {
     @Override
     public Object format(String template, Map<String, Object> variables, boolean tryToObj) {
         try {
+            if (isPureVariable(template)) {
+                JsonNode resultNode = objectMapper.valueToTree(
+                        getVariableValue(extractVariableName(template), variables));
+                if (tryToObj) {
+                    return objectMapper.treeToValue(resultNode, Object.class);
+                }
+                return resultNode.toString();
+            }
             // 将模板字符串转换为JSON树
             JsonNode templateNode = objectMapper.readTree(template);
             // 处理模板树

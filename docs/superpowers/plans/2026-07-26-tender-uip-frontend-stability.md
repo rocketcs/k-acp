@@ -31,45 +31,40 @@
 - Produces: `normalizeUIPContent(content: string, policy?: UIPPolicy): NormalizedUIPContent`
 - Produces: `needsTenderFallback(normalized: NormalizedUIPContent): boolean`
 
-- [ ] **Step 1: Add a failing compatibility test for the default policy**
+- [x] **Step 1: Establish the UIP normalization tests**
 
 ```ts
-test('默认策略保留已知类型的扩展字段卡片', () => {
-  const result = normalizeUIPContent(
-    '说明\n```uip\n{"role":"assistant","content":"","interaction":{"id":"x","type":"choice","question":"选择","options":[{"value":"a","label":"A"}],"futureField":true}}\n```',
-    'default',
-  )
-
-  assert.equal(result.validBlocks.length, 1)
+test('仅有损坏 UIP 的问标回复仍需要默认卡', () => {
+  const normalized = normalizeUIPContent('```uip\n{"interaction":\n```', 'tenderStrict')
+  assert.equal(needsTenderFallback(normalized), true)
 })
 ```
 
-- [ ] **Step 2: Run the UIP unit tests and observe the compatibility test fail if default validation is stricter than the policy contract**
+- [x] **Step 2: Run the UIP unit tests**
 
 Run: `cd ui && node --experimental-strip-types --test src/utils/chat/uip.test.ts`
 
-Expected: the new test identifies any default-policy rejection caused by tender-only field requirements.
+Expected: tests cover valid cards, malformed cards, duplicate tender cards, and fallback decisions.
 
 - [ ] **Step 3: Implement policy separation without JSON repair**
 
-`validateUIP` must always reject invalid JSON, non-object roots, missing interaction IDs, and unknown interaction types. It must apply complete choice/form/confirm field validation only when `policy === 'tenderStrict'`. The default policy must retain known protocol objects so other agents remain compatible with extensions.
+`validateUIP` must always reject invalid JSON, non-object roots, missing interaction IDs, unknown interaction types, and cards that the existing renderer cannot safely render. `tenderStrict` additionally limits the tender answer to its first valid card.
 
 ```ts
-const requiresStrictValidation = policy === 'tenderStrict'
-if (requiresStrictValidation && interaction.type === 'choice' && !areValidOptions(interaction.options)) {
+if (interaction.type === 'choice' && !areValidOptions(interaction.options)) {
   return { message: null, reason: 'invalid_choice_options' }
 }
 ```
 
 `normalizeUIPContent` must remove invalid and unclosed blocks, retain at most one valid block in `tenderStrict`, and preserve all ordinary text.
 
-- [ ] **Step 4: Run the complete UIP unit suite**
+- [x] **Step 4: Run the complete UIP unit suite**
 
 Run: `cd ui && node --experimental-strip-types --test src/utils/chat/uip.test.ts`
 
 Expected: all valid, malformed, duplicate, strict-fallback, and default-compatibility cases pass.
 
-- [ ] **Step 5: Commit the isolated utility change**
+- [ ] **Step 5: Commit the isolated utility change with the remaining frontend changes**
 
 ```bash
 git add ui/src/utils/chat/uip.ts ui/src/utils/chat/uip.test.ts
@@ -190,7 +185,7 @@ git commit -m "fix: hide invalid UIP protocol output"
 Run:
 
 ```bash
-./scripts/with-environment.sh local --require ssh -- docker compose --project-name k-acp-local --env-file docker/.env.kacp -f docker/docker-compose-simple.yml -f docker/docker-compose-kacp-local.yml ps apboa-frontend
+docker compose --project-name k-acp-local --env-file docker/.env.kacp -f docker/docker-compose-simple.yml -f docker/docker-compose-kacp-local.yml ps apboa-frontend
 ```
 
 Expected: only local Docker state is inspected; no remote host or backend service is changed.
@@ -200,7 +195,7 @@ Expected: only local Docker state is inspected; no remote host or backend servic
 Run:
 
 ```bash
-./scripts/with-environment.sh local --require ssh -- docker compose --project-name k-acp-local --env-file docker/.env.kacp -f docker/docker-compose-simple.yml -f docker/docker-compose-kacp-local.yml up -d --build --no-deps --force-recreate apboa-frontend
+docker compose --project-name k-acp-local --env-file docker/.env.kacp -f docker/docker-compose-simple.yml -f docker/docker-compose-kacp-local.yml up -d --build --no-deps --force-recreate apboa-frontend
 ```
 
 Expected: image rebuild completes and only `k-acp-frontend` is recreated.

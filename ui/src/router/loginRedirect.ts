@@ -6,3 +6,7 @@ export function resolveLoginRedirect(redirect: unknown): string {
   }
   return redirect
 }
+
+export function buildLoginRedirectUrl(currentRoute: unknown): string {
+  return `/#/login?redirect=${encodeURIComponent(resolveLoginRedirect(currentRoute))}`
+}
