@@ -108,6 +108,7 @@ cd docker
 
 # 使用管理脚本（推荐）
 bash start-console.sh build      # 构建并启动
+bash start-console.sh update     # 测试环境：拉取 dev、构建并重建服务
 bash start-console.sh status     # 查看状态
 
 # 或手动启动
