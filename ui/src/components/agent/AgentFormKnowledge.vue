@@ -330,7 +330,7 @@ defineExpose({
 </script>
 
 <template>
-  <ASpin :spinning="loading">
+  <ApboaSpin :spinning="loading">
     <AForm ref="formRef" :model="formData" layout="vertical">
       <AFormItem label="知识库">
         <ACollapse v-if="knowledgeBaseTypes?.length > 0">
@@ -425,7 +425,7 @@ defineExpose({
                     <div class="binding-tip">
                       仅注册下方勾选、且当前仍全局可用的工具。
                     </div>
-                    <ASpin :spinning="isToolLoading(mcp.id as string)">
+                    <ApboaSpin :spinning="isToolLoading(mcp.id as string)">
                       <AButton
                         v-if="!mcpToolMap[mcp.id as string]"
                         type="link"
@@ -461,7 +461,7 @@ defineExpose({
                           </ACheckbox>
                         </div>
                       </div>
-                    </ASpin>
+                    </ApboaSpin>
                   </template>
                 </div>
               </div>
@@ -505,7 +505,7 @@ defineExpose({
         </div>
       </AFormItem>
     </AForm>
-  </ASpin>
+  </ApboaSpin>
 </template>
 
 <style scoped lang="scss">

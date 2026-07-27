@@ -19,6 +19,7 @@ const props = defineProps<{
   providerId: string
   providerName: string
   providerType?: string
+  providerBaseUrl?: string
 }>()
 
 /**
@@ -256,6 +257,7 @@ async function handleTest(id: string) {
           v-for="item in modelList"
           :key="item.id"
           :data="item"
+          :provider-base-url="providerBaseUrl"
           @edit="handleEdit"
           @delete="handleDelete"
           @enable="handleEnable"
@@ -287,7 +289,7 @@ async function handleTest(id: string) {
 
   .modal-toolbar {
     position: sticky;
-    top: 0px;
+    top: 0;
     z-index: 10;
     background-color: #F5F6F8;
     margin: calc(-1 * var(--spacing-md)) calc(-1 * var(--spacing-md)) 0;

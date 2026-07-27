@@ -6,12 +6,14 @@
 <script setup lang="ts">
 /* eslint-disable vue/multi-word-component-names */
 import { onMounted, ref, computed, h, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Modal } from 'ant-design-vue'
 import {RobotOutlined, SearchOutlined} from '@ant-design/icons-vue'
 import { useAgentStore } from '@/stores'
 import { storeToRefs } from 'pinia'
 import * as agentApi from '@/api/agent'
 import * as agentA2aApi from '@/api/agentA2a'
+import * as agentDiyApi from '@/api/agentDiy'
 import type { AgentDefinitionVO, WellKnownAgentConfig, NacosAgentConfig } from '@/types'
 import AgentCard from '@/components/agent/AgentCard.vue'
 import CreateCard from '@/components/agent/CreateCard.vue'
@@ -20,8 +22,10 @@ import AgentA2aForm from '@/components/agent/AgentA2aForm.vue'
 import AgentConfigPanel from '@/components/agent/config/AgentConfigPanel.vue'
 import {ApboaModalApi} from "@/components/common/ApboaModalApi.ts";
 import ApboaInfiniteLoading from '@/components/common/ApboaInfiniteLoading.vue'
+import { RouteNames } from '@/router'
 
 const store = useAgentStore()
+const router = useRouter()
 const { list, tags, selectedAgentType, selectedTag, keyword, loading, hasMore } = storeToRefs(store)
 
 const formVisible = ref<boolean>(false)
@@ -247,10 +251,27 @@ function handleSearch() {
 /**
  * 访问智能体对话（新开页）
  */
-function handleGoVisit(id: string) {
-  const hash = `#/chat/${encodeURIComponent(id)}`
-  const url = `${window.location.origin}${window.location.pathname}${hash}`
-  window.open(url, '_blank')
+async function handleGoVisit(id: string) {
+  const targetWindow = window.open('', '_blank')
+  let routeName: typeof RouteNames.CHAT | typeof RouteNames.CHAT_DIY = RouteNames.CHAT
+
+  try {
+    const response = await agentDiyApi.getPublished(id)
+    if (response.data.data) routeName = RouteNames.CHAT_DIY
+  } catch {
+    // DIY 配置不可用时保持原对话入口，避免影响其他智能体。
+  }
+
+  const url = router.resolve({ name: routeName, params: { agentId: id } }).href
+  if (targetWindow) {
+    targetWindow.location.href = url
+  } else {
+    await router.push({ name: routeName, params: { agentId: id } })
+  }
+}
+
+function handleDiy(id: string) {
+  router.push({ name: RouteNames.AGENT_DIY, params: { agentId: id } })
 }
 
 /**
@@ -388,7 +409,7 @@ onMounted(() => {
         <ASelect
           v-model:value="selectedTag"
           placeholder="选择标签"
-          style="width: 200px; border: rgba(14,14,14,0.1) solid 1px !important; border-radius: 6px;"
+          style="width: 200px; border-radius: 6px;"
         >
           <ASelectOption v-for="opt in tagOptions" :key="opt.value" :value="opt.value">
             {{ opt.label }}
@@ -398,7 +419,7 @@ onMounted(() => {
         <AInput
           v-model:value="keyword"
           placeholder="搜索智能体名称"
-          style="width: 300px; border: rgba(14,14,14,0.1) solid 1px !important;"
+          style="width: 300px; "
           @pressEnter="handleSearch"
         >
           <template #suffix>
@@ -428,6 +449,7 @@ onMounted(() => {
           @enable="handleEnable"
           @delete="handleDelete"
           @go-visit="handleGoVisit"
+          @diy="handleDiy"
         />
       </div>
 

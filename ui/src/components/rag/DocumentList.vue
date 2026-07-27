@@ -343,7 +343,7 @@ const columns = computed(() => [
 
     <!-- 文档表格 -->
     <div v-else class="doc-table">
-      <ASpin :spinning="loading">
+      <ApboaSpin :spinning="loading">
         <ATable
           :data-source="filteredDocuments"
           :columns="columns"
@@ -448,7 +448,7 @@ const columns = computed(() => [
             </template>
           </template>
         </ATable>
-      </ASpin>
+      </ApboaSpin>
     </div>
 
     <!-- 分块详情抽屉 -->

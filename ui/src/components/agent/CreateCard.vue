@@ -99,7 +99,6 @@ function handleOptionClick(value: 'CUSTOM' | 'WELLKNOWN' | 'NACOS') {
 
   &:hover {
     border-color: var(--color-primary);
-    background-color: var(--color-bg-light);
 
     .create-icon {
       color: var(--color-primary);
@@ -144,7 +143,7 @@ function handleOptionClick(value: 'CUSTOM' | 'WELLKNOWN' | 'NACOS') {
         transition: all var(--transition-base);
 
         &:hover {
-          background-color: #eeeeee;
+          background-color: var(--color-bg-light);
         }
 
         .type-label {

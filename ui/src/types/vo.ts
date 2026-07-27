@@ -104,6 +104,7 @@ export interface AgentDefinitionVO {
   name: string
   agentCode: string
   description: string
+  avatar: string
   modelConfigId: string
   modelParamsOverride: Record<string, unknown> | null
   skill: string[]

@@ -356,7 +356,7 @@ defineExpose({
 </script>
 
 <template>
-  <ASpin :spinning="loading">
+  <ApboaSpin :spinning="loading">
     <AForm ref="formRef" :model="formData" layout="vertical">
       <AFormItem label="钩子配置">
         <ACollapse>
@@ -546,7 +546,7 @@ defineExpose({
         </div>
       </AFormItem>
     </AForm>
-  </ASpin>
+  </ApboaSpin>
 </template>
 
 <style scoped lang="scss">

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { GithubOutlined } from '@ant-design/icons-vue'
 /**
  * 应用底部组件
  *
@@ -11,12 +10,6 @@ const currentYear = new Date().getFullYear()
 <template>
   <div class="app-footer flex items-center justify-center">
     <div class="footer-content flex flex-col items-center gap-sm">
-      <div class="footer-links flex items-center gap-sm">
-        <a href="https://gitee.com/studioustiger/apboa-next" target="_blank" rel="noopener noreferrer">
-          <img src="https://gitee.com/static/images/logo-en.svg" width="16" alt="gitee">
-        </a>
-      </div>
-
       <div class="footer-description">
         <p>金智维智能体平台</p>
       </div>

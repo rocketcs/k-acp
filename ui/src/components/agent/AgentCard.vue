@@ -5,15 +5,17 @@
  */
 <script setup lang="ts">
 import { computed } from 'vue'
-import { EllipsisOutlined, RobotOutlined, ClockCircleOutlined } from '@ant-design/icons-vue'
+import { EllipsisOutlined, ClockCircleOutlined } from '@ant-design/icons-vue'
 import type { AgentDefinitionVO } from '@/types'
 import { useAccountStore } from '@/stores'
+import { resolveAgentAvatar } from '@/utils/agentAvatar'
 import {
   createViewItem,
   createConfigPanelItem,
   createEnableItem,
   createDeleteItem,
   createGoVisitItem,
+  createDiyItem,
   createDivider,
 } from '@/composables/useCardMenuItems'
 
@@ -35,6 +37,7 @@ const emit = defineEmits<{
   delete: [id: string]
   enable: [id: string]
   goVisit: [id: string]
+  diy: [id: string]
 }>()
 
 /**
@@ -67,6 +70,7 @@ const menuItems = computed(() => {
   return [
     createViewItem(),
     createConfigPanelItem(),
+    createDiyItem(),
     createEnableItem(props.data.enabled),
     createDivider(),
     createGoVisitItem(),
@@ -108,6 +112,9 @@ function handleMenuClick({ key }: { key: string }) {
     case 'goVisit':
       emit('goVisit', id)
       break
+    case 'diy':
+      emit('diy', id)
+      break
   }
 }
 </script>
@@ -117,7 +124,11 @@ function handleMenuClick({ key }: { key: string }) {
     <div class="card-header flex items-center gap-sm">
       <div class="card-avatar-wrapper">
         <div class="card-avatar flex-center" :class="{ disabled: !data.enabled }">
-          <RobotOutlined />
+          <img
+            :src="resolveAgentAvatar(data.avatar)"
+            :alt="`${data.name}头像`"
+            class="agent-avatar-image"
+          />
         </div>
         <span
           v-if="data?.jobInfo"
@@ -166,16 +177,16 @@ function handleMenuClick({ key }: { key: string }) {
 .agent-card {
   min-height: 180px;
   padding: var(--spacing-md);
-  background-color: var(--color-bg-white);
+  background-color: #FFFFFF;
   border-radius: var(--border-radius-lg);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid #ebebeb;
   transition: all var(--transition-base);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
 
   &:hover {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px -5px rgba(0, 0, 0, 0.3);
     transform: translateY(-2px);
   }
 
@@ -189,11 +200,15 @@ function handleMenuClick({ key }: { key: string }) {
       width: 40px;
       height: 40px;
       background-color: #e8eaf6;
-      color: #4449d0;
       border-radius: var(--border-radius-xl);
-      font-size: var(--font-size-2xl);
-      font-weight: 600;
       flex-shrink: 0;
+      overflow: hidden;
+
+      .agent-avatar-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
     }
 
     .avatar-corner-badge {
@@ -255,6 +270,11 @@ function handleMenuClick({ key }: { key: string }) {
   .disabled {
     color: #757575 !important;
     background-color: #e7e7e7 !important;
+
+    .agent-avatar-image {
+      filter: grayscale(1);
+      opacity: 0.72;
+    }
   }
 }
 </style>

@@ -166,7 +166,7 @@ onMounted(() => loadSessions())
           </div>
         </div>
 
-        <ASpin :spinning="listLoading">
+        <ApboaSpin :spinning="listLoading">
           <div v-if="sessions.length === 0 && !listLoading" style="padding: 40px 0; text-align: center;">
             <AEmpty description="暂无会话记录" />
           </div>
@@ -195,7 +195,7 @@ onMounted(() => loadSessions())
               </div>
             </div>
           </div>
-        </ASpin>
+        </ApboaSpin>
 
         <div v-if="totalSessions > pageSize" style="padding: 16px 0; display: flex; justify-content: center;">
           <APagination

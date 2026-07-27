@@ -55,7 +55,7 @@
       </div>
     </div>
 
-    <div v-if="!disabled" class="uip-choice-actions">
+    <div v-if="!disabled && !autoSubmit" class="uip-choice-actions">
       <a-button type="primary" :loading="submitting" :disabled="!canSubmit" @click="handleSubmit">
         确定
       </a-button>
@@ -91,7 +91,12 @@ const canSubmit = computed(() => {
   return selectedValues.value.length > 0 || customInput.value.trim().length > 0
 })
 
-const autoSubmit = computed(() => props.interaction.autoSubmit === true)
+// 商业标书的追问卡片在旧会话中没有 autoSubmit 字段；按固定交互 ID
+// 兼容这些已生成的卡片，确保点选即查询。
+const autoSubmit = computed(() =>
+  props.interaction.autoSubmit === true || props.interaction.id === 'tender-followups'
+)
+
 const submittedSummary = computed(() => {
   const parts = [...selectedValues.value]
   if (customInput.value) parts.push(customInput.value)

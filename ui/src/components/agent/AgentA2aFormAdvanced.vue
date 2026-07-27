@@ -173,7 +173,7 @@ defineExpose({
 </script>
 
 <template>
-  <ASpin :spinning="loading">
+  <ApboaSpin :spinning="loading">
     <AForm ref="formRef" :model="formData" layout="vertical">
       <AFormItem label="启用记忆持久化">
         <ASwitch v-model:checked="formData.enableMemory" />
@@ -229,7 +229,7 @@ defineExpose({
         </div>
       </AFormItem>
     </AForm>
-  </ASpin>
+  </ApboaSpin>
 </template>
 
 <style scoped lang="scss">

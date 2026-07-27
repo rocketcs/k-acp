@@ -309,7 +309,7 @@ onMounted(load)
           <AEmpty :description="meta.emptyText" />
         </div>
         <div v-if="loading" class="workflow-resource-loading">
-          <ASpin />
+          <ApboaSpin :spinning="true" />
         </div>
       </div>
     </div>

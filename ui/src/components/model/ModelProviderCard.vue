@@ -5,7 +5,8 @@
  */
 <script setup lang="ts">
 import { computed } from 'vue'
-import { EllipsisOutlined, ApiOutlined } from '@ant-design/icons-vue'
+import { EllipsisOutlined } from '@ant-design/icons-vue'
+import { getProviderLogo } from '@/utils/providerLogo'
 import type { ModelProviderVO } from '@/types'
 import { useAccountStore } from '@/stores'
 import {
@@ -32,7 +33,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   view: [id: string]
   edit: [id: string]
-  configModels: [id: string, name: string, type?: string]
+  configModels: [id: string, name: string, type?: string, baseUrl?: string]
   delete: [id: string]
   enable: [id: string]
 }>()
@@ -65,6 +66,13 @@ const providerTypeLabels: Record<string, string> = {
 
 const providerTypeText = computed(() => {
   return providerTypeLabels[props.data.type] || props.data.type
+})
+
+/**
+ * 根据baseUrl智能匹配品牌Logo
+ */
+const providerLogo = computed(() => {
+  return getProviderLogo(props.data.baseUrl)
 })
 
 /**
@@ -105,7 +113,7 @@ function handleMenuClick({ key }: { key: string }) {
       emit('enable', props.data.id as string)
       break
     case 'config':
-      emit('configModels', props.data.id as string, props.data.name, props.data.type)
+      emit('configModels', props.data.id as string, props.data.name, props.data.type, props.data.baseUrl)
       break
     case 'delete':
       emit('delete', props.data.id as string)
@@ -117,14 +125,14 @@ function handleMenuClick({ key }: { key: string }) {
  * 处理配置模型按钮点击
  */
 function handleConfigClick() {
-  emit('configModels', props.data.id as string, props.data.name, props.data.type)
+  emit('configModels', props.data.id as string, props.data.name, props.data.type, props.data.baseUrl)
 }
 </script>
 
 <template>
   <div class="provider-card">
     <div class="card-header flex items-center gap-sm">
-      <div class="card-avatar flex-center" :class="{ disabled: !data.enabled }"><ApiOutlined /></div>
+      <div class="card-avatar flex-center" :class="{ disabled: !data.enabled }"><img :src="providerLogo" alt="model" /></div>
       <div class="card-name flex-1 truncate" :title="data.name" @click="emit('view', data.id as string)">{{ data.name }}</div>
       <ADropdown :trigger="['hover']">
         <AButton type="text" size="small">
@@ -144,12 +152,12 @@ function handleConfigClick() {
       <div class="card-actions flex items-center gap-xs">
         <ATag color="default" class="tag">{{ providerTypeText }}</ATag>
       </div>
-      <div class="card-time text-placeholder text-xs">
+      <div v-if="hasReadOnly" class="card-time text-placeholder text-xs">
         更新于 {{ formattedTime }}
       </div>
-<!--      <div class="card-time text-placeholder text-xs">-->
-<!--        <AButton type="link" size="small" @click="handleConfigClick">配置模型</AButton>-->
-<!--      </div>-->
+     <div v-else class="card-time text-placeholder text-xs">
+       <AButton type="link" size="small" @click="handleConfigClick">配置模型</AButton>
+     </div>
     </div>
   </div>
 </template>
@@ -158,16 +166,16 @@ function handleConfigClick() {
 .provider-card {
   min-height: 180px;
   padding: var(--spacing-md);
-  background-color: var(--color-bg-white);
+  background-color: #FFFFFF;
   border-radius: var(--border-radius-lg);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid #ebebeb;
   transition: all var(--transition-base);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
 
   &:hover {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px -5px rgba(0, 0, 0, 0.3);
     transform: translateY(-2px);
   }
 
@@ -175,12 +183,15 @@ function handleConfigClick() {
     .card-avatar {
       width: 40px;
       height: 40px;
-      background-color: #e8f5e9;
-      color: #00b81b;
+      background-color: #e8eaf6;
       border-radius: var(--border-radius-xl);
-      font-size: var(--font-size-2xl);
-      font-weight: 600;
       flex-shrink: 0;
+
+      img {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+      }
     }
 
     .card-name {
@@ -225,6 +236,10 @@ function handleConfigClick() {
   .disabled {
     color: #757575 !important;
     background-color: #e7e7e7 !important;
+    img {
+      filter: grayscale(100%);
+      opacity: 0.5;
+    }
   }
 }
 </style>

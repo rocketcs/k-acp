@@ -81,11 +81,11 @@
   cursor: pointer;
 }
 
-/*.ant-segmented {*/
-/*  background-color: transparent;*/
-/*}*/
+.ant-segmented {
+  background-color: transparent;
+}
 
-.ant-modal-mask {
+.ant-modal-mask,.ant-drawer-mask {
   /* 1. 现代浏览器标准属性（带webkit前缀，适配Safari/Chrome） */
   -webkit-backdrop-filter: blur(10px); /* Safari/Chrome 旧版 */
   backdrop-filter: blur(10px); /* 标准属性 */

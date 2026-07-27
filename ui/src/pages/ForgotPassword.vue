@@ -10,6 +10,7 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import { AuthContainer } from '@/components/auth'
+import { LeftOutlined } from '@ant-design/icons-vue'
 
 interface ForgotPasswordForm {
   email: string
@@ -117,6 +118,7 @@ const goToLogin = () => {
       layout="vertical"
       @finish="handleResetPassword"
     >
+      <div class="auth-form-label">邮箱</div>
       <AFormItem name="email" class="auth-form-item">
         <AInput
           v-model:value="formState.email"
@@ -125,8 +127,9 @@ const goToLogin = () => {
         />
       </AFormItem>
 
+      <div class="auth-form-label">验证码</div>
       <AFormItem name="verificationCode" class="auth-form-item">
-        <div class="flex gap-sm">
+        <div class="code-input-row">
           <AInput
             v-model:value="formState.verificationCode"
             size="large"
@@ -135,15 +138,16 @@ const goToLogin = () => {
           />
           <AButton
             size="large"
-            type="text"
             :disabled="!canSendCode"
             @click="handleSendCode"
+            class="code-send-btn"
           >
             {{ sendCodeButtonText }}
           </AButton>
         </div>
       </AFormItem>
 
+      <div class="auth-form-label">新密码</div>
       <AFormItem name="newPassword" class="auth-form-item">
         <AInputPassword
           v-model:value="formState.newPassword"
@@ -152,6 +156,7 @@ const goToLogin = () => {
         />
       </AFormItem>
 
+      <div class="auth-form-label">确认密码</div>
       <AFormItem name="confirmPassword" class="auth-form-item">
         <AInputPassword
           v-model:value="formState.confirmPassword"
@@ -166,21 +171,49 @@ const goToLogin = () => {
           html-type="submit"
           size="large"
           :loading="loading"
-          block
+          class="auth-submit-btn"
         >
           重置密码
         </AButton>
       </AFormItem>
     </AForm>
 
-    <div class="text-center mt-md">
-      <a @click="goToLogin" class="text-primary cursor-pointer">
-        返回登录
-      </a>
+    <div class="auth-footer-link">
+      <a @click="goToLogin">返回登录</a>
     </div>
   </AuthContainer>
 </template>
 
 <style scoped lang="scss">
 @use '@/styles/modules/auth' as *;
+
+.forgot-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #999;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.2s ease;
+  user-select: none;
+
+  &:hover {
+    color: #4F6EF7;
+  }
+
+  .anticon {
+    font-size: 12px;
+  }
+}
+
+.code-input-row {
+  display: flex;
+  gap: 10px;
+}
+
+.code-send-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 </style>

@@ -3,7 +3,7 @@ import { message } from 'ant-design-vue'
 import { useAgentClient } from '@/composables/useAgentClient'
 import { usePlanTracking } from '@/composables/chat/usePlanTracking'
 import { buildToolCallsContent } from '@/utils/chat/format'
-import { composeTenderResponse, normalizeUIPContent } from '@/utils/chat/uip'
+import { composeTenderResponse, needsTenderFallback, normalizeUIPContent } from '@/utils/chat/uip'
 import type {ChatMessageVO, RawEvent} from '@/types'
 import { useAccountStore } from '@/stores'
 import { stopRun } from '@/api/agui'
@@ -12,6 +12,14 @@ let lastIdBig = BigInt(Date.now()) << 12n;
 function nextIdBig() {
   return String(lastIdBig++);
 }
+
+// 仅在模型未按商业标书追问 Skill 生成卡片时兜底。正常路径的卡片由当前
+// 项目、采购方和商机阶段动态生成；兜底不能再退回纯分页式的固定菜单。
+const TENDER_FOLLOW_UP_CARD = `下一步想推进哪件事？
+
+\`\`\`uip
+{"role":"assistant","content":"","version":"2.0","interaction":{"id":"tender-followups","type":"choice","question":"下一步想推进哪件事？","multiple":false,"allowCustom":false,"autoSubmit":true,"options":[{"value":"prioritize_current","label":"筛选当前最值得跟进的项目","description":"结合时间、预算和匹配度排出优先顺序"},{"value":"capability_match","label":"根据我的业务能力精准筛一筛当前项目","description":"找出更适合我方参与的机会"},{"value":"compare_similar","label":"再看看同类在招项目，横向对比选择","description":"扩展机会并比较采购需求与时间窗口"},{"value":"continue_next_batch","label":"继续查看下一批","description":"保留当前条件，继续展示尚未查看的结果"}]}}
+\`\`\``
 
 export function useChatStream(
   agentId: import('vue').Ref<string>,
@@ -52,6 +60,10 @@ export function useChatStream(
   const streamingContent = ref('')
   // 高召回工作流提供确定性事实正文；外层策展 Skill 提供唯一的后续卡片。
   const pendingHighRecallAnswer = ref<string | null>(null)
+  // 任何商业标书回答都应保留后续操作；不只限于高召回检索，也包括筛选和分析。
+  const runHasAssistantAnswer = ref(false)
+  const runHasTenderFollowups = ref(false)
+  const fallbackFollowupSaved = ref(false)
 
   const isTenderAgent = () => agentDetail.value?.agentCode === 'default-tender'
 
@@ -62,6 +74,13 @@ export function useChatStream(
   ) {
     const normalized = normalizeUIPContent(rawContent, isTenderAgent() ? 'tenderStrict' : 'default')
     const displayText = normalized.content
+
+    if (displayText || (isTenderAgent() && needsTenderFallback(normalized))) {
+      runHasAssistantAnswer.value = true
+      if (isTenderAgent() && normalized.validBlocks.length > 0) {
+        runHasTenderFollowups.value = true
+      }
+    }
 
     if (displayText) {
       const sid = currentSessionId.value
@@ -97,6 +116,26 @@ export function useChatStream(
     clearStreamingMessage()
   }
 
+  function appendTenderFallbackIfNeeded() {
+    if (!isTenderAgent()) return
+    const sid = currentSessionId.value
+    if (!sid || !runHasAssistantAnswer.value || runHasTenderFollowups.value || fallbackFollowupSaved.value) {
+      return
+    }
+
+    fallbackFollowupSaved.value = true
+    onMessageSaved?.({
+      id: nextIdBig(),
+      sessionId: sid,
+      role: 'assistant',
+      content: TENDER_FOLLOW_UP_CARD,
+      parentId: '',
+      path: '',
+      depth: 0,
+      createdAt: ''
+    } as ChatMessageVO)
+  }
+
   // 工具调用进度
   const toolCallsInProgress = ref<
     Array<{ id: string; name: string; args: string; result?: string; startTime: number; elapsed?: number, needConfirm?: boolean }>
@@ -110,6 +149,9 @@ export function useChatStream(
         streamingContent.value = ''
         streamingMessageId.value = null
         pendingHighRecallAnswer.value = null
+        runHasAssistantAnswer.value = false
+        runHasTenderFollowups.value = false
+        fallbackFollowupSaved.value = false
       },
       onTextMessageStart: (e) => {
         streamingRole.value = 'assistant'
@@ -221,6 +263,7 @@ export function useChatStream(
         // 商业标书智能体的高召回入口已明确配置为无需人工确认。
         // UIP 卡片点击后应立即继续查询；不要把未完成的工具状态误渲染成“允许/禁止”。
         if (isTenderAgent()) {
+          appendTenderFallbackIfNeeded()
           toolCallsInProgress.value = []
           return
         }
@@ -257,6 +300,7 @@ export function useChatStream(
       onRunError: () => {
         agentHasResult.value = true
         finalizeStreamingMessage()
+        appendTenderFallbackIfNeeded()
         toolCallsInProgress.value = []
       }
     }

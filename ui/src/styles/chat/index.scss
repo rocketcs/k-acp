@@ -7,7 +7,7 @@
 $chat-sidebar-width: 260px;
 $chat-sidebar-collapsed-width: 56px;
 $chat-primary: #0F74FF;
-$chat-bg-sidebar: #F9FAFB;
+$chat-bg-sidebar: #F2F4F7;
 $chat-bg-main: #ffffff;
 $chat-transition: 0.25s ease;
 $chat-main-padding-h: calc(var(--spacing-lg, 24px) * 1 / 3);
@@ -764,6 +764,49 @@ $small-mobile-breakpoint: 375px;
   @media (max-width: $small-mobile-breakpoint) {
     padding: var(--spacing-lg) var(--spacing-sm);
     padding-top: 15vh;
+  }
+}
+
+.chat-welcome.has-diy-form {
+  justify-content: flex-start;
+  padding-top: 64px;
+  padding-bottom: 48px;
+
+  @media (max-width: $mobile-breakpoint) {
+    padding-top: var(--spacing-lg);
+    padding-bottom: var(--spacing-lg);
+  }
+}
+
+.chat-welcome.is-diy-welcome {
+  justify-content: flex-start;
+  padding-top: clamp(64px, 9vh, 112px);
+  padding-bottom: 48px;
+
+  .chat-welcome-title {
+    margin-bottom: 40px;
+  }
+
+  .chat-welcome-input {
+    max-width: 1280px;
+    margin-top: 36px;
+  }
+
+  &.has-diy-form {
+    padding-top: 64px;
+  }
+
+  @media (max-width: $mobile-breakpoint) {
+    padding-top: var(--spacing-xl);
+    padding-bottom: var(--spacing-lg);
+
+    .chat-welcome-title {
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .chat-welcome-input {
+      margin-top: var(--spacing-md);
+    }
   }
 }
 

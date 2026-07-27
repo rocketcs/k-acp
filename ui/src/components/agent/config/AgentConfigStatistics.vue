@@ -140,7 +140,7 @@ onMounted(() => loadData())
       <ASegmented v-model:value="selectedDays" :options="dayOptions" @change="handleDaysChange" />
     </div>
 
-    <ASpin :spinning="loading">
+    <ApboaSpin :spinning="loading">
       <div class="statistics-grid">
         <!-- 会话数趋势 -->
         <div class="statistics-card">
@@ -186,7 +186,7 @@ onMounted(() => loadData())
           </div>
         </div>
       </div>
-    </ASpin>
+    </ApboaSpin>
   </div>
 </template>
 

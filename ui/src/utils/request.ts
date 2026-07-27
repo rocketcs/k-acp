@@ -92,8 +92,8 @@ instance.interceptors.response.use(
       window.location.reload();
       return Promise.reject(msg);
     } else {
-      console.error('系统异常，请稍后再试：', msg)
-      AMessage.error('系统异常，请稍后再试').then(() => {})
+      console.error('接口请求失败：', msg)
+      AMessage.error(msg).then(() => {})
       return Promise.reject(msg);
     }
   },

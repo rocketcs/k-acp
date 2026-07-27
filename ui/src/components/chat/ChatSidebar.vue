@@ -2,10 +2,12 @@
 import { MessageOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons-vue'
 import SessionList from './SessionList.vue'
 import type { ChatSessionVO } from '@/types'
+import { resolveAgentAvatar } from '@/utils/agentAvatar'
 
 defineProps<{
   collapsed: boolean
   agentName?: string
+  agentAvatar?: string
   pinnedSessions: ChatSessionVO[]
   otherSessions: ChatSessionVO[]
   currentSessionId: string | null
@@ -80,7 +82,11 @@ const handleNewSession = () => {
     />
     <div class="chat-sidebar-header">
       <div class="chat-sidebar-brand">
-        <img src="@/assets/images/logo/logo.png" alt="logo" class="chat-sidebar-logo" />
+        <img
+          :src="resolveAgentAvatar(agentAvatar)"
+          :alt="`${agentName || '智能体'}头像`"
+          class="chat-sidebar-logo"
+        />
         <span class="chat-sidebar-name" :title="agentName || '智能体'">{{ agentName || '智能体' }}</span>
       </div>
       <AButton type="text" class="chat-sidebar-collapse-btn" :title="collapsed ? '展开' : '折叠'" @click="$emit('toggleCollapse')">

@@ -212,8 +212,9 @@ async function handleOverrideToggle(checked: boolean) {
   }
 }
 
-function handleMcpBindingsChange(bindings: McpBinding[]) {
-  updateConfig('mcps', bindings.map((b) => ({
+function handleMcpBindingsChange(bindings: string | McpBinding[] | null) {
+  const list = Array.isArray(bindings) ? bindings : []
+  updateConfig('mcps', list.map((b) => ({
     mcpServerId: b.mcpServerId,
     exposureMode: McpToolExposureMode.ALL_GLOBAL,
     mcpToolIds: [],
@@ -289,7 +290,7 @@ onMounted(async () => {
 <template>
   <div ref="panelRoot" class="agent-node-panel" :class="{ 'editor-maximized': isEditorMaximized }">
     <div v-if="loading" class="loading-overlay">
-      <ASpin :spinning="true" />
+      <ApboaLoading />
     </div>
     <AForm layout="vertical">
         <PanelSection title="节点名称">
@@ -432,7 +433,7 @@ onMounted(async () => {
                 :model-value="arrayConfig('toolIds')"
                 :tools="allTools"
                 :categories="toolCategories"
-                @update:model-value="(ids: string[]) => updateConfig('toolIds', ids)"
+                @update:model-value="(ids: string | string[] | null) => updateConfig('toolIds', ids)"
               />
             </template>
             <div v-else class="empty-action">
@@ -519,13 +520,9 @@ onMounted(async () => {
   height: 100vh;
   margin-bottom: -100vh;
   background: rgba(255, 255, 255, 0.65);
-}
-
-.loading-overlay :deep(.ant-spin) {
-  position: absolute !important;
-  top: calc(50% - 120px) !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .checkbox-grid,

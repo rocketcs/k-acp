@@ -175,7 +175,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <ASpin :spinning="loading">
+    <ApboaSpin :spinning="loading">
       <div class="api-keys-list">
         <div
           v-for="(item, index) in filteredList"
@@ -204,7 +204,7 @@ onMounted(() => {
       </div>
 
       <AEmpty v-if="!loading && filteredList.length === 0" description="暂无API Key" />
-    </ASpin>
+    </ApboaSpin>
 
     <!-- 新建 / 编辑弹窗 -->
     <AModal

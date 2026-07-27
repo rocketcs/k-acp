@@ -11,7 +11,7 @@ import MessageNavigator from './MessageNavigator.vue'
 import ChatInput from './ChatInput.vue'
 import Welcome from './Welcome.vue'
 import PlanPanel from './PlanPanel.vue'
-import type { DisplayMessage, UploadedFileItem, PlanInfo } from '@/types'
+import type { DisplayMessage, UploadedFileItem, PlanInfo, DiyOutputFormat, DiyPageConfig } from '@/types'
 import type {FlatFileItem} from "@/composables/chat/useWorkspaceFiles.ts";
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
 import WorkspaceFilePreview from "@/components/workspace/WorkspaceFilePreview.vue";
@@ -45,6 +45,7 @@ const props = defineProps<{
   historyLoading?: boolean
   /** 当前计划信息 */
   currentPlan?: PlanInfo | null
+  diyConfig?: DiyPageConfig | null
 }>()
 
 const emit = defineEmits<{
@@ -67,6 +68,7 @@ const emit = defineEmits<{
   (e: 'interactionSubmit', payload: InteractionSubmitPayload): void
   (e: 'uipRetry', uipCode: string): void
   (e: 'vepRetry', vepCode: string): void
+  (e: 'quickSend', payload: { text: string; outputFormat: DiyOutputFormat }): void
 }>()
 
 // 滚动容器 ref
@@ -276,6 +278,7 @@ defineExpose({
         :session-id="sessionId"
         :has-code-execution-config="hasCodeExecutionConfig"
         :mention-allowed="true"
+        :diy-config="diyConfig"
         @update:input-value="$emit('update:inputValue', $event)"
         @update:uploaded-files="$emit('update:uploadedFiles', $event)"
         @memory="$emit('memory', $event)"
@@ -283,6 +286,7 @@ defineExpose({
         @toolProcess="$emit('toolProcess', $event)"
         @send="handleSend"
         @new-session="$emit('newSession')"
+        @quick-send="$emit('quickSend', $event)"
       />
     </div>
 
@@ -365,6 +369,13 @@ defineExpose({
 
 <style scoped lang="scss">
 @use '@/styles/chat/index.scss' as *;
+
+.chat-welcome-container {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
 
 /* 历史消息加载提示 */
 .chat-history-loading {

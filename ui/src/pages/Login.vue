@@ -6,7 +6,7 @@
  * @author huxuehao
  */
 import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import type { LoginRequest, TenantInfo, PendingApprovalInfo } from '@/types'
@@ -14,6 +14,7 @@ import { AuthContainer } from '@/components/auth'
 import { useAccountStore } from '@/stores'
 import { md5 } from 'js-md5'
 import { RoutePaths } from '@/router/constants.ts'
+import { resolveLoginRedirect } from '@/router/loginRedirect'
 import {
   ExclamationCircleOutlined,
   LeftOutlined,
@@ -25,9 +26,13 @@ interface LoginForm extends LoginRequest {
 }
 
 const router = useRouter()
+const route = useRoute()
 const accountStore = useAccountStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+
+/** 当前登录方式 tab: account | sso */
+const activeTab = ref<'account' | 'sso'>('account')
 
 /** 是否显示租户选择弹窗 */
 const showTenantModal = ref(false)
@@ -36,7 +41,7 @@ const pendingTenants = ref<TenantInfo[]>([])
 /** 租户选择加载中 */
 const selectingTenant = ref(false)
 
-/** 登录被阻断 — 待审批视图 */
+/** 登录被阻断 -- 待审批视图 */
 const showBlockedView = ref(false)
 /** 待审批的申请列表 */
 const pendingApprovals = ref<PendingApprovalInfo[]>([])
@@ -140,10 +145,7 @@ function completeLogin(remember: boolean) {
     localStorage.removeItem('remember')
     localStorage.removeItem('username')
   }
-  location.reload()
-  setTimeout(() => {
-    router.push(RoutePaths.AGENT)
-  }, 100)
+  router.replace(resolveLoginRedirect(route.query.redirect))
 }
 
 /**
@@ -290,14 +292,16 @@ const goToForgotPassword = () => {
           layout="vertical"
           @finish="handleLogin"
         >
+          <div class="auth-form-label">账号 / 邮箱</div>
           <AFormItem name="username" class="auth-form-item">
             <AInput
               v-model:value="formState.username"
               size="large"
-              placeholder="请输入用户名"
+              placeholder="请输入账号或邮箱"
             />
           </AFormItem>
 
+          <div class="auth-form-label">密码</div>
           <AFormItem name="password" class="auth-form-item">
             <AInputPassword
               v-model:value="formState.password"
@@ -309,10 +313,10 @@ const goToForgotPassword = () => {
           <AFormItem class="auth-form-item">
             <div class="flex justify-between items-center">
               <ACheckbox v-model:checked="formState.remember">
-                记住密码
+                记住我
               </ACheckbox>
-              <a @click="goToForgotPassword" class="text-primary cursor-pointer">
-                忘记密码？
+              <a @click="goToForgotPassword" style="color: #4F6EF7; font-size: 14px; cursor: pointer;">
+                忘记密码?
               </a>
             </div>
           </AFormItem>
@@ -323,18 +327,17 @@ const goToForgotPassword = () => {
               html-type="submit"
               size="large"
               :loading="loading"
-              block
+              class="auth-submit-btn"
             >
               登录
             </AButton>
           </AFormItem>
         </AForm>
 
-        <div class="text-center mt-md">
-          <span class="text-secondary">还没有账号？</span>
-          <a @click="goToRegister" class="text-primary cursor-pointer ml-sm">
-            立即注册
-          </a>
+        <!-- 注册链接 -->
+        <div class="auth-footer-link">
+          还没有账号？
+          <a @click="goToRegister">立即注册</a>
         </div>
       </div>
     </Transition>
@@ -343,6 +346,51 @@ const goToForgotPassword = () => {
 
 <style scoped lang="scss">
 @use '@/styles/modules/auth' as *;
+
+// ========== 视图切换过渡动画 ==========
+.auth-view-enter-active,
+.auth-view-leave-active {
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.auth-view-enter-from {
+  opacity: 0;
+  transform: translateY(16px) scale(0.97);
+}
+
+.auth-view-leave-to {
+  opacity: 0;
+  transform: translateY(-12px) scale(0.98);
+}
+
+.view-wrapper {
+  width: 100%;
+}
+
+// ========== SSO占位 ==========
+.sso-placeholder {
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sso-empty {
+  text-align: center;
+  color: #bbb;
+
+  .sso-empty-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  p {
+    font-size: 14px;
+    margin: 0;
+  }
+}
 
 // ========== 阻断视图样式 ==========
 .blocked-container {
@@ -423,27 +471,6 @@ const goToForgotPassword = () => {
   text-align: center;
 }
 
-// ========== 视图切换过渡动画 ==========
-.auth-view-enter-active,
-.auth-view-leave-active {
-  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-              transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.auth-view-enter-from {
-  opacity: 0;
-  transform: translateY(16px) scale(0.97);
-}
-
-.auth-view-leave-to {
-  opacity: 0;
-  transform: translateY(-12px) scale(0.98);
-}
-
-.view-wrapper {
-  width: 100%;
-}
-
 // ========== 租户选择视图 ==========
 .tenant-select-view {
   padding: 4px 0;
@@ -462,7 +489,7 @@ const goToForgotPassword = () => {
   user-select: none;
 
   &:hover {
-    color: #1677ff;
+    color: #4F6EF7;
   }
 
   .anticon {
@@ -546,30 +573,14 @@ const goToForgotPassword = () => {
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 14px;
-    background: linear-gradient(135deg, rgba(22, 119, 255, 0.04), rgba(22, 119, 255, 0.01));
-    opacity: 0;
-    transition: opacity 0.35s ease;
-  }
+  transition: all 0.2s ease;
 
   &:hover {
     border-color: #b8d4ff;
-    transform: translateY(-3px);
-
-    &::before {
-      opacity: 1;
-    }
 
     .tenant-card-avatar {
-      background: linear-gradient(135deg, #1677ff, #4096ff);
+      background: #4F6EF7;
       color: #fff;
-      transform: scale(1.05);
     }
 
     .tenant-card-arrow {
@@ -578,14 +589,12 @@ const goToForgotPassword = () => {
     }
 
     .tenant-card-name {
-      color: #1677ff;
+      color: #4F6EF7;
     }
   }
 
   &:active {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(22, 119, 255, 0.06);
-    transition: all 0.15s ease;
+    transition: all 0.1s ease;
   }
 
   &.tenant-card-loading {
@@ -598,15 +607,15 @@ const goToForgotPassword = () => {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #e8f2ff, #d6e8ff);
-  color: #1677ff;
+  background: #f0f4ff;
+  color: #4F6EF7;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 18px;
   font-weight: 600;
   flex-shrink: 0;
-  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
 }
 
 .tenant-card-body {
@@ -622,7 +631,7 @@ const goToForgotPassword = () => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: color 0.35s ease;
+  transition: color 0.2s ease;
   line-height: 1.4;
 }
 
@@ -651,11 +660,11 @@ const goToForgotPassword = () => {
 }
 
 .tenant-card-arrow {
-  color: #1677ff;
+  color: #4F6EF7;
   font-size: 12px;
   opacity: 0;
   transform: translateX(-8px);
-  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
 }

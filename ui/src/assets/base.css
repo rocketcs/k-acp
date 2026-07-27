@@ -14,7 +14,8 @@
 /* CSS 变量定义 */
 :root {
   /* 背景颜色 */
-  --color-bg: #f5f6f8;
+  /*--color-bg: #f5f6f8;*/
+  --color-bg: #ffffff;
   /* 颜色系统 */
   --color-primary: #0f74ff;
   --color-success: #67c23a;
@@ -37,7 +38,7 @@
 
   /* 背景颜色 */
   --color-bg-base: rgba(237, 237, 237, 0);
-  --color-bg-light: #fafafa;
+  --color-bg-light: #F2F4F7;
   --color-bg-white: #ffffff;
 
   /* 字体家族 */
@@ -226,7 +227,7 @@ details > summary::before {
 
 /* 滚动条样式 */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
   height: 8px;
 }
 
