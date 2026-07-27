@@ -51,8 +51,14 @@ NEW_CALL_B64="$(b64 <<'EOF'
             if ("rotate".equals(action)) return rotateFromDatabase(connection,
                 string(params.get("provider_status")).toUpperCase(Locale.ROOT));
             return rotationError("INVALID_KEY_POOL_ACTION");
-        } catch (Exception ignored) {
-            return rotationError("KEY_POOL_UNAVAILABLE");
+        } catch (Exception error) {
+            Map<String, Object> response = rotationError("KEY_POOL_UNAVAILABLE");
+            String detail = error.getClass().getSimpleName();
+            if (error.getMessage() != null && !error.getMessage().isBlank()) {
+                detail += ": " + error.getMessage();
+            }
+            response.put("error_detail", detail);
+            return response;
         }
     }
 
@@ -187,9 +193,11 @@ NEW_NO_ACTIVE_B64="$(b64 <<'EOF'
         response.put("incomplete_reason", reason);
         response.put("records", List.of());
         response.put("errors", List.of("No active Wenbiao key is available"));
-        response.put("key_rotation", Map.of(
-            "attempted", false,
-            "error_code", errorCode));
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("attempted", false);
+        metadata.put("error_code", errorCode);
+        metadata.put("error_detail", string(lease.get("error_detail")));
+        response.put("key_rotation", metadata);
         return response;
     }
 EOF
@@ -260,6 +268,9 @@ SET code=REPLACE(
   CONVERT(FROM_BASE64('$OLD_EXHAUSTED_B64') USING utf8mb4),
   CONVERT(FROM_BASE64('$NEW_EXHAUSTED_B64') USING utf8mb4))
 WHERE tool_id='execute_tender_high_recall_v1';
+DELETE st FROM skill_tools st
+JOIN skill_package sp ON sp.id=st.skill_id
+WHERE sp.name='tender-search' AND st.tool_id=2090300000000000101;
 COMMIT;
 SQL
 
