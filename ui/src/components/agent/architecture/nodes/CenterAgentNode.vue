@@ -7,8 +7,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
-import {ClockCircleOutlined, RobotOutlined} from '@ant-design/icons-vue'
+import { ClockCircleOutlined } from '@ant-design/icons-vue'
 import type { CenterAgentNodeData } from '../types'
+import { resolveAgentAvatar } from '@/utils/agentAvatar'
 
 /**
  * Props定义
@@ -44,7 +45,11 @@ const descriptionText = computed(() => {
     <div class="node-header">
       <div class="node-avatar-wrapper">
         <div class="node-avatar">
-          <RobotOutlined />
+          <img
+            :src="resolveAgentAvatar(data.agent.avatar)"
+            :alt="`${data.agent.name}头像`"
+            class="agent-avatar-image"
+          />
         </div>
         <span
           v-if="data.agent?.jobInfo"
@@ -112,6 +117,13 @@ const descriptionText = computed(() => {
       border-radius: 12px;
       font-size: 24px;
       color: #4449D0;
+      overflow: hidden;
+
+      .agent-avatar-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
     }
 
     .avatar-corner-badge {

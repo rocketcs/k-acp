@@ -199,12 +199,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <AuthContainer>
-    <!-- 标题区 -->
-    <div class="auth-card-header">
-      <h2 class="auth-card-title">创建账号</h2>
-    </div>
-    <p class="auth-card-subtitle">注册金智维智能体平台</p>
+  <AuthContainer :show-back="true" back-to="/login">
+    <div class="auth-title">欢迎使用金智维智能体平台</div>
+
+    <!-- 步骤指示器 -->
+    <ASteps :current="currentStep" size="small" class="register-steps">
+      <AStep title="选择组织" />
+      <AStep title="填写信息" />
+    </ASteps>
 
     <AForm
       ref="formRef"

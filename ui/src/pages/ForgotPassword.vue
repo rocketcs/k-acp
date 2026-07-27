@@ -109,17 +109,8 @@ const goToLogin = () => {
 </script>
 
 <template>
-  <AuthContainer>
-    <!-- 返回登录 -->
-    <div class="forgot-back" @click="goToLogin">
-      <LeftOutlined />
-      <span>返回登录</span>
-    </div>
-
-    <!-- 标题区 -->
-    <h2 class="auth-card-title" style="margin-top: 16px;">重置密码</h2>
-    <p class="auth-card-subtitle">通过邮箱验证重置金智维账号密码</p>
-
+  <AuthContainer :show-back="true" back-to="/login">
+    <div class="auth-title">欢迎使用金智维智能体平台</div>
     <AForm
       ref="formRef"
       :model="formState"

@@ -7,8 +7,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
-import { RobotOutlined } from '@ant-design/icons-vue'
 import type { AgentItemNodeData } from '../types'
+import { resolveAgentAvatar } from '@/utils/agentAvatar'
 
 /**
  * Props定义
@@ -39,7 +39,11 @@ const descriptionText = computed(() => {
 
     <div class="node-header">
       <div class="node-avatar">
-        <RobotOutlined />
+        <img
+          :src="resolveAgentAvatar(data.agent.avatar)"
+          :alt="`${data.agent.name}头像`"
+          class="agent-avatar-image"
+        />
       </div>
       <div class="node-title">
         <div class="node-name" :title="data.agent.name">
@@ -108,6 +112,13 @@ const descriptionText = computed(() => {
       border-radius: 8px;
       font-size: 16px;
       flex-shrink: 0;
+      overflow: hidden;
+
+      .agent-avatar-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
     }
 
     .node-title {

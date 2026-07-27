@@ -2,7 +2,7 @@
   <div>
     <!-- 页面内容 -->
     <div class="page-content">
-      <h1>Apboa 加载动画示例</h1>
+      <h1>平台加载动画示例</h1>
       
       <!-- 示例1: 基础加载动画 -->
       <div class="example-section">
@@ -43,7 +43,7 @@
 
       <!-- 示例4: 包裹式加载 -->
       <div class="example-section">
-        <h2>包裹式加载 (ApboaSpin)</h2>
+        <h2>包裹式加载</h2>
         <div class="example-box">
           <ApboaSpin :spinning="spinning" tip="加载中...">
             <div class="content-box">

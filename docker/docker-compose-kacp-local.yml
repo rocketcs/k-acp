@@ -15,8 +15,15 @@ services:
 
   apboa-runtime:
     container_name: k-acp-runtime
+    environment:
+      # 面向业务用户的对话不展示模型内部思考或查询计划。
+      AGENTSCOPE_AGUI_ENABLE_REASONING: "false"
+      # 高召回检索包含计划、受控搜索和批量原文解析，60 秒会在完成前中断。
+      APBOA_TOOL_EXECUTION_TIMEOUT_SECONDS: "240"
     ports:
       - "23061:3061"
+    volumes:
+      - ../scripts:/app/scripts:ro
 
   apboa-proxy:
     container_name: k-acp-proxy

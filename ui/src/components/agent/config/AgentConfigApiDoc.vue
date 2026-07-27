@@ -8,6 +8,7 @@ import { ref, computed, watch } from 'vue'
 import { CopyOutlined, CheckOutlined, DownOutlined, RightOutlined, KeyOutlined, LinkOutlined, ThunderboltOutlined, SyncOutlined, GlobalOutlined, FolderOpenOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { getChatKey } from '@/api/agentChatKey'
+import { buildExternalChatUrl, copyText } from '@/utils/externalChat'
 
 const props = defineProps<{
   agentId?: string | number
@@ -25,8 +26,11 @@ const chatKeyLoading = ref(false)
  */
 const externalChatUrl = computed(() => {
   if (!chatKey.value) return ''
-  const loc = window.location
-  return `${loc.protocol}//${loc.host}/#/communication/${chatKey.value}`
+  return buildExternalChatUrl(
+    window.location.origin,
+    import.meta.env.VITE_APP_CONTEXT_PATH || '',
+    chatKey.value,
+  )
 })
 
 /**
@@ -92,7 +96,7 @@ const accessUrl = computed(() => {
 const copiedKey = ref('')
 async function copyToClipboard(text: string, key: string) {
   try {
-    await navigator.clipboard.writeText(text)
+    await copyText(text)
     copiedKey.value = key
     message.success('已复制')
     setTimeout(() => { copiedKey.value = '' }, 2000)

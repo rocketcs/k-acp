@@ -76,7 +76,7 @@ RUN groupadd -r apboa -g 1001 && \
 # 安装 gosu（容器降权启动工具）
 RUN sed -i 's|http://ports.ubuntu.com/ubuntu-ports|https://mirrors.aliyun.com/ubuntu-ports|g' /etc/apt/sources.list.d/ubuntu.sources && \
     apt-get update && \
-    apt-get install -y --no-install-recommends gosu curl && \
+    apt-get install -y --no-install-recommends gosu curl python3 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 复制构建产物

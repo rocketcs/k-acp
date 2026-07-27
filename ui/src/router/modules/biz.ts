@@ -62,6 +62,16 @@ const bizRoutes: AppRouteRecordRaw[] = [
         },
       },
       {
+        path: RoutePaths.AGENT_DIY,
+        name: RouteNames.AGENT_DIY,
+        component: () => import('@/views/AgentDiy/index.vue'),
+        meta: {
+          title: 'DIY 页面设置',
+          hidden: true,
+          hideFooter: true,
+        },
+      },
+      {
         path: RoutePaths.WORKFLOW,
         name: RouteNames.WORKFLOW,
         component: () => import('@/views/Workflow/index.vue'),

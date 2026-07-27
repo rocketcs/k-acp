@@ -8,6 +8,7 @@ import com.hxh.apboa.common.enums.NodeType;
 import com.hxh.apboa.node.base.context.NodeContext;
 import com.hxh.apboa.node.base.template.TemplateFormatter;
 import com.hxh.apboa.node.base.template.TemplateFormatterFactory;
+import com.hxh.apboa.node.base.template.FormatterType;
 import com.hxh.apboa.node.base.verify.VerifyFail;
 import com.hxh.apboa.node.base.verify.VerifyResult;
 import lombok.Getter;
@@ -35,11 +36,13 @@ public class HttpExternalNode extends EnhancedNode {
     private final Map<String, OkHttpClient> clientCache = new ConcurrentHashMap<>();
     private Map<String, Object> inputsMap;
     private final TemplateFormatter formatter;
+    private final TemplateFormatter textFormatter;
 
     public HttpExternalNode(String id, String name, Config config) {
         super(id, name, NodeType.HTTP_EXTERNAL);
         this.config = config;
         this.formatter = TemplateFormatterFactory.createFormatter(config.getFormatterType());
+        this.textFormatter = TemplateFormatterFactory.createFormatter(FormatterType.STRING);
         this.client = buildClient(config);
     }
 
@@ -114,7 +117,15 @@ public class HttpExternalNode extends EnhancedNode {
      * 异常节点输出
      */
     private NodeOutput executionNodeOutput(Exception e, NodeOutput output) {
-        output.markFailed( getName() + "执行失败: " + e.getMessage());
+        String message = e.getMessage();
+        Throwable cause = e.getCause();
+        while (cause != null) {
+            if (cause.getMessage() != null && !cause.getMessage().isBlank()) {
+                message += ": " + cause.getMessage();
+            }
+            cause = cause.getCause();
+        }
+        output.markFailed(getName() + "执行失败: " + message);
         return output;
     }
 
@@ -183,13 +194,13 @@ public class HttpExternalNode extends EnhancedNode {
     // 构建OkHttp请求
     private Request buildRequest(HttpRequest httpRequest) {
         // 处理路径参数
-        String url = processPathParams(convertVariables(httpRequest.getUrl()), httpRequest.getPathParams());
+        String url = processPathParams(convertTextVariables(httpRequest.getUrl()), httpRequest.getPathParams());
 
         // 构建URL和查询参数
         HttpUrl.Builder urlBuilder = Objects.requireNonNull(HttpUrl.parse(url)).newBuilder();
         for (MapItem queryParam : httpRequest.getQueryParams()) {
             urlBuilder.addQueryParameter(queryParam.getKey(),
-                    convertVariables(queryParam.getValue()));
+                    convertTextVariables(queryParam.getValue()));
         }
 
         // 构建请求体
@@ -202,7 +213,7 @@ public class HttpExternalNode extends EnhancedNode {
 
         // 添加请求头
         for (MapItem header : httpRequest.getHeaders()) {
-            requestBuilder.addHeader(header.getKey(), convertVariables(header.getValue()));
+            requestBuilder.addHeader(header.getKey(), convertTextVariables(header.getValue()));
         }
 
         // 设置Content-Type（如果未在headers中设置）
@@ -232,7 +243,7 @@ public class HttpExternalNode extends EnhancedNode {
     private String processPathParams(String url, List<MapItem> pathParams) {
         String processedUrl = url;
         for (MapItem entry : pathParams) {
-            String encodedValue = URLEncoder.encode(convertVariables(entry.getValue()), StandardCharsets.UTF_8);
+            String encodedValue = URLEncoder.encode(convertTextVariables(entry.getValue()), StandardCharsets.UTF_8);
             processedUrl = processedUrl.replace("{" + entry.getKey() + "}", encodedValue);
         }
         return processedUrl;
@@ -254,7 +265,7 @@ public class HttpExternalNode extends EnhancedNode {
                     @SuppressWarnings("unchecked")
                     Map<String, String> formData = (Map<String, String>) body;
                     for (Map.Entry<String, String> entry : formData.entrySet()) {
-                        formBuilder.add(entry.getKey(), convertVariables(entry.getValue()));
+                        formBuilder.add(entry.getKey(), convertTextVariables(entry.getValue()));
                     }
                     return formBuilder.build();
                 }
@@ -276,7 +287,7 @@ public class HttpExternalNode extends EnhancedNode {
                         } else {
                             multipartBuilder.addFormDataPart(
                                     entry.getKey(),
-                                    convertVariables(entry.getValue().toString())
+                                    convertTextVariables(entry.getValue().toString())
                             );
                         }
                     }
@@ -286,14 +297,14 @@ public class HttpExternalNode extends EnhancedNode {
 
             case JSON:
                 if (body instanceof String) {
-                    return RequestBody.create(convertVariables((String) body), MediaType.parse(mediaType));
+                    return RequestBody.create(convertBodyVariables((String) body), MediaType.parse(mediaType));
                 } else {
                     throw new IllegalArgumentException("不合法的 JSON 请求体");
                 }
 
             default:
                 if (body instanceof String) {
-                    return RequestBody.create(convertVariables((String) body), MediaType.parse(mediaType));
+                    return RequestBody.create(convertTextVariables((String) body), MediaType.parse(mediaType));
                 } else if (body instanceof byte[]) {
                      return RequestBody.create((byte[]) body, MediaType.parse(mediaType));
                 }
@@ -308,7 +319,15 @@ public class HttpExternalNode extends EnhancedNode {
      * @param template 模板
      * @return 模板内容
      */
-    private String convertVariables(String template) {
+    private String convertTextVariables(String template) {
+        Object format = textFormatter.format(template, inputsMap, false);
+        if (format == null) {
+            return template;
+        }
+        return format.toString();
+    }
+
+    private String convertBodyVariables(String template) {
         Object format = formatter.format(template, inputsMap, false);
         if (format == null) {
             return template;

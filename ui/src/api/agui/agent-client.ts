@@ -39,6 +39,11 @@ import {
   removeRefreshToken
 } from "@/utils/auth";
 import setting from "@/config/setting.ts";
+import { buildLoginRedirectUrl } from '@/router/loginRedirect'
+
+function redirectToLogin(): void {
+  window.location.href = buildLoginRedirectUrl(window.location.hash.slice(1))
+}
 
 
 /** 事件处理器集合 */
@@ -159,8 +164,7 @@ export class AgentClient {
             try {
               const refreshToken = getRefreshToken()
               if (!refreshToken) {
-                window.location.href = "/#/login";
-                window.location.reload();
+                redirectToLogin()
                 return
               }
 
@@ -174,7 +178,8 @@ export class AgentClient {
               })
 
               if (!refreshResponse.ok) {
-                window.location.href = "/#/login";
+                redirectToLogin()
+                return
               }
 
               const data = await refreshResponse.json()
@@ -203,20 +208,18 @@ export class AgentClient {
                 await executeRequest()
                 return
               } else {
-                window.location.href = "/#/login";
-                window.location.reload();
+                redirectToLogin()
+                return
               }
             } catch (refreshError) {
               console.error('Token refresh failed:', refreshError)
               removeToken()
               removeRefreshToken()
-              window.location.href = "/#/login";
-              window.location.reload();
+              redirectToLogin()
               return
             }
           } else {
-            window.location.href = "/#/login";
-            window.location.reload();
+            redirectToLogin()
             return
           }
         }

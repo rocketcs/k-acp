@@ -6,7 +6,7 @@
  * @author huxuehao
  */
 import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import type { LoginRequest, TenantInfo, PendingApprovalInfo } from '@/types'
@@ -14,6 +14,7 @@ import { AuthContainer } from '@/components/auth'
 import { useAccountStore } from '@/stores'
 import { md5 } from 'js-md5'
 import { RoutePaths } from '@/router/constants.ts'
+import { resolveLoginRedirect } from '@/router/loginRedirect'
 import {
   ExclamationCircleOutlined,
   LeftOutlined,
@@ -25,6 +26,7 @@ interface LoginForm extends LoginRequest {
 }
 
 const router = useRouter()
+const route = useRoute()
 const accountStore = useAccountStore()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
@@ -143,10 +145,7 @@ function completeLogin(remember: boolean) {
     localStorage.removeItem('remember')
     localStorage.removeItem('username')
   }
-  location.reload()
-  setTimeout(() => {
-    router.push(RoutePaths.DASHBOARD)
-  }, 100)
+  router.replace(resolveLoginRedirect(route.query.redirect))
 }
 
 /**
@@ -285,15 +284,7 @@ const goToForgotPassword = () => {
 
       <!-- 登录表单 -->
       <div v-else key="login" class="view-wrapper">
-        <!-- 标题区 -->
-        <div class="auth-card-header">
-          <h2 class="auth-card-title">欢迎回来 👋</h2>
-          <span class="auth-lang-select">
-            <img src="@/assets/images/logo/logo.png" alt="金智维" width="90px"/>
-          </span>
-        </div>
-        <p class="auth-card-subtitle">登录金智维智能体平台</p>
-
+        <div class="auth-title">欢迎使用金智维智能体平台</div>
         <AForm
           ref="formRef"
           :model="formState"
@@ -342,21 +333,6 @@ const goToForgotPassword = () => {
             </AButton>
           </AFormItem>
         </AForm>
-
-        <!-- 仓库地址 -->
-        <div class="auth-divider">Apboa Next 项目仓库地址</div>
-        <div class="auth-social-login">
-          <div class="auth-social-icon">
-            <a href="https://gitee.com/studioustiger/apboa-next" target="_blank" rel="noopener noreferrer">
-              <img src="https://gitee.com/static/images/logo-en.svg" alt="Gitee" width="24">
-            </a>
-          </div>
-          <div class="auth-social-icon">
-            <a href="https://github.com/huxuehao/apboa-next" target="_blank" rel="noopener noreferrer">
-              <img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/github.svg" alt="GitHub" width="24">
-            </a>
-          </div>
-        </div>
 
         <!-- 注册链接 -->
         <div class="auth-footer-link">

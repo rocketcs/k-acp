@@ -9,6 +9,7 @@ import { useRouter } from 'vue-router'
 import { useAccountStore } from '@/stores'
 import { RoutePaths } from '@/router/constants'
 import SideMenu from './SideMenu.vue'
+import AppLogo from './AppLogo.vue'
 import {
   TeamOutlined,
   SwapOutlined,
@@ -112,8 +113,7 @@ const roleName = computed(() => {
   <div class="sidebar flex flex-col" :class="{ collapsed: collapsed }">
     <!-- 顶部Logo区域 -->
     <div class="sidebar-logo">
-      <img v-if="!collapsed" src="@/assets/logo/logo_3.png" alt="logo" width="125">
-      <img v-else src="@/assets/logo/logo_1.png" alt="logo" width="35">
+      <AppLogo :compact="collapsed" />
       <ATooltip v-if="!collapsed" :title="collapsed ? '展开菜单' : '收起菜单'" placement="right">
         <div class="collapse-btn" @click="toggleCollapsed">
           <MenuFoldOutlined v-if="!collapsed" />

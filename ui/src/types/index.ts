@@ -37,3 +37,5 @@ export * from './workflow'
 
 // Workflow resource maintenance types
 export * from './workflowResources'
+
+export * from './diy'

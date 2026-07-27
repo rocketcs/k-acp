@@ -25,6 +25,7 @@ export const RouteNames = {
 
   // Agent管理
   AGENT: 'Agent',
+  AGENT_DIY: 'AgentDiy',
   WORKFLOW: 'Workflow',
   WORKFLOW_NEW: 'WorkflowNew',
   WORKFLOW_EDIT: 'WorkflowEdit',
@@ -65,6 +66,7 @@ export const RouteNames = {
 
   // 智能体对话
   CHAT: 'Chat',
+  CHAT_DIY: 'ChatDiy',
   CHAT_HISTORY: 'ChatHistory',
   COMMUNICATION: 'Communication',
 
@@ -107,6 +109,7 @@ export const RoutePaths = {
 
   // Agent管理
   AGENT: 'agent',
+  AGENT_DIY: 'agent/:agentId/diy',
   WORKFLOW: 'workflow',
   WORKFLOW_NEW: '/workflow/new',
   WORKFLOW_EDIT: '/workflow/:id',
@@ -147,6 +150,7 @@ export const RoutePaths = {
 
   // 智能体对话
   CHAT: '/chat',
+  CHAT_DIY: '/chat/diy',
   CHAT_HISTORY: '/chat/history',
   COMMUNICATION: '/communication',
 

@@ -89,7 +89,6 @@ Agent 调用工具实现用户确认，需要配合 IConfirmationHook 钩子使�
 :::success 解决方案
 可以使用 GlusterFS 实现多节点服务器上指定文件夹的自动更新实施同步
 :::
-
 ## 二、MCP 相关
 
 ### 1、配置的 MCP 不可使用？

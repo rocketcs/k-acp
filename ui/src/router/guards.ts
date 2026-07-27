@@ -9,6 +9,7 @@ import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
 import { useAccountStore } from '@/stores'
 import { WHITE_LIST } from './constants'
+import { resolveLoginRedirect } from './loginRedirect'
 
 // 配置NProgress
 NProgress.configure({
@@ -54,8 +55,8 @@ export function setupRouterGuard(router: Router): void {
     // 已登录
     if (hasToken) {
       if (to.path === '/login') {
-        // 已登录且访问登录页，重定向到首页
-        next({ path: '/' })
+        // 已登录且访问登录页，返回登录前请求的页面。
+        next({ path: resolveLoginRedirect(to.query.redirect) })
         NProgress.done()
       } else {
         // 检查是否已获取用户信息
@@ -69,7 +70,7 @@ export function setupRouterGuard(router: Router): void {
           } catch (error) {
             // 获取用户信息失败，清除token并重定向到登录页
             await accountStore.logout()
-            next({ path: '/login' })
+            next({ path: '/login', query: { redirect: to.fullPath } })
             NProgress.done()
           }
         }
@@ -81,7 +82,7 @@ export function setupRouterGuard(router: Router): void {
         next()
       } else {
         // 不在白名单中，重定向到登录页
-        next({ path: '/login' })
+        next({ path: '/login', query: { redirect: to.fullPath } })
         NProgress.done()
       }
     }

@@ -10,6 +10,7 @@ import skillAvatar from '@/assets/avatar/skill.png'
 import { message } from 'ant-design-vue'
 import type { SkillPackageVO } from '@/types'
 import * as skillApi from '@/api/skill'
+import { displaySkillName } from '@/utils/skillDisplayName'
 import {
   createViewItem,
   createEditItem,
@@ -54,6 +55,8 @@ const formattedTime = computed(() => {
     minute: '2-digit'
   })
 })
+
+const displayName = computed(() => displaySkillName(props.data.name))
 
 /**
  * 操作菜单项
@@ -186,7 +189,7 @@ function handleMenuClick({ key }: { key: string }) {
           </span>
         </div>
       </ATooltip>
-      <div class="card-name flex-1 truncate" :title="data.name" @click="emit('view', data.id as string)">{{ data.name }}</div>
+      <div class="card-name flex-1 truncate" :title="displayName" @click="emit('view', data.id as string)">{{ displayName }}</div>
       <ADropdown :trigger="['hover']">
         <AButton type="text" size="small" v-permission="['TENANT_EDITOR','TENANT_ADMIN','TENANT_OWNER']">
           <EllipsisOutlined />

@@ -18,6 +18,7 @@ import SkillTree from '@/components/skill/SkillTree.vue'
 import SkillEditor from '@/components/skill/SkillEditor.vue'
 import type { SkillFileTreeNode, SkillPackageVO } from '@/types'
 import * as skillApi from '@/api/skill'
+import { displaySkillName } from '@/utils/skillDisplayName'
 
 const route = useRoute()
 const router = useRouter()
@@ -497,7 +498,7 @@ onBeforeUnmount(() => {
           <ArrowLeftOutlined />
         </a-button>
         <span class="skill-name">
-          <span v-if="!isNew" class="skill-name-text">{{ skillInfo.name }}</span>
+          <span v-if="!isNew" class="skill-name-text">{{ displaySkillName(skillInfo.name) }}</span>
           <span v-else>新建技能包</span>
         </span>
         <span style="flex:1"></span>

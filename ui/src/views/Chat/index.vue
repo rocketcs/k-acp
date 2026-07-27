@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import { useRoute } from 'vue-router'
+import { RouteNames } from '@/router'
 import { Modal, message } from 'ant-design-vue'
 import { useAccountStore, useChatStore } from '@/stores'
 import { formatSessionTitle } from '@/utils/chat/format'
@@ -14,6 +15,7 @@ import RenameModal from '@/components/chat/RenameModal.vue'
 import WorkspacePanel from '@/components/workspace/WorkspacePanel.vue'
 import type { DisplayMessage, ChatMessageVO, UploadedFileItem, ChatSessionVO } from '@/types'
 import * as chatSessionApi from '@/api/chatSession'
+import * as agentDiyApi from '@/api/agentDiy'
 import { getActiveRuns, getStatus } from '@/api/agui'
 import { LoadingOutlined } from '@ant-design/icons-vue'
 import {
@@ -21,6 +23,8 @@ import {
   injectSubmissionToRawContent
 } from '@/utils/chat/uip.ts'
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
+import type { DiyOutputFormat, DiyPageConfig } from '@/types'
+import { buildOutputInstruction } from '@/utils/diy/questionTemplate'
 
 const props = withDefaults(defineProps<{
   showAccount: boolean
@@ -36,6 +40,8 @@ const chatStore = useChatStore()
 const userInfo = computed(() => accountStore.userInfo)
 
 const agentId = computed(() => (props.chatAgentId || route.params.agentId) as string || '')
+const isDiyRoute = computed(() => route.name === RouteNames.CHAT_DIY)
+const diyConfig = ref<DiyPageConfig | null>(null)
 
 // 智能体详情
 const { agentDetail, allowFileType } = useAgentDetail(agentId)
@@ -176,7 +182,7 @@ const displayMessages = computed<DisplayMessage[]>(() => {
   const list: DisplayMessage[] = []
   for (let i = 0; i < messagesList.value.length; i++) {
     const m = messagesList.value[i]
-    if (!m || m.role === 'system' || !m.content) continue
+    if (!m || m.role === 'system' || m.role === 'thinking' || !m.content) continue
 
     let displayId = String(m.id)
     // key 桥接：流式刚结束时，将最后一条 assistant 消息的展示 key 替换为流式 ID
@@ -196,7 +202,7 @@ const displayMessages = computed<DisplayMessage[]>(() => {
     })
   }
 
-  if (streamingMessageId.value) {
+  if (streamingMessageId.value && streamingRole.value !== 'thinking') {
     list.push({
       id: streamingMessageId.value,
       role: streamingRole.value,
@@ -395,7 +401,40 @@ const handleVEPRetry = async (vepCode: string) => {
   await sendMessage(retryText, [{ id: 'vep', role: 'user', content: retryText }] as ChatMessageVO[])
 }
 
-// 发送消息
+async function submitMessage(options: {
+  displayText: string
+  runtimeText: string
+  titleText: string
+  fileIds?: string[]
+}) {
+  if (!agentId.value || isRunning.value) return
+
+  if (!currentSessionId.value) {
+    const newSession = await createSession(formatSessionTitle(options.titleText || '新对话'))
+    if (!newSession) return
+    currentSessionId.value = String(newSession.id)
+    currentSessionTitle.value = newSession.title || '新对话'
+  }
+
+  const userMsg = await chatSessionApi.appendMessage(currentSessionId.value, {
+    role: 'user',
+    content: options.displayText,
+  })
+  if (messagesList.value.length <= 1) {
+    const title = formatSessionTitle(options.titleText || '新对话')
+    await updateSessionTitle(currentSessionId.value, title)
+    currentSessionTitle.value = title
+  }
+  messagesList.value.push(userMsg.data.data)
+
+  await sendMessage(
+    options.runtimeText,
+    [{ role: 'user', content: options.runtimeText }] as ChatMessageVO[],
+    options.fileIds,
+  )
+}
+
+// 发送普通输入消息
 const handleSend = async () => {
   const text = inputText.value.trim()
   const filesToSend = uploadedFiles.value.filter((f) => !f.uploading)
@@ -405,35 +444,25 @@ const handleSend = async () => {
   const finalText = hasFiles ? buildFilesPrefix(filesToSend) + text : text
   const fileIdsToSend = filesToSend.map((f) => f.id)
 
-  // 立即清空输入框和附件，提升交互体验
   inputText.value = ''
   uploadedFiles.value = []
 
-  // 如果没有当前会话，先创建
-  if (!currentSessionId.value) {
-    const titleInput = text || '新对话'
-    const newSession = await createSession(formatSessionTitle(titleInput))
-    if (!newSession) return
-    currentSessionId.value = String(newSession.id)
-    currentSessionTitle.value = newSession.title || '新对话'
-  }
+  await submitMessage({
+    displayText: finalText,
+    runtimeText: finalText,
+    titleText: text,
+    fileIds: fileIdsToSend,
+  })
+}
 
-  // 保存用户消息
-  const userMsg = await chatSessionApi.appendMessage(currentSessionId.value, { role: 'user', content: finalText })
-  // 如果是新会话，更新标题
-  if (messagesList.value.length <= 1) {
-    const title = formatSessionTitle(text || '新对话')
-    await updateSessionTitle(currentSessionId.value, title)
-    currentSessionTitle.value = title
-  }
-  messagesList.value.push(userMsg.data.data)
-
-  // 触发流式回复（传入 fileIdsToSend，因输入框已提前清空）
-  await sendMessage(
-    finalText,
-    [{ role: 'user', content: finalText }] as ChatMessageVO[],
-    fileIdsToSend
-  )
+const handleQuickSend = async (payload: { text: string; outputFormat: DiyOutputFormat }) => {
+  const text = payload.text.trim()
+  if (!text) return
+  await submitMessage({
+    displayText: text,
+    runtimeText: `${text}\n\n${buildOutputInstruction(payload.outputFormat)}`,
+    titleText: text,
+  })
 }
 
 // 切换侧边栏（通过 computed setter 自动持久化到 store）
@@ -510,6 +539,21 @@ onMounted(async () => {
   }
 })
 
+watch(
+  [isDiyRoute, agentId],
+  async ([enabled, currentAgentId]) => {
+    diyConfig.value = null
+    if (!enabled || !currentAgentId) return
+    try {
+      const response = await agentDiyApi.getPublished(currentAgentId)
+      diyConfig.value = response.data.data
+    } catch {
+      message.error('DIY 页面配置加载失败')
+    }
+  },
+  { immediate: true },
+)
+
 // 组件卸载时清理 poll timer
 onBeforeUnmount(() => {
   stopPolling()
@@ -538,6 +582,7 @@ watch(isRunning, (running) => {
     <ChatSidebar
       :collapsed="sidebarCollapsed"
       :agent-name="agentDetail?.name"
+      :agent-avatar="agentDetail?.avatar"
       :pinned-sessions="pinnedSessions"
       :other-sessions="otherSessions"
       :current-session-id="currentSessionId"
@@ -589,6 +634,7 @@ watch(isRunning, (running) => {
       :has-more-history="hasMoreHistory"
       :history-loading="historyLoading"
       :current-plan="currentPlan"
+      :diy-config="diyConfig"
       @update:input-value="inputText = $event"
       @update:uploaded-files="uploadedFiles = $event"
       @memory="handleMemoryChange"
@@ -605,6 +651,7 @@ watch(isRunning, (running) => {
       @interaction-submit="handleInteractionSubmit"
       @uip-retry="handleUIPRetry"
       @vep-retry="handleVEPRetry"
+      @quick-send="handleQuickSend"
     />
     <!-- 工作空间面板（作为 flex 子项从右侧滑出） -->
     <WorkspacePanel

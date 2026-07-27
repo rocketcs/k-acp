@@ -6,9 +6,10 @@
 
 .app-logo {
   .logo-icon {
-    width: 124px;
-    height: 32px;
+    width: 160px;
+    height: 42px;
     flex-shrink: 0;
+    overflow: hidden;
   }
 
   .logo-image {
@@ -16,5 +17,20 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
+  }
+
+  &.compact {
+    .logo-icon {
+      width: 48px;
+      height: 38px;
+      justify-content: flex-start;
+    }
+
+    .logo-image {
+      width: auto;
+      max-width: none;
+      height: 38px;
+      object-fit: initial;
+    }
   }
 }
