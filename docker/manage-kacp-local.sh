@@ -9,6 +9,7 @@ ENV_FILE="$SCRIPT_DIR/.env.kacp"
 COMPOSE_BASE="$SCRIPT_DIR/docker-compose-simple.yml"
 COMPOSE_LOCAL="$SCRIPT_DIR/docker-compose-kacp-local.yml"
 APP_SERVICES=(apboa-console apboa-runtime apboa-proxy apboa-websocket apboa-frontend)
+DATA_SERVICES=(apboa-mysql apboa-redis apboa-pgvector)
 
 usage() {
   cat <<'USAGE'
@@ -75,8 +76,11 @@ update() {
   echo '>> 构建 k-acp-local 的前后端应用镜像...'
   compose build "${APP_SERVICES[@]}"
 
+  echo '>> 确保中间件已启动（不重建已有容器）...'
+  compose up -d --no-recreate "${DATA_SERVICES[@]}"
+
   echo '>> 重建 k-acp-local 的前后端应用服务（中间件与数据卷保持不动）...'
-  compose up -d --force-recreate "${APP_SERVICES[@]}"
+  compose up -d --no-deps --force-recreate "${APP_SERVICES[@]}"
 
   compose ps "${APP_SERVICES[@]}"
 }
