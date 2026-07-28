@@ -1,6 +1,6 @@
 # `resolve_tender_source_urls` 手工配置指南
 
-用途：将知了标讯页中的聚合链接解析并校验为招标方/交易平台的真实原文链接。一次最多处理 20 条。
+用途：从知了标讯页的 HTML 提取招标方/交易平台的真实原文链接。一次最多处理 20 条；不探测原文站点可达性。
 
 ## 1. 新建自定义工具
 
@@ -13,10 +13,10 @@
 | 标签/分类 | `招投标` |
 | 名称 | `resolve_tender_source_urls｜招标原文链接批量解析` |
 | 编号 | `resolve_tender_source_urls` |
-| 描述 | `批量处理最多20条知了标讯结果：优先校验source_url，缺失时从聚合页提取真实原文地址；逐条返回验证、删除、未找到或不可访问状态。` |
+| 描述 | `批量处理最多20条知了标讯结果：逐条读取知了标讯页 HTML，从“查看原文”链接或页面内 sourceUrl 提取真实原文地址；不调用详情 API 或原文站点可达性探测。` |
 | 类型 | 自定义（CUSTOM） |
 | 语言 | Java |
-| 版本号 | `1.0.1` |
+| 版本号 | `2.3.0` |
 | 是否需要确认 | 否 |
 
 ## 2. 配置输入参数
@@ -65,16 +65,15 @@
 }
 ```
 
-预期：结果中的 `items[0]` 带有 `status`、`original_url`、`source_domain`、`method`。只有 `status = VERIFIED` 时，前端才应将项目名称链接到 `original_url`。
+预期：结果中的 `items[0]` 带有 `status`、`original_url`、`source_domain`、`method`。当 `status = EXTRACTED` 时，前端可将项目名称链接到 `original_url`。
 
 状态说明：
 
 | 状态 | 含义 |
 | --- | --- |
-| `VERIFIED` | 原文可访问，可使用 `original_url` |
-| `SOURCE_DELETED` | 原文返回 404 或 410，原文已删除 |
+| `EXTRACTED` | 已从知了页面提取到原文 URL；未探测原文站点可达性 |
 | `NOT_FOUND` | 聚合页中没有找到原文地址 |
-| `UNREACHABLE` | 原文或聚合页暂时不可访问 |
+| `UNREACHABLE` | 知了聚合页暂时不可访问 |
 | `INVALID_INPUT` | 传入地址不是有效的公开 HTTP/HTTPS 链接 |
 
 ## 常见问题

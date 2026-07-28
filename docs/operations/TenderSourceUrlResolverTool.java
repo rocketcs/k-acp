@@ -10,18 +10,12 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -38,15 +32,18 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(8);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Pattern SOURCE_URL = Pattern.compile(
-        "sourceUrl\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
+        "(?i)(?:sourceUrl|source_url)\\s*[:=]\\s*[\"']((?:\\\\.|[^\"'\\\\])*)[\"']");
     private static final Pattern HREF_URL = Pattern.compile(
         "(?i)href\\s*=\\s*[\"'](https?://[^\"'\\s<>]+)");
+    private static final Pattern HREF_ATTRIBUTE = Pattern.compile(
+        "(?i)\\bhref\\s*=\\s*[\"']([^\"'\\s<>]+)");
     private static final Pattern HTTP_URL = Pattern.compile(
         "https?://[^\\s\"'<>]+");
-    private static final URI DETAIL_API = URI.create(
-        "https://mcp-server.zhiliaobiaoxun.com/api_v2/get_bid_detail");
-    private static final Path PROFILE_DIR = Paths.get(
-        ".apboa", "secrets", "http-profiles").toAbsolutePath().normalize();
+    private static final Pattern ANCHOR_TAG = Pattern.compile(
+        "(?is)<a\\b([^>]*)>(.*?)</a\\s*>");
+    private static final Pattern BUTTON_TAG = Pattern.compile(
+        "(?is)<button\\b([^>]*)>(.*?)</button\\s*>");
+    private static final Pattern TAGS = Pattern.compile("(?is)<[^>]+>");
     private static final HttpClient CLIENT = HttpClient.newBuilder()
         .connectTimeout(REQUEST_TIMEOUT)
         .followRedirects(HttpClient.Redirect.NEVER)
@@ -86,7 +83,7 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
         }
 
         long resolved = results.stream()
-            .filter(item -> "VERIFIED".equals(item.get("status")))
+            .filter(item -> "EXTRACTED".equals(item.get("status")))
             .count();
         response.put("success", true);
         response.put("total", results.size());
@@ -100,37 +97,22 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
             ConcurrentHashMap<String, FutureTask<FetchResult>> pageCache) {
         String bidId = text(item, "bid_id");
         String title = text(item, "title");
-        String method = "API_SOURCE_URL";
+        String method = "INPUT_SOURCE_URL";
         String sourceUrl = text(item, "source_url");
         String lookupMessage = "";
         try {
-            if (sourceUrl.isBlank()) {
-                method = "PAGE_SOURCE_URL";
-                String aggregateUrl = text(item, "aggregate_url");
-                if (aggregateUrl.isBlank()) aggregateUrl = text(item, "url");
-                try {
-                    URI aggregateUri = validateAggregateUri(aggregateUrl);
-                    FetchResult page = cachedPage(aggregateUri.toString(), pageCache);
-                    if (page.statusCode >= 200 && page.statusCode < 300) {
-                        Matcher matcher = SOURCE_URL.matcher(page.body);
-                        if (matcher.find()) {
-                            sourceUrl = decodeJsonString(matcher.group(1));
-                        } else {
-                            lookupMessage = "Original source URL was not found on aggregation page";
-                        }
-                    } else {
-                        lookupMessage = "Aggregation page returned HTTP " + page.statusCode;
+            String aggregateUrl = aggregationUrl(item);
+            if (!aggregateUrl.isBlank()) {
+                method = "PAGE_VIEW_ORIGINAL";
+                URI aggregateUri = validateAggregateUri(aggregateUrl);
+                FetchResult page = cachedPage(aggregateUri.toString(), pageCache);
+                if (page.statusCode >= 200 && page.statusCode < 300) {
+                    sourceUrl = sourceFromPage(page.body, page.finalUri);
+                    if (sourceUrl.isBlank()) {
+                        lookupMessage = "Original source URL was not found in the aggregation page HTML";
                     }
-                } catch (Exception e) {
-                    lookupMessage = safeMessage(e, "Aggregation page is unavailable");
-                }
-
-                if (sourceUrl.isBlank() && !bidId.isBlank()) {
-                    String detailSource = sourceFromBidDetail(bidId);
-                    if (!detailSource.isBlank()) {
-                        sourceUrl = detailSource;
-                        method = "DETAIL_API_SOURCE";
-                    }
+                } else {
+                    lookupMessage = "Aggregation page returned HTTP " + page.statusCode;
                 }
                 if (sourceUrl.isBlank()) {
                     return result(bidId, title, null, null, "NOT_FOUND", method,
@@ -139,17 +121,8 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
             }
 
             URI sourceUri = validateSourceUri(sourceUrl);
-            ProbeResult probe = probe(sourceUri);
-            if (probe.statusCode >= 200 && probe.statusCode < 400) {
-                return result(bidId, title, probe.finalUri.toString(),
-                    probe.finalUri.getHost(), "VERIFIED", method, "");
-            }
-            if (probe.statusCode == 404 || probe.statusCode == 410) {
-                return result(bidId, title, null, sourceUri.getHost(),
-                    "SOURCE_DELETED", method, "Original source has been deleted");
-            }
-            return result(bidId, title, null, sourceUri.getHost(),
-                "UNREACHABLE", method, "Original source returned HTTP " + probe.statusCode);
+            return result(bidId, title, sourceUri.toString(), sourceUri.getHost(),
+                "EXTRACTED", method, "");
         } catch (IllegalArgumentException e) {
             return result(bidId, title, null, null, "INVALID_INPUT", method,
                 safeMessage(e, "Invalid input"));
@@ -159,70 +132,51 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
         }
     }
 
-    private static String sourceFromBidDetail(String bidId) throws Exception {
-        JsonNode profile = loadWenbiaoAgentProfile();
-        validateDetailProfile(profile);
-        byte[] requestBody = MAPPER.writeValueAsBytes(Map.of("bid_id", bidId));
-        HttpRequest.Builder builder = HttpRequest.newBuilder(DETAIL_API)
-            .timeout(REQUEST_TIMEOUT)
-            .header("Accept", "application/json")
-            .header("Content-Type", "application/json")
-            .header("User-Agent", "K-ACP-Tender-Source-Resolver/1.1")
-            .POST(HttpRequest.BodyPublishers.ofByteArray(requestBody));
-        Iterator<Map.Entry<String, JsonNode>> fields = profile.path("headers").fields();
-        while (fields.hasNext()) {
-            Map.Entry<String, JsonNode> field = fields.next();
-            String name = field.getKey();
-            String value = field.getValue().asText();
-            if (!name.isBlank() && !value.contains("\r") && !value.contains("\n")) {
-                builder.header(name, value);
+    private static String aggregationUrl(JsonNode item) {
+        for (String field : List.of("source_url", "aggregate_url", "url")) {
+            String candidate = text(item, field);
+            try {
+                URI uri = parseHttpUri(candidate);
+                if (isAggregationHost(uri.getHost())) return uri.toString();
+            } catch (Exception ignored) {
+                // The caller receives the normal invalid-input result if no usable URL remains.
             }
-        }
-
-        HttpResponse<InputStream> response = sendWithRetry(builder.build());
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            closeBody(response.body());
-            return "";
-        }
-        byte[] bytes;
-        try (InputStream input = response.body()) {
-            bytes = input.readNBytes(MAX_PAGE_BYTES + 1);
-        }
-        if (bytes.length > MAX_PAGE_BYTES) return "";
-        JsonNode root = MAPPER.readTree(new String(bytes, StandardCharsets.UTF_8));
-        if (!root.path("success").asBoolean(false)) return "";
-        JsonNode detail = root.path("data");
-        for (String field : List.of("source_url", "original_url", "source_ext", "source", "url")) {
-            String candidate = firstExternalUrl(text(detail, field));
-            if (!candidate.isBlank()) return candidate;
         }
         return "";
     }
 
-    private static JsonNode loadWenbiaoAgentProfile() throws Exception {
-        Path profilePath = PROFILE_DIR.resolve("wenbiao_agent.json").normalize();
-        if (!profilePath.startsWith(PROFILE_DIR) || !Files.isRegularFile(profilePath)) {
-            throw new IllegalArgumentException("wenbiao_agent auth profile is unavailable");
+    private static String sourceFromPage(String html, URI pageUri) throws Exception {
+        String source = sourceFromViewOriginalTag(ANCHOR_TAG, html, pageUri);
+        if (!source.isBlank()) return source;
+        source = sourceFromViewOriginalTag(BUTTON_TAG, html, pageUri);
+        if (!source.isBlank()) return source;
+        Matcher matcher = SOURCE_URL.matcher(html);
+        while (matcher.find()) {
+            String sourceUrl = firstExternalUrl(decodeJsonString(matcher.group(1)));
+            if (!sourceUrl.isBlank()) return sourceUrl;
         }
-        JsonNode profile = MAPPER.readTree(Files.readString(profilePath, StandardCharsets.UTF_8));
-        if (profile == null || !profile.isObject()) {
-            throw new IllegalArgumentException("wenbiao_agent auth profile is invalid");
-        }
-        return profile;
+        return "";
     }
 
-    private static void validateDetailProfile(JsonNode profile) {
-        Set<String> allowedHosts = new HashSet<>();
-        profile.path("allowed_hosts").forEach(node ->
-            allowedHosts.add(node.asText().toLowerCase(Locale.ROOT)));
-        Set<String> allowedMethods = new HashSet<>();
-        profile.path("allowed_methods").forEach(node ->
-            allowedMethods.add(node.asText().toUpperCase(Locale.ROOT)));
-        if (!hostAllowed(DETAIL_API.getHost(), allowedHosts)
-                || !allowedMethods.contains("POST")
-                || !profile.path("headers").isObject()) {
-            throw new IllegalArgumentException("wenbiao_agent auth profile does not allow detail lookup");
+    private static String sourceFromViewOriginalTag(Pattern tagPattern, String html, URI pageUri) {
+        Matcher tag = tagPattern.matcher(html);
+        while (tag.find()) {
+            String label = TAGS.matcher(tag.group(2)).replaceAll(" ")
+                .replaceAll("&nbsp;", " ").replaceAll("\\s+", "").trim();
+            if (!label.contains("查看原文")) continue;
+            String source = firstExternalUrl(tag.group(1));
+            if (!source.isBlank()) return source;
+            Matcher href = HREF_ATTRIBUTE.matcher(tag.group(1));
+            if (href.find()) {
+                try {
+                    String candidate = pageUri.resolve(href.group(1)).toString();
+                    if (!isAggregationHost(parseHttpUri(candidate).getHost())) return candidate;
+                } catch (Exception ignored) {
+                    // Continue searching for another "查看原文" control.
+                }
+            }
         }
+        return "";
     }
 
     private static String firstExternalUrl(String value) {
@@ -250,17 +204,6 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
         } catch (Exception ignored) {
             return "";
         }
-    }
-
-    private static boolean hostAllowed(String host, Set<String> allowedHosts) {
-        String normalized = lower(host);
-        for (String allowed : allowedHosts) {
-            if (normalized.equals(allowed)) return true;
-            if (allowed.startsWith("*.")
-                    && normalized.endsWith(allowed.substring(1))
-                    && normalized.length() > allowed.length() - 1) return true;
-        }
-        return false;
     }
 
     private static FetchResult cachedPage(
@@ -303,38 +246,6 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
         throw new IllegalArgumentException("Too many redirects");
     }
 
-    private static ProbeResult probe(URI uri) throws Exception {
-        ProbeResult head = probeMethod(uri, "HEAD");
-        if (head.statusCode != 405) return head;
-        return probeMethod(uri, "GET");
-    }
-
-    private static ProbeResult probeMethod(URI uri, String method) throws Exception {
-        URI current = uri;
-        for (int redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
-            validatePublicTarget(current);
-            HttpRequest.Builder builder = HttpRequest.newBuilder(current)
-                .timeout(REQUEST_TIMEOUT)
-                .header("Accept", "text/html,application/xhtml+xml,*/*")
-                .header("User-Agent", "K-ACP-Tender-Source-Resolver/1.0");
-            if ("HEAD".equals(method)) {
-                builder.method("HEAD", HttpRequest.BodyPublishers.noBody());
-            } else {
-                builder.header("Range", "bytes=0-0").GET();
-            }
-            HttpResponse<InputStream> response = sendWithRetry(builder.build());
-            int status = response.statusCode();
-            if (isRedirect(status)) {
-                closeBody(response.body());
-                current = nextLocation(current, response);
-                continue;
-            }
-            closeBody(response.body());
-            return new ProbeResult(status, current);
-        }
-        throw new IllegalArgumentException("Too many redirects");
-    }
-
     private static HttpResponse<InputStream> sendWithRetry(HttpRequest request) throws Exception {
         Exception last = null;
         for (int attempt = 0; attempt < 2; attempt++) {
@@ -349,10 +260,8 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
 
     private static URI validateAggregateUri(String url) throws Exception {
         URI uri = parseHttpUri(url);
-        String host = lower(uri.getHost());
-        if (!("www.zhiliaobiaoxun.com".equals(host) || "zhiliaobiaoxun.com".equals(host))
-                || uri.getPath() == null || !uri.getPath().startsWith("/content/")) {
-            throw new IllegalArgumentException("aggregate URL must be a zhiliaobiaoxun content page");
+        if (!isAggregationHost(uri.getHost())) {
+            throw new IllegalArgumentException("aggregate URL must be a zhiliaobiaoxun page");
         }
         validatePublicTarget(uri);
         return uri;
@@ -360,8 +269,7 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
 
     private static URI validateSourceUri(String url) throws Exception {
         URI uri = parseHttpUri(url);
-        String host = lower(uri.getHost());
-        if ("www.zhiliaobiaoxun.com".equals(host) || "zhiliaobiaoxun.com".equals(host)) {
+        if (isAggregationHost(uri.getHost())) {
             throw new IllegalArgumentException("source URL cannot be an aggregation page");
         }
         validatePublicTarget(uri);
@@ -449,6 +357,12 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
     }
 
+    private static boolean isAggregationHost(String host) {
+        String normalized = lower(host);
+        return "www.zhiliaobiaoxun.com".equals(normalized)
+            || "zhiliaobiaoxun.com".equals(normalized);
+    }
+
     private static void closeBody(InputStream body) {
         if (body == null) return;
         try { body.close(); } catch (Exception ignored) {}
@@ -495,13 +409,4 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
         }
     }
 
-    private static final class ProbeResult {
-        private final int statusCode;
-        private final URI finalUri;
-
-        private ProbeResult(int statusCode, URI finalUri) {
-            this.statusCode = statusCode;
-            this.finalUri = finalUri;
-        }
-    }
 }
