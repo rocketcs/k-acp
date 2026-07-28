@@ -45,7 +45,7 @@
         </div>
       </a-checkbox-group>
 
-      <div v-if="interaction.allowCustom" class="uip-choice-custom">
+      <div v-if="shouldShowChoiceCustomInput(isDiyChat === true, interaction.allowCustom)" class="uip-choice-custom">
         <a-input
           v-model:value="customInput"
           placeholder="输入自定义内容..."
@@ -66,10 +66,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { ChoiceInteraction } from './types'
+import { shouldShowChoiceCustomInput } from '@/utils/chat/runActivity'
 
 const props = defineProps<{
   interaction: ChoiceInteraction
   disabled?: boolean
+  isDiyChat?: boolean
 }>()
 
 const emit = defineEmits<{

@@ -780,20 +780,21 @@ $small-mobile-breakpoint: 375px;
 
 .chat-welcome.is-diy-welcome {
   justify-content: flex-start;
-  padding-top: clamp(64px, 9vh, 112px);
-  padding-bottom: 48px;
+  width: 100%;
+  padding: clamp(24px, 7vh, 96px) clamp(16px, 3.5vw, 72px) clamp(24px, 5vh, 48px);
 
   .chat-welcome-title {
-    margin-bottom: 40px;
+    margin-bottom: clamp(20px, 4vh, 40px);
+    font-size: clamp(20px, 1.6vw, 28px);
   }
 
   .chat-welcome-input {
     max-width: 1280px;
-    margin-top: 36px;
+    margin-top: clamp(20px, 3.6vh, 36px);
   }
 
   &.has-diy-form {
-    padding-top: 64px;
+    padding-top: clamp(24px, 5vh, 64px);
   }
 
   @media (max-width: $mobile-breakpoint) {
@@ -806,6 +807,19 @@ $small-mobile-breakpoint: 375px;
 
     .chat-welcome-input {
       margin-top: var(--spacing-md);
+    }
+  }
+
+  @media (max-height: 700px) and (min-width: #{$mobile-breakpoint + 1}) {
+    padding-top: 20px;
+    padding-bottom: 20px;
+
+    .chat-welcome-title {
+      margin-bottom: 16px;
+    }
+
+    .chat-welcome-input {
+      margin-top: 18px;
     }
   }
 }

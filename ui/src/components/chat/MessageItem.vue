@@ -80,6 +80,7 @@ const props = defineProps<{
   createdAt?: string
   agentHasResult?: boolean
   isStreaming?: boolean
+  isDiyChat?: boolean
 }>()
 
 defineEmits<{
@@ -258,6 +259,7 @@ const openPreview = (index: number) => {
           <MarkdownRenderer
             :content="content"
             :is-streaming="isStreaming"
+            :is-diy-chat="isDiyChat"
             :disabled="currentIndex !== totalMessages - 1"
             @interaction-submit="$emit('interactionSubmit', $event)"
             @uip-retry="$emit('uipRetry', $event)"

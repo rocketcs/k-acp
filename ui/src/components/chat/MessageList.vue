@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import MessageItem from './MessageItem.vue'
 import ToolCallItem from './ToolCallItem.vue'
-import type { DisplayMessage } from '@/types'
+import AgentRunActivity from './AgentRunActivity.vue'
+import AgentRunWaiting from './AgentRunWaiting.vue'
+import type { DisplayMessage, RunActivity } from '@/types'
+import { shouldShowLegacyToolCall } from '@/utils/chat/runActivity'
 import type {FlatFileItem} from "@/composables/chat/useWorkspaceFiles.ts";
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
 
@@ -9,9 +12,15 @@ defineProps<{
   messages: DisplayMessage[]
   agentHasResult?: boolean
   toolCalls: Array<{ id: string; name: string; args: string; result?: string; elapsed?: number, needConfirm?: boolean }>
+  runActivities: RunActivity[]
+  isDiyChat: boolean
+  showRunActivity: boolean
+  showRunWaiting: boolean
+  runStartedAt: number | null
 }>()
 
 defineEmits<{
+  (e: 'abort'): void
   (e: 'toolContent', value: any): void
   (e: 'inputTagPreview', value: FlatFileItem): void
   (e: 'interactionSubmit', payload: InteractionSubmitPayload): void
@@ -37,10 +46,11 @@ defineEmits<{
       :created-at="msg.createdAt"
       :agent-has-result="agentHasResult"
       :is-streaming="msg.isStreaming"
+      :is-diy-chat="isDiyChat"
     />
     <TransitionGroup name="jelly">
       <ToolCallItem
-        v-for="t in toolCalls"
+        v-for="t in toolCalls.filter((toolCall) => shouldShowLegacyToolCall(isDiyChat, toolCall.needConfirm))"
         :key="t.id"
         :id="t.id"
         :name="t.name"
@@ -52,6 +62,16 @@ defineEmits<{
         @toolContent="(content: any) => $emit('toolContent', content)"
       />
     </TransitionGroup>
+    <AgentRunActivity
+      v-if="showRunActivity"
+      :activities="runActivities"
+      @abort="$emit('abort')"
+    />
+    <AgentRunWaiting
+      v-else-if="showRunWaiting"
+      :started-at="runStartedAt"
+      @abort="$emit('abort')"
+    />
   </div>
 </template>
 

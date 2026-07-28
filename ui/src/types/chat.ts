@@ -6,3 +6,13 @@ export interface DisplayMessage {
   createdAt?: string
   isStreaming?: boolean
 }
+
+/** 一次运行期间面向用户展示的工具执行状态 */
+export interface RunActivity {
+  id: string
+  name: string
+  args: string
+  status: 'running' | 'completed' | 'failed'
+  startTime: number
+  elapsed?: number
+}

@@ -131,18 +131,22 @@ function confirm() {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 18px;
+  gap: clamp(12px, 1.4vw, 18px);
 }
 
 .diy-question-card {
   display: flex;
-  flex: 0 1 calc((100% - 36px) / 3);
+  /*
+   * 以卡片的可读最小宽度决定换行，而不是依赖固定的屏幕断点：
+   * 宽屏为三列，中等宽度自然变为两列，竖屏则变为单列。
+   */
+  flex: 1 1 clamp(280px, 30%, 400px);
   align-items: center;
-  gap: 18px;
-  min-width: 0;
-  min-height: 136px;
-  max-width: 410px;
-  padding: 24px 28px;
+  gap: clamp(12px, 1.4vw, 18px);
+  min-width: min(100%, 280px);
+  min-height: clamp(104px, 14vh, 136px);
+  max-width: 420px;
+  padding: clamp(16px, 2vw, 24px) clamp(18px, 2.2vw, 28px);
   border: 1px solid #e6ebee;
   border-radius: 22px;
   background: #fff;
@@ -169,11 +173,11 @@ function confirm() {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
+  width: clamp(48px, 5vw, 64px);
+  height: clamp(48px, 5vw, 64px);
+  border-radius: clamp(14px, 1.6vw, 20px);
   background: #edf6f6;
-  font-size: 30px;
+  font-size: clamp(23px, 2.4vw, 30px);
   line-height: 1;
 }
 
@@ -185,14 +189,14 @@ function confirm() {
 
   strong {
     color: #1f2a30;
-    font-size: 20px;
+    font-size: clamp(17px, 1.55vw, 20px);
     font-weight: 650;
     line-height: 1.4;
   }
 
   small {
     color: #76838a;
-    font-size: 15px;
+    font-size: clamp(13px, 1.2vw, 15px);
     line-height: 1.55;
   }
 }
@@ -329,9 +333,7 @@ function confirm() {
   }
 
   .diy-question-card {
-    flex-basis: 100%;
-    min-height: 96px;
-    padding: 16px 18px;
+    min-height: 92px;
     border-radius: 16px;
   }
 
@@ -373,10 +375,25 @@ function confirm() {
   }
 }
 
-@media (min-width: 769px) and (max-width: 1140px) {
+@media (max-width: 599px) {
   .diy-question-card {
-    flex-basis: calc((100% - 18px) / 2);
-    max-width: 500px;
+    flex-basis: 100%;
+  }
+}
+
+@media (max-height: 700px) and (min-width: 769px) {
+  .diy-question-card {
+    min-height: 96px;
+  }
+
+  .diy-question-form {
+    padding-top: 18px;
+    padding-bottom: 16px;
+  }
+
+  .diy-fields {
+    gap: 14px;
+    padding: 16px 0 18px;
   }
 }
 </style>

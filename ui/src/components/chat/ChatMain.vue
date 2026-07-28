@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, watch, onMounted} from 'vue'
+import {computed, ref, watch, onMounted} from 'vue'
 import {
   MenuOutlined,
   FolderOutlined,
@@ -11,10 +11,11 @@ import MessageNavigator from './MessageNavigator.vue'
 import ChatInput from './ChatInput.vue'
 import Welcome from './Welcome.vue'
 import PlanPanel from './PlanPanel.vue'
-import type { DisplayMessage, UploadedFileItem, PlanInfo, DiyOutputFormat, DiyPageConfig } from '@/types'
+import type { DisplayMessage, UploadedFileItem, PlanInfo, DiyOutputFormat, DiyPageConfig, RunActivity } from '@/types'
 import type {FlatFileItem} from "@/composables/chat/useWorkspaceFiles.ts";
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
 import WorkspaceFilePreview from "@/components/workspace/WorkspaceFilePreview.vue";
+import { shouldShowChatInput, shouldShowRunActivity, shouldShowRunWaiting } from '@/utils/chat/runActivity'
 
 const props = defineProps<{
   title: string
@@ -23,6 +24,10 @@ const props = defineProps<{
   welcomeDesc?: string
   messages: DisplayMessage[]
   toolCalls: any[]
+  runActivities: RunActivity[]
+  isDiyChat: boolean
+  hasVisibleAnswer: boolean
+  runStartedAt: number | null
   inputValue: string
   uploadedFiles?: UploadedFileItem[]
   isRunning: boolean
@@ -83,6 +88,13 @@ const savedScrollTop = ref(0)
 
 const workspaceFilePreviewVisible = ref(false)
 const workspaceFilePreviewNode = ref<FlatFileItem | null>(null)
+const showRunActivity = computed(() =>
+  shouldShowRunActivity(props.isDiyChat, props.isRunning, props.hasVisibleAnswer),
+)
+const showRunWaiting = computed(() =>
+  shouldShowRunWaiting(props.isDiyChat, props.isRunning, props.hasVisibleAnswer),
+)
+const showInput = computed(() => shouldShowChatInput(props.isDiyChat, props.isRunning))
 
 // 标志位：区分程序化滚动与用户手动滚动，防止 scrollToBottom 触发的 scroll 事件错误更新 shouldAutoScroll
 let programmaticScrolling = false
@@ -268,6 +280,11 @@ defineExpose({
         :description="welcomeDesc"
         :uploaded-files="uploadedFiles"
         :isRunning="isRunning"
+        :run-activities="runActivities"
+        :show-run-activity="showRunActivity"
+        :show-run-waiting="showRunWaiting"
+        :run-started-at="runStartedAt"
+        :show-input="showInput"
         :memory-active="memoryActive"
         :plan-active="planActive"
         :enable-memory="enableMemory"
@@ -285,6 +302,7 @@ defineExpose({
         @plan="$emit('plan', $event)"
         @toolProcess="$emit('toolProcess', $event)"
         @send="handleSend"
+        @abort="$emit('abort')"
         @new-session="$emit('newSession')"
         @quick-send="$emit('quickSend', $event)"
       />
@@ -317,6 +335,12 @@ defineExpose({
             :agent-has-result="agentHasResult"
             :messages="messages"
             :tool-calls="toolCalls"
+            :run-activities="runActivities"
+            :is-diy-chat="isDiyChat"
+            :show-run-activity="showRunActivity"
+            :show-run-waiting="showRunWaiting"
+            :run-started-at="runStartedAt"
+            @abort="$emit('abort')"
             @inputTagPreview="inputTagPreviewHandle"
             @toolContent="(content: any) => $emit('toolContent', content)"
             @interaction-submit="$emit('interactionSubmit', $event)"
@@ -329,7 +353,7 @@ defineExpose({
           :scroll-container="messagesScrollRef"
         />
       </div>
-      <div class="chat-main-input-wrap" v-if="!sessionMessageTable">
+      <div class="chat-main-input-wrap" v-if="!sessionMessageTable && showInput">
         <div class="chat-input-outer">
           <ChatInput
             :model-value="inputValue"

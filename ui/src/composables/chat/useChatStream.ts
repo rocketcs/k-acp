@@ -4,7 +4,7 @@ import { useAgentClient } from '@/composables/useAgentClient'
 import { usePlanTracking } from '@/composables/chat/usePlanTracking'
 import { buildToolCallsContent } from '@/utils/chat/format'
 import { composeTenderResponse, needsTenderFallback, normalizeUIPContent } from '@/utils/chat/uip'
-import type {ChatMessageVO, RawEvent} from '@/types'
+import type {ChatMessageVO, RawEvent, RunActivity} from '@/types'
 import { useAccountStore } from '@/stores'
 import { stopRun } from '@/api/agui'
 
@@ -58,6 +58,9 @@ export function useChatStream(
   const streamingMessageId = ref<string | null>(null)
   const streamingRole = ref<'user' | 'assistant' | 'system' | 'tool' | 'thinking'>('system')
   const streamingContent = ref('')
+  // 一旦本轮回答已有可见正文，执行卡应立刻退出，避免占据正文下方的位置。
+  const hasVisibleAnswer = ref(false)
+  const runStartedAt = ref<number | null>(null)
   // 高召回工作流提供确定性事实正文；外层策展 Skill 提供唯一的后续卡片。
   const pendingHighRecallAnswer = ref<string | null>(null)
   // 任何商业标书回答都应保留后续操作；不只限于高召回检索，也包括筛选和分析。
@@ -140,13 +143,19 @@ export function useChatStream(
   const toolCallsInProgress = ref<
     Array<{ id: string; name: string; args: string; result?: string; startTime: number; elapsed?: number, needConfirm?: boolean }>
   >([])
+  // 与工具调用的持久化记录分开：此列表只服务于当前一轮的实时执行轨迹。
+  // 即使工具已返回，也保留它直到本轮结束，避免用户在模型继续整理答案时看到空白。
+  const runActivities = ref<RunActivity[]>([])
 
   // 使用原有的 useAgentClient
   const { messages, isRunning, isReplaying, run, abort, disconnect, reconnect, addUserMessage, client } = useAgentClient({
     handlers: {
       onRunStarted: () => {
         toolCallsInProgress.value = []
+        runActivities.value = []
+        runStartedAt.value = Date.now()
         streamingContent.value = ''
+        hasVisibleAnswer.value = false
         streamingMessageId.value = null
         pendingHighRecallAnswer.value = null
         runHasAssistantAnswer.value = false
@@ -161,6 +170,7 @@ export function useChatStream(
       onTextMessageContent: (_e, currentText) => {
         agentHasResult.value = true
         streamingContent.value = currentText
+        if (currentText.trim()) hasVisibleAnswer.value = true
       },
       onTextMessageEnd: (_e, finalText) => {
         finalizeStreamingMessage(finalText)
@@ -184,6 +194,10 @@ export function useChatStream(
           ...toolCallsInProgress.value,
           { id: e.toolCallId, name: e.toolCallName, args: '', startTime: Date.now() }
         ]
+        runActivities.value = [
+          ...runActivities.value,
+          { id: e.toolCallId, name: e.toolCallName, args: '', status: 'running', startTime: Date.now() }
+        ]
 
         const sid = currentSessionId.value
         // Reasoning is not user-visible and is intentionally not persisted here.
@@ -192,10 +206,12 @@ export function useChatStream(
         // 计划追踪：累积工具参数
         onPlanToolArgs(_e.toolCallId, partialArgs)
 
-        const arr = [...toolCallsInProgress.value]
-        const last = arr[arr.length - 1]
-        if (last) last.args = partialArgs
-        toolCallsInProgress.value = arr
+        toolCallsInProgress.value = toolCallsInProgress.value.map((toolCall) =>
+          toolCall.id === _e.toolCallId ? { ...toolCall, args: partialArgs } : toolCall,
+        )
+        runActivities.value = runActivities.value.map((activity) =>
+          activity.id === _e.toolCallId ? { ...activity, args: partialArgs } : activity,
+        )
       },
       onToolCallResult: (e) => {
         // 计划追踪：处理工具结果
@@ -226,7 +242,14 @@ export function useChatStream(
             }
           }
 
-          // 判断是否开启了显示工具调用
+          runActivities.value = runActivities.value.map((activity) =>
+            activity.id === e.toolCallId
+              ? { ...activity, status: 'completed', elapsed: Date.now() - activity.startTime }
+              : activity,
+          )
+
+          // 判断是否开启了显示工具调用。实时执行轨迹不受此设置影响：
+          // 它只展示面向业务用户的进度，不展示工具的原始参数与结果。
           if (!(toolProcessActive?.value ?? true)) {
             return
           }
@@ -301,6 +324,11 @@ export function useChatStream(
         agentHasResult.value = true
         finalizeStreamingMessage()
         appendTenderFallbackIfNeeded()
+        runActivities.value = runActivities.value.map((activity) =>
+          activity.status === 'running'
+            ? { ...activity, status: 'failed', elapsed: Date.now() - activity.startTime }
+            : activity,
+        )
         toolCallsInProgress.value = []
       }
     }
@@ -427,6 +455,7 @@ export function useChatStream(
     streamingContent.value = ''
     streamingRole.value = 'system'
     toolCallsInProgress.value = []
+    runStartedAt.value = null
     agentHasResult.value = true
     currentPlan.value = null
   }
@@ -434,9 +463,12 @@ export function useChatStream(
   return {
     agentHasResult,
     streamingContent,
+    hasVisibleAnswer,
+    runStartedAt,
     streamingMessageId,
     streamingRole,
     toolCallsInProgress,
+    runActivities,
     isRunning,
     isReplaying,
     currentPlan,

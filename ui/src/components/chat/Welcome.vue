@@ -2,7 +2,9 @@
 import ChatInput from './ChatInput.vue'
 import { computed, ref } from 'vue'
 import DiyWelcome from './DiyWelcome.vue'
-import type { DiyOutputFormat, DiyPageConfig } from '@/types'
+import AgentRunActivity from './AgentRunActivity.vue'
+import AgentRunWaiting from './AgentRunWaiting.vue'
+import type { DiyOutputFormat, DiyPageConfig, RunActivity } from '@/types'
 
 const props = defineProps<{
   messageSize: number
@@ -12,6 +14,11 @@ const props = defineProps<{
   description?: string
   uploadedFiles?: import('@/types').UploadedFileItem[]
   isRunning?: boolean
+  runActivities?: RunActivity[]
+  showRunActivity?: boolean
+  showRunWaiting?: boolean
+  runStartedAt?: number | null
+  showInput?: boolean
   memoryActive?: boolean
   planActive?: boolean
   enableMemory?: boolean
@@ -37,6 +44,7 @@ defineEmits<{
   (e: 'plan', value: boolean): void
   (e: 'toolProcess', value: boolean): void
   (e: 'newSession'): void
+  (e: 'abort'): void
   (e: 'quickSend', payload: { text: string; outputFormat: DiyOutputFormat }): void
 }>()
 
@@ -55,14 +63,24 @@ const resolvedDescription = computed(() => props.diyConfig?.description || props
   >
     <h2 class="chat-welcome-title" :title="resolvedHeadline">{{ resolvedHeadline }}</h2>
     <p v-if="resolvedDescription && !diyConfig" class="chat-welcome-desc" :title="resolvedDescription">{{ resolvedDescription }}</p>
+    <AgentRunActivity
+      v-if="showRunActivity"
+      :activities="runActivities || []"
+      @abort="$emit('abort')"
+    />
+    <AgentRunWaiting
+      v-else-if="showRunWaiting"
+      :started-at="runStartedAt"
+      @abort="$emit('abort')"
+    />
     <DiyWelcome
-      v-if="diyConfig"
+      v-else-if="diyConfig"
       :config="diyConfig"
       :is-running="isRunning"
       @confirm="$emit('quickSend', $event)"
       @form-active="diyFormActive = $event"
     />
-    <div v-if="!diyFormActive" class="chat-input-outer chat-welcome-input">
+    <div v-if="!diyFormActive && showInput !== false" class="chat-input-outer chat-welcome-input">
       <ChatInput
         :model-value="inputValue"
         :agent-id="agentId"

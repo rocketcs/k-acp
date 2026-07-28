@@ -136,9 +136,12 @@ const fileIds = computed(() =>
 const {
   agentHasResult,
   streamingContent,
+  hasVisibleAnswer,
+  runStartedAt,
   streamingMessageId,
   streamingRole,
   toolCallsInProgress,
+  runActivities,
   isRunning,
   currentPlan,
   sendMessage,
@@ -615,6 +618,10 @@ watch(isRunning, (running) => {
       :welcome-desc="agentDetail?.description || '有什么想说的，直接发给我就好～'"
       :messages="displayMessages"
       :tool-calls="toolCallsInProgress"
+      :run-activities="runActivities"
+      :is-diy-chat="isDiyRoute"
+      :has-visible-answer="hasVisibleAnswer"
+      :run-started-at="runStartedAt"
       :input-value="inputText"
       :uploaded-files="uploadedFiles"
       :isRunning="isRunning"

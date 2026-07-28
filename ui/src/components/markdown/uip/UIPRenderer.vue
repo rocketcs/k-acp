@@ -8,6 +8,7 @@
       v-else-if="parsed?.interaction.type === 'form'"
       :interaction="parsed.interaction"
       :disabled="disabled"
+      :is-diy-chat="isDiyChat"
       @submit="onSubmit"
     />
 
@@ -46,6 +47,7 @@ const props = defineProps<{
   isStreaming?: boolean
   /** 历史消息只读模式（或已提交只读） */
   disabled?: boolean
+  isDiyChat?: boolean
 }>()
 
 const emit = defineEmits<{
