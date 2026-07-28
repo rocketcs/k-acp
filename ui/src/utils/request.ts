@@ -13,7 +13,6 @@ import NProgress from "nprogress";
 import "nprogress/nprogress.css";
 import { message as AMessage } from 'ant-design-vue'
 import { refreshToken as refreshTokenApi } from "@/api/auth";
-import { buildLoginRedirectUrl } from '@/router/loginRedirect'
 
 type TokenRefreshCallback = (newToken: string) => void;
 
@@ -27,10 +26,6 @@ const instance = axios.create({
 let isRefreshing = false;
 // 存储等待刷新令牌完成后重试的请求
 let requestsQueue:TokenRefreshCallback[] = [];
-
-function redirectToLogin(): void {
-  window.location.href = buildLoginRedirectUrl(window.location.hash.slice(1))
-}
 
 // 请求拦截器
 instance.interceptors.request.use(
@@ -93,11 +88,16 @@ instance.interceptors.response.use(
       return response;
     } else if(code === 401) {
       AMessage.warning('登录状态已失效，请重新登录').then(() => {})
-      redirectToLogin()
+      window.location.href = '/#/login';
+      window.location.reload();
+      return Promise.reject(msg);
+    } else if (code === 510) {
+      console.error(msg)
+      AMessage.error(msg).then(() => {})
       return Promise.reject(msg);
     } else {
-      console.error('接口请求失败：', msg)
-      AMessage.error(msg).then(() => {})
+      console.error(msg)
+      AMessage.error('系统异常，请稍后再试').then(() => {})
       return Promise.reject(msg);
     }
   },
@@ -117,7 +117,8 @@ instance.interceptors.response.use(
       removeRefreshToken();
       requestsQueue = [];
       AMessage.warning('刷新令牌失败，请重新登录').then(() => {})
-      redirectToLogin()
+      window.location.href = '/#/login';
+      window.location.reload();
       return Promise.reject('刷新令牌失败');
     }
 
@@ -127,7 +128,8 @@ instance.interceptors.response.use(
       removeRefreshToken();
       requestsQueue = [];
       AMessage.warning('登录状态已失效，请重新登录').then(() => {})
-      redirectToLogin()
+      window.location.href = '/#/login';
+      window.location.reload();
       return Promise.reject('令牌重试失败');
     }
 
@@ -143,7 +145,8 @@ instance.interceptors.response.use(
         removeRefreshToken();
         requestsQueue = [];
         AMessage.warning('无刷新令牌，请重新登录').then(() => {})
-        redirectToLogin()
+        window.location.href = '/#/login';
+        window.location.reload();
         isRefreshing = false;
         return Promise.reject('无刷新令牌');
       }
@@ -183,7 +186,8 @@ instance.interceptors.response.use(
         isRefreshing = false;
 
         AMessage.warning('登录已过期，请重新登录').then(() => {})
-        redirectToLogin()
+        window.location.href = '/#/login';
+        window.location.reload();
         return Promise.reject(err);
       }
     } else {

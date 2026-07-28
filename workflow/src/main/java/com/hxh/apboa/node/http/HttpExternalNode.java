@@ -8,7 +8,6 @@ import com.hxh.apboa.common.enums.NodeType;
 import com.hxh.apboa.node.base.context.NodeContext;
 import com.hxh.apboa.node.base.template.TemplateFormatter;
 import com.hxh.apboa.node.base.template.TemplateFormatterFactory;
-import com.hxh.apboa.node.base.template.FormatterType;
 import com.hxh.apboa.node.base.verify.VerifyFail;
 import com.hxh.apboa.node.base.verify.VerifyResult;
 import lombok.Getter;
@@ -18,6 +17,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -36,13 +36,11 @@ public class HttpExternalNode extends EnhancedNode {
     private final Map<String, OkHttpClient> clientCache = new ConcurrentHashMap<>();
     private Map<String, Object> inputsMap;
     private final TemplateFormatter formatter;
-    private final TemplateFormatter textFormatter;
 
     public HttpExternalNode(String id, String name, Config config) {
         super(id, name, NodeType.HTTP_EXTERNAL);
         this.config = config;
         this.formatter = TemplateFormatterFactory.createFormatter(config.getFormatterType());
-        this.textFormatter = TemplateFormatterFactory.createFormatter(FormatterType.STRING);
         this.client = buildClient(config);
     }
 
@@ -82,7 +80,8 @@ public class HttpExternalNode extends EnhancedNode {
             if (config.isBodyToObject()) {
                 ObjectMapper objectMapper = new ObjectMapper();
                 try {
-                    output.addOutput(NodeConst.DEFAULT_OUTPUT_NAME, objectMapper.readTree(body));
+                    // body 转为 Object
+                    output.addOutput(NodeConst.DEFAULT_OUTPUT_NAME, objectMapper.readValue(body, Object.class));
                 } catch (Exception e) {
                     throw new RuntimeException("JSON解析失败: " + e.getMessage());
                 }
@@ -117,15 +116,7 @@ public class HttpExternalNode extends EnhancedNode {
      * 异常节点输出
      */
     private NodeOutput executionNodeOutput(Exception e, NodeOutput output) {
-        String message = e.getMessage();
-        Throwable cause = e.getCause();
-        while (cause != null) {
-            if (cause.getMessage() != null && !cause.getMessage().isBlank()) {
-                message += ": " + cause.getMessage();
-            }
-            cause = cause.getCause();
-        }
-        output.markFailed(getName() + "执行失败: " + message);
+        output.markFailed( getName() + "执行失败: " + e.getMessage());
         return output;
     }
 
@@ -194,13 +185,13 @@ public class HttpExternalNode extends EnhancedNode {
     // 构建OkHttp请求
     private Request buildRequest(HttpRequest httpRequest) {
         // 处理路径参数
-        String url = processPathParams(convertTextVariables(httpRequest.getUrl()), httpRequest.getPathParams());
+        String url = processPathParams(convertVariables(httpRequest.getUrl()), httpRequest.getPathParams());
 
         // 构建URL和查询参数
         HttpUrl.Builder urlBuilder = Objects.requireNonNull(HttpUrl.parse(url)).newBuilder();
         for (MapItem queryParam : httpRequest.getQueryParams()) {
             urlBuilder.addQueryParameter(queryParam.getKey(),
-                    convertTextVariables(queryParam.getValue()));
+                    convertVariables(queryParam.getValue()));
         }
 
         // 构建请求体
@@ -213,7 +204,7 @@ public class HttpExternalNode extends EnhancedNode {
 
         // 添加请求头
         for (MapItem header : httpRequest.getHeaders()) {
-            requestBuilder.addHeader(header.getKey(), convertTextVariables(header.getValue()));
+            requestBuilder.addHeader(header.getKey(), convertVariables(header.getValue()));
         }
 
         // 设置Content-Type（如果未在headers中设置）
@@ -243,75 +234,132 @@ public class HttpExternalNode extends EnhancedNode {
     private String processPathParams(String url, List<MapItem> pathParams) {
         String processedUrl = url;
         for (MapItem entry : pathParams) {
-            String encodedValue = URLEncoder.encode(convertTextVariables(entry.getValue()), StandardCharsets.UTF_8);
+            String encodedValue = URLEncoder.encode(convertVariables(entry.getValue()), StandardCharsets.UTF_8);
             processedUrl = processedUrl.replace("{" + entry.getKey() + "}", encodedValue);
         }
         return processedUrl;
     }
 
-    // 构建请求体
+    // 构建请求体（前端始终以字符串形式存储 body，空串视为无请求体）
     private RequestBody buildRequestBody(HttpRequest httpRequest) {
-        if (httpRequest.getBody() == null) {
+        // GET/HEAD 等方法不允许携带请求体，即使配置了 body 也直接忽略
+        if (!httpRequest.getMethod().permitsBody()) {
             return null;
         }
 
         Object body = httpRequest.getBody();
+        if (body == null || (body instanceof String && ((String) body).isBlank())) {
+            // POST/PUT/PATCH 必须有请求体，未配置时给空体兼容，避免 OkHttp 报错
+            if (httpRequest.getMethod().requiresBody()) {
+                return RequestBody.create(new byte[0], null);
+            }
+            return null;
+        }
+
         String mediaType = httpRequest.getContentType().getMediaType();
 
         switch (httpRequest.getContentType()) {
             case FORM_URLENCODED:
-                if (body instanceof Map) {
-                    FormBody.Builder formBuilder = new FormBody.Builder();
-                    @SuppressWarnings("unchecked")
-                    Map<String, String> formData = (Map<String, String>) body;
-                    for (Map.Entry<String, String> entry : formData.entrySet()) {
-                        formBuilder.add(entry.getKey(), convertTextVariables(entry.getValue()));
-                    }
-                    return formBuilder.build();
-                }
-                break;
+                return buildFormUrlencodedBody(body);
 
             case FORM_DATA:
-                if (body instanceof Map) {
-                    MultipartBody.Builder multipartBuilder = new MultipartBody.Builder()
-                            .setType(MultipartBody.FORM);
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> formData = (Map<String, Object>) body;
-                    for (Map.Entry<String, Object> entry : formData.entrySet()) {
-                        if (entry.getValue() instanceof byte[]) {
-                            multipartBuilder.addFormDataPart(
-                                    entry.getKey(),
-                                    "file",
-                                    RequestBody.create((byte[]) entry.getValue(), MediaType.parse(mediaType))
-                            );
-                        } else {
-                            multipartBuilder.addFormDataPart(
-                                    entry.getKey(),
-                                    convertTextVariables(entry.getValue().toString())
-                            );
-                        }
-                    }
-                    return multipartBuilder.build();
-                }
-                break;
+                return buildFormDataBody(body, mediaType);
 
             case JSON:
                 if (body instanceof String) {
-                    return RequestBody.create(convertBodyVariables((String) body), MediaType.parse(mediaType));
-                } else {
-                    throw new IllegalArgumentException("不合法的 JSON 请求体");
+                    return RequestBody.create(convertVariables((String) body), MediaType.parse(mediaType));
+                }
+                // 兼容 body 被反序列化为 Map/List 等对象的情况，序列化为 JSON 字符串
+                try {
+                    String json = convertVariables(new ObjectMapper().writeValueAsString(body));
+                    return RequestBody.create(json, MediaType.parse(mediaType));
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("不合法的 JSON 请求体: " + e.getMessage());
                 }
 
             default:
+                // XML / TEXT_PLAIN / OCTET_STREAM：字符串走模板渲染，字节数组原样发送
                 if (body instanceof String) {
-                    return RequestBody.create(convertTextVariables((String) body), MediaType.parse(mediaType));
+                    return RequestBody.create(convertVariables((String) body), MediaType.parse(mediaType));
                 } else if (body instanceof byte[]) {
                      return RequestBody.create((byte[]) body, MediaType.parse(mediaType));
                 }
         }
 
         // 默认处理为字符串
-        return RequestBody.create(body.toString(), MediaType.parse(mediaType));
+        return RequestBody.create(convertVariables(body.toString()), MediaType.parse(mediaType));
+    }
+
+    /**
+     * 构建 x-www-form-urlencoded 请求体，兼容 Map 与 "k1=v1&k2=v2" 字符串两种形态
+     */
+    private RequestBody buildFormUrlencodedBody(Object body) {
+        FormBody.Builder formBuilder = new FormBody.Builder();
+        if (body instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> formData = (Map<String, Object>) body;
+            for (Map.Entry<String, Object> entry : formData.entrySet()) {
+                formBuilder.add(entry.getKey(), convertVariables(String.valueOf(entry.getValue())));
+            }
+        } else {
+            for (String[] pair : parseFormPairs(String.valueOf(body))) {
+                formBuilder.add(pair[0], pair[1]);
+            }
+        }
+        return formBuilder.build();
+    }
+
+    /**
+     * 构建 multipart/form-data 请求体，兼容 Map（含 byte[] 文件部分）与 "k1=v1&k2=v2" 字符串两种形态
+     */
+    private RequestBody buildFormDataBody(Object body, String mediaType) {
+        MultipartBody.Builder multipartBuilder = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM);
+        if (body instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> formData = (Map<String, Object>) body;
+            for (Map.Entry<String, Object> entry : formData.entrySet()) {
+                if (entry.getValue() instanceof byte[]) {
+                    multipartBuilder.addFormDataPart(
+                            entry.getKey(),
+                            "file",
+                            RequestBody.create((byte[]) entry.getValue(), MediaType.parse(mediaType))
+                    );
+                } else {
+                    multipartBuilder.addFormDataPart(
+                            entry.getKey(),
+                            convertVariables(String.valueOf(entry.getValue()))
+                    );
+                }
+            }
+        } else {
+            for (String[] pair : parseFormPairs(String.valueOf(body))) {
+                multipartBuilder.addFormDataPart(pair[0], pair[1]);
+            }
+        }
+        return multipartBuilder.build();
+    }
+
+    /**
+     * 将 "k1=v1&k2=v2" 形式的表单字符串解析为有序键值对（允许重复 key），
+     * 先按 & 和首个 = 切分，再对 key/value 分别做模板渲染，避免渲染结果中的分隔符破坏解析
+     */
+    private List<String[]> parseFormPairs(String formString) {
+        List<String[]> pairs = new ArrayList<>();
+        for (String pair : formString.split("&")) {
+            if (pair.isBlank()) {
+                continue;
+            }
+            int idx = pair.indexOf('=');
+            String key = idx >= 0 ? pair.substring(0, idx) : pair;
+            String value = idx >= 0 ? pair.substring(idx + 1) : "";
+            // 跳过前端键值对编辑器产生的空行（key 为空的条目无提交意义）
+            if (key.isBlank()) {
+                continue;
+            }
+            pairs.add(new String[]{convertVariables(key.trim()), convertVariables(value)});
+        }
+        return pairs;
     }
 
     /**
@@ -319,15 +367,7 @@ public class HttpExternalNode extends EnhancedNode {
      * @param template 模板
      * @return 模板内容
      */
-    private String convertTextVariables(String template) {
-        Object format = textFormatter.format(template, inputsMap, false);
-        if (format == null) {
-            return template;
-        }
-        return format.toString();
-    }
-
-    private String convertBodyVariables(String template) {
+    private String convertVariables(String template) {
         Object format = formatter.format(template, inputsMap, false);
         if (format == null) {
             return template;
