@@ -174,6 +174,21 @@ export function needsTenderFallback(normalized: NormalizedUIPContent): boolean {
     && (normalized.content.trim().length > 0 || normalized.invalidReasons.length > 0)
 }
 
+/**
+ * 高召回工作流只提供经过确定性整理的事实正文；下一步卡片只能来自外层
+ * 策展 Skill 的最终输出。这样工作流中的历史卡片不会覆盖动态策展结果。
+ */
+export function composeTenderResponse(primaryContent: string, curatorContent: string): string {
+  const primary = stripUIPBlock(normalizeUIPContent(primaryContent, 'tenderStrict').content).trim()
+  const curator = normalizeUIPContent(curatorContent, 'tenderStrict')
+  const curatorCard = curator.validBlocks[0]
+
+  if (!primary) return curator.content
+  if (!curatorCard) return primary
+
+  return `${primary}\n\n${wrapUIPBlock(JSON.stringify(curatorCard))}`
+}
+
 /** HTML 实体解码 */
 function decodeHtmlEntities(str: string): string {
   return str

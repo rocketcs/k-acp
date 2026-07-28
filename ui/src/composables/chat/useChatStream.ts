@@ -3,7 +3,7 @@ import { message } from 'ant-design-vue'
 import { useAgentClient } from '@/composables/useAgentClient'
 import { usePlanTracking } from '@/composables/chat/usePlanTracking'
 import { buildToolCallsContent } from '@/utils/chat/format'
-import { needsTenderFallback, normalizeUIPContent } from '@/utils/chat/uip'
+import { composeTenderResponse, needsTenderFallback, normalizeUIPContent } from '@/utils/chat/uip'
 import type {ChatMessageVO, RawEvent} from '@/types'
 import { useAccountStore } from '@/stores'
 import { stopRun } from '@/api/agui'
@@ -58,8 +58,7 @@ export function useChatStream(
   const streamingMessageId = ref<string | null>(null)
   const streamingRole = ref<'user' | 'assistant' | 'system' | 'tool' | 'thinking'>('system')
   const streamingContent = ref('')
-  // 高召回工作流已经生成可直接渲染的业务答案和 UIP 卡片。外层 Agent 的
-  // 文本重写可能丢失卡片，因此在本次运行结束时优先展示该工具的原始答案。
+  // 高召回工作流提供确定性事实正文；外层策展 Skill 提供唯一的后续卡片。
   const pendingHighRecallAnswer = ref<string | null>(null)
   // 任何商业标书回答都应保留后续操作；不只限于高召回检索，也包括筛选和分析。
   const runHasAssistantAnswer = ref(false)
@@ -107,8 +106,10 @@ export function useChatStream(
     pendingHighRecallAnswer.value = null
   }
 
-  function finalizeStreamingMessage() {
-    const displayText = pendingHighRecallAnswer.value || streamingContent.value
+  function finalizeStreamingMessage(finalText = streamingContent.value) {
+    const displayText = isTenderAgent() && pendingHighRecallAnswer.value
+      ? composeTenderResponse(pendingHighRecallAnswer.value, finalText)
+      : finalText
     if (displayText) {
       saveNormalizedAssistantContent(displayText, streamingMessageId.value, streamingRole.value)
     }
@@ -162,9 +163,7 @@ export function useChatStream(
         streamingContent.value = currentText
       },
       onTextMessageEnd: (_e, finalText) => {
-        const displayText = pendingHighRecallAnswer.value || finalText
-        saveNormalizedAssistantContent(displayText, streamingMessageId.value, streamingRole.value)
-        clearStreamingMessage()
+        finalizeStreamingMessage(finalText)
       },
       onReasoningMessageStart: (_e) => {
         // Internal reasoning is not business-facing content. Ignore it instead of

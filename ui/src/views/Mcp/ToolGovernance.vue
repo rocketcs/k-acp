@@ -7,13 +7,12 @@
 /* eslint-disable vue/multi-word-component-names */
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeftOutlined, BugOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { ArrowLeftOutlined, BugOutlined, SearchOutlined, ToolOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import type { McpServerVO, McpToolVO } from '@/types'
 import { McpActivationStatus, McpFailureSource } from '@/types'
 import * as mcpApi from '@/api/mcp'
 import ToolDebugDrawer from '@/components/mcp/ToolDebugDrawer.vue'
-import mcpToolAvatar from '@/assets/avatar/mcp-tool.png'
 import SimpleSwitch from '@/components/common/SimpleSwitch.vue'
 
 const route = useRoute()
@@ -113,6 +112,20 @@ function handleDebugTool(tool: McpToolVO) {
   debugOpen.value = true
 }
 
+/** 关闭调试抽屉 */
+function handleDebugClose() {
+  debugOpen.value = false
+  debugTool.value = null
+}
+
+function handleDebugOpenChange(open: boolean) {
+  if (open) {
+    debugOpen.value = true
+    return
+  }
+  handleDebugClose()
+}
+
 onMounted(() => {
   loadData()
 })
@@ -165,8 +178,8 @@ onMounted(() => {
               class="tool-card"
             >
               <div class="card-header">
-                <div class="card-icon" :class="{ 'avatar-disabled': tool.missing || !tool.enabled }">
-                  <img :src="mcpToolAvatar" alt="mcp-tool" />
+                <div class="card-icon">
+                  <ToolOutlined />
                 </div>
                 <div class="card-title truncate" :title="tool.toolName">
                   {{ tool.toolName }}
@@ -207,8 +220,9 @@ onMounted(() => {
 
     <!-- 调试抽屉 -->
     <ToolDebugDrawer
-      v-model:open="debugOpen"
+      :open="debugOpen"
       :tool="debugTool"
+      @update:open="handleDebugOpenChange"
     />
   </div>
 </template>
@@ -309,27 +323,11 @@ onMounted(() => {
         display: flex;
         align-items: center;
         justify-content: center;
-        background-color: #e7e7e7;
+        background-color: #e8eaf6;
+        color: #5c6bc0;
         border-radius: var(--border-radius-xl);
+        font-size: 18px;
         flex-shrink: 0;
-
-        img {
-          width: 22px;
-          height: 22px;
-          object-fit: contain;
-          filter: grayscale(100%);
-          opacity: 0.5;
-        }
-
-        /* 可用态：正常颜色 */
-        &:not(.avatar-disabled) {
-          background-color: #e8eaf6;
-
-          img {
-            filter: none;
-            opacity: 1;
-          }
-        }
       }
 
       .card-title {

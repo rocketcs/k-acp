@@ -25,7 +25,7 @@ import type {
 } from '@/types'
 import { McpToolExposureMode } from '@/types'
 import type { WorkflowFlowEdge, WorkflowFlowNode, WorkflowResourceMaps } from '@/types/workflow'
-import { LoadingOutlined } from '@ant-design/icons-vue'
+import ApboaLoading from '@/components/common/ApboaLoading.vue'
 
 interface AgentNodeMcpConfig {
   mcpServerId: string
@@ -291,7 +291,7 @@ onMounted(async () => {
 <template>
   <div ref="panelRoot" class="agent-node-panel" :class="{ 'editor-maximized': isEditorMaximized }">
     <div v-if="loading" class="loading-overlay">
-      <LoadingOutlined style="margin-right: 6px" />加载中
+      <ApboaLoading />
     </div>
     <AForm layout="vertical">
       <PanelSection title="节点名称">

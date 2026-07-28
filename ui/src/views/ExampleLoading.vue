@@ -3,7 +3,7 @@
     <!-- 页面内容 -->
     <div class="page-content">
       <h1>平台加载动画示例</h1>
-      
+
       <!-- 示例1: 基础加载动画 -->
       <div class="example-section">
         <h2>基础加载动画</h2>
@@ -67,10 +67,10 @@
       </div>
 
       <!-- 全屏加载组件 -->
-      <ApboaLoading 
-        v-if="showFullscreen" 
-        fullscreen 
-        tip="系统加载中..." 
+      <ApboaLoading
+        v-if="showFullscreen"
+        fullscreen
+        tip="系统加载中..."
       />
     </div>
   </div>

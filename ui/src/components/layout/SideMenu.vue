@@ -7,12 +7,11 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import homeAvatar from '@/assets/avatar/home.png'
-import chatBotAvatar from '@/assets/avatar/chat-bot.png'
 import agentAvatar from '@/assets/avatar/agent.png'
 import workflowAvatar from '@/assets/avatar/workflow.png'
 import automationAvatar from '@/assets/avatar/automation.png'
 import apiServiceAvatar from '@/assets/avatar/api-service.png'
-import knowledgebaseAvatar from '@/assets/avatar/knowledgebase.png'
+import knowledgeAvatar from '@/assets/avatar/knowledgebase.png'
 import modelProviderAvatar from '@/assets/avatar/model-provider.png'
 import skillAvatar from '@/assets/avatar/skill.png'
 import mcpAvatar from '@/assets/avatar/mcp.png'
@@ -46,27 +45,21 @@ interface MenuItem {
  * 菜单配置
  */
 const menuConfig: MenuItem[] = [
-// 空间分类
+  // 首页分类
   {
-    key: 'space-category',
-    label: '空间',
+    key: 'home-category',
+    label: '首页',
     path: '',
     type: 'category'
   },
+  // 工作台
   {
     key: 'dashboard',
-    label: '总览',
+    label: '工作台',
     avatar: homeAvatar,
     path: '/dashboard',
     type: 'menu'
   },
-  // {
-  //   key: 'chat-cluster',
-  //   label: '对话',
-  //   avatar: chatBotAvatar,
-  //   path: '/chat-cluster',
-  //   type: 'menu'
-  // },
   // 开发分类
   {
     key: 'dev-category',
@@ -105,7 +98,7 @@ const menuConfig: MenuItem[] = [
   {
     key: 'knowledge',
     label: '知识库',
-    avatar: knowledgebaseAvatar,
+    avatar: knowledgeAvatar,
     path: '/knowledge',
     type: 'menu'
   },

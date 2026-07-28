@@ -5,14 +5,15 @@
     </div>
     <Transition name="fade">
       <div v-if="spinning" class="apboa-spin-mask">
-         <LoadingOutlined style="margin-right: 6px" />加载中
+        <ApboaLoading :size="size" :tip="tip" />
       </div>
     </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { LoadingOutlined } from '@ant-design/icons-vue'
+import ApboaLoading from './ApboaLoading.vue'
+
 interface Props {
   /** 是否显示加载状态 */
   spinning?: boolean
@@ -39,7 +40,6 @@ withDefaults(defineProps<Props>(), {
 }
 
 .apboa-spin-container {
-  height: 100%;
   transition: filter 0.3s ease;
 }
 
@@ -57,7 +57,6 @@ withDefaults(defineProps<Props>(), {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #575757;
   z-index: 10;
   background-color: rgba(255, 255, 255, 0.7);
 }

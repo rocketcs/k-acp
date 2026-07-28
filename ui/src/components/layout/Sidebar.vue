@@ -445,7 +445,7 @@ const roleName = computed(() => {
   }
 
   &::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.03);
+    background-color: transparent;
   }
 
   &:hover::-webkit-scrollbar {
