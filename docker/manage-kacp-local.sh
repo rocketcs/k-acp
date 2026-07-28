@@ -8,6 +8,7 @@ PROJECT_NAME="k-acp-local"
 ENV_FILE="$SCRIPT_DIR/.env.kacp"
 COMPOSE_BASE="$SCRIPT_DIR/docker-compose-simple.yml"
 COMPOSE_LOCAL="$SCRIPT_DIR/docker-compose-kacp-local.yml"
+APP_SERVICES=(apboa-console apboa-runtime apboa-proxy apboa-websocket apboa-frontend)
 
 usage() {
   cat <<'USAGE'
@@ -71,13 +72,13 @@ update() {
   git -C "$REPO_DIR" switch dev
   git -C "$REPO_DIR" pull --ff-only origin dev
 
-  echo '>> 构建 k-acp-local 的全部应用镜像...'
-  compose build
+  echo '>> 构建 k-acp-local 的前后端应用镜像...'
+  compose build "${APP_SERVICES[@]}"
 
-  echo '>> 重建 k-acp-local 的全部服务（不删除数据卷）...'
-  compose up -d --force-recreate
+  echo '>> 重建 k-acp-local 的前后端应用服务（中间件与数据卷保持不动）...'
+  compose up -d --force-recreate "${APP_SERVICES[@]}"
 
-  compose ps
+  compose ps "${APP_SERVICES[@]}"
 }
 
 start() {
