@@ -28,8 +28,8 @@
 
 | 字段 | 值 |
 | --- | --- |
-| 平台包名 | `大屏视觉总监` |
-| Skill Key | `large-screen-image-visual-director` |
+| 平台稳定名 / Skill Key | `large-screen-image-visual-director` |
+| 中文标题 | `大屏视觉总监` |
 | 类别 | `大屏生图` |
 | 绑定 Agent | `default-large-screen-image` |
 | 触发条件 | 用户消息包含 `large-screen-image action=analyze` 且带有图片附件 |
@@ -91,6 +91,7 @@ Skill 在最终回复中只输出一个带语言标识的代码块，页面以�
 - `prompt` 是用户可编辑、可直接送入生图 Tool 的完整中文正向提示词。
 - `negativePrompt` 不超过 160 个中文字符。
 - 不能在代码块外输出解释、寒暄、Markdown 标题或 Tool 调用文本。
+- 当前 `action=analyze` 绝不调用生成或编辑 Tool/MCP；它只输出创作方案。
 
 ## 专属页面交互
 
@@ -122,13 +123,14 @@ Skill 在最终回复中只输出一个带语言标识的代码块，页面以�
 ## 数据与隔离
 
 - Skill 内容存储为平台 `skill_package` 的 `SKILL.md` 文件，并使用 `agent_skill_packages` 仅关联目标 Agent。
+- 当前平台没有独立 Skill Key 字段；`skill_package.name`、`SKILL.md` 的 frontmatter `name`、运行时 Skill 名和技能目录必须同为 `large-screen-image-visual-director`，后续不得仅修改其中之一。
 - 不新增表、不修改已有 Skill、不更改通用 Agent 的系统提示词。
 - 原始结构化回复已随现有会话消息保存；页面刷新后可重新解析，故不需要新增持久化字段。
 - 新增解析器、类型与样式仅位于 `ui/src/features/large-screen-image/`。
 
 ## 验收标准
 
-1. `default-large-screen-image` 的 Skill 包数量为 1，其他 Agent Skill 绑定不变。
+1. 新增的 `large-screen-image-visual-director` Skill 包仅存在一份、仅绑定 `default-large-screen-image` 一次；目标 Agent 已有的其他绑定保持不变。
 2. 上传真实参考图并点击“识图”后，模型返回 `large-screen-image-plan/v1` 协议。
 3. 专属页面显示创作方案卡片，不显示协议 JSON 或内部控制文本。
 4. 正向提示词自动回填，用户修改后点击生成时使用修改后的内容。
