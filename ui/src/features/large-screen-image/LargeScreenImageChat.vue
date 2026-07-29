@@ -29,6 +29,11 @@ type ReferenceImage =
 
 type LargeScreenImageAction = 'analyze' | 'generate'
 
+type AnalyzeRequestBoundary = {
+  sessionId: string
+  userMessageId: string
+}
+
 type VisibleMessage = {
   id: string | number
   role: string
@@ -51,6 +56,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const activePlanMessageId = ref<string>('')
 const activePlan = ref<LargeScreenImagePlan | null>(null)
 const pendingAction = ref<LargeScreenImageAction | null>(null)
+const pendingAnalyzeRequest = ref<AnalyzeRequestBoundary | null>(null)
 const generationToolConfigured = ref(false)
 
 const agentId = computed(() => agent.value ? String(agent.value.id) : '')
@@ -106,9 +112,9 @@ function toVisibleMessage(item: { id: string | number; role: string; content?: s
 
 const visibleMessages = computed<VisibleMessage[]>(() => {
   const persisted = messagesList.value
-    .filter((item) => item.role !== 'system' && item.role !== 'thinking' && item.content)
+    .filter((item) => (item.role === 'user' || item.role === 'assistant') && item.content)
     .map(toVisibleMessage)
-  if (streamingContent.value && streamingRole.value !== 'thinking') {
+  if (streamingContent.value && (streamingRole.value === 'user' || streamingRole.value === 'assistant')) {
     if (pendingAction.value === 'analyze' && streamingRole.value === 'assistant') {
       return [...persisted, {
         id: 'streaming-plan',
@@ -146,19 +152,24 @@ function restoreActivePlan() {
 }
 
 watch(messagesList, (messages) => {
-  if (pendingAction.value !== 'analyze') return
-  const latestPlanMessage = [...messages].reverse().find((item) => {
+  const boundary = pendingAnalyzeRequest.value
+  if (pendingAction.value !== 'analyze' || !boundary || currentSessionId.value !== boundary.sessionId) return
+  const userMessageIndex = messages.findIndex((item) => {
+    return item.role === 'user' && String(item.id) === boundary.userMessageId
+  })
+  if (userMessageIndex < 0) return
+  const planMessage = messages.slice(userMessageIndex + 1).find((item) => {
     return item.role === 'assistant' && parseLargeScreenImagePlan(item.content ?? '').kind === 'valid'
   })
-  if (!latestPlanMessage) return
-  const parsed = parseLargeScreenImagePlan(latestPlanMessage.content ?? '')
+  if (!planMessage) return
+  const parsed = parseLargeScreenImagePlan(planMessage.content ?? '')
   if (parsed.kind !== 'valid') return
-  if (activePlanMessageId.value !== String(latestPlanMessage.id)) {
-    applyPlan(latestPlanMessage.id, parsed.plan)
-  }
+  applyPlan(planMessage.id, parsed.plan)
+  pendingAnalyzeRequest.value = null
 }, { deep: true })
 
 watch(currentSessionId, () => {
+  pendingAnalyzeRequest.value = null
   activePlanMessageId.value = ''
   activePlan.value = null
   prompt.value = ''
@@ -218,13 +229,18 @@ async function sendAction(action: LargeScreenImageAction) {
   const text = actionText(action)
   try {
     const appended = await chatSessionApi.appendMessage(sessionId, { role: 'user', content: text })
-    if (appended.data?.data) messagesList.value.push(appended.data.data)
+    const userMessage = appended.data?.data
+    if (userMessage) messagesList.value.push(userMessage)
     pendingAction.value = action
+    pendingAnalyzeRequest.value = action === 'analyze' && userMessage
+      ? { sessionId, userMessageId: String(userMessage.id) }
+      : null
     await sendMessage(text, [{ id: `large-screen-image-${Date.now()}`, role: 'user', content: text }] as ChatMessageVO[], referenceFileIds.value)
   } catch {
     message.error(action === 'analyze' ? '识图请求发送失败，可重试' : '生图请求发送失败，可重试')
   } finally {
     pendingAction.value = null
+    pendingAnalyzeRequest.value = null
   }
 }
 
@@ -278,11 +294,17 @@ function handleDrop(event: DragEvent) {
 }
 
 async function handleNewSession() {
+  if (isRunning.value) return
   disconnectStream()
   reference.value = null
   prompt.value = ''
   negativePrompt.value = ''
   resetSession(null)
+}
+
+async function handleSelectSession(session: ChatSessionVO) {
+  if (isRunning.value) return
+  await selectSession(session)
 }
 
 async function handleDelete(session: ChatSessionVO) {
@@ -350,7 +372,8 @@ onMounted(() => { void loadAgent() })
           class="large-screen-image-session"
           :class="{ 'is-active': String(session.id) === currentSessionId }"
           type="button"
-          @click="selectSession(session)"
+          :disabled="isRunning"
+          @click="handleSelectSession(session)"
         >
           <span>{{ session.title || '新对话' }}</span>
           <span class="large-screen-image-session-delete" @click.stop="handleDelete(session)">×</span>
