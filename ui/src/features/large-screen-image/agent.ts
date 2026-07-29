@@ -1,4 +1,4 @@
-export const LARGE_SCREEN_IMAGE_AGENT_CODE = 'large-screen-image' as const
+export const LARGE_SCREEN_IMAGE_AGENT_CODE = 'default-large-screen-image' as const
 
 export interface LargeScreenImageAgent {
   id: string | number

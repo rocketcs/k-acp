@@ -4,7 +4,7 @@ import { resolveLargeScreenImageAgent } from './agent.ts'
 
 const matchedAgent = {
   id: '2078675601634549762',
-  agentCode: 'large-screen-image',
+  agentCode: 'default-large-screen-image',
   name: '大屏生图',
 }
 
