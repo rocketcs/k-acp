@@ -16,6 +16,15 @@ const commonRoutes: AppRouteRecordRaw[] = [
     redirect: RoutePaths.DASHBOARD,
   },
   {
+    path: RoutePaths.LARGE_SCREEN_IMAGE_CHAT,
+    name: RouteNames.LARGE_SCREEN_IMAGE_CHAT,
+    component: () => import('@/views/LargeScreenImageChat/index.vue'),
+    meta: {
+      title: '大屏生图',
+      hidden: true,
+    },
+  },
+  {
     path: `${RoutePaths.CHAT_DIY}/:agentId`,
     name: RouteNames.CHAT_DIY,
     component: () => import('@/views/Chat/index.vue'),

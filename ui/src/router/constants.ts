@@ -68,6 +68,7 @@ export const RouteNames = {
   // 智能体对话
   CHAT: 'Chat',
   CHAT_DIY: 'ChatDiy',
+  LARGE_SCREEN_IMAGE_CHAT: 'LargeScreenImageChat',
   CHAT_HISTORY: 'ChatHistory',
   COMMUNICATION: 'Communication',
 
@@ -153,6 +154,7 @@ export const RoutePaths = {
   // 智能体对话
   CHAT: '/chat',
   CHAT_DIY: '/chat/diy',
+  LARGE_SCREEN_IMAGE_CHAT: '/chat/diy/large-screen-image',
   CHAT_HISTORY: '/chat/history',
   COMMUNICATION: '/communication',
 
