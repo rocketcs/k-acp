@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import * as agentApi from '@/api/agent'
 import * as attachApi from '@/api/attach'
@@ -9,8 +9,17 @@ import { useChatStream } from '@/composables/chat/useChatStream'
 import { useCurrentSession } from '@/composables/chat/useCurrentSession'
 import { useSessions } from '@/composables/chat/useSessions'
 import type { AgentDefinitionVO, ChatMessageVO, ChatSessionVO } from '@/types'
-import { LARGE_SCREEN_IMAGE_AGENT_CODE, resolveLargeScreenImageAgent } from './agent'
+import {
+  LARGE_SCREEN_IMAGE_AGENT_CODE,
+  LARGE_SCREEN_IMAGE_GENERATION_TOOL_ID,
+  resolveLargeScreenImageAgent,
+} from './agent'
 import { parseGeneratedImages } from './gallery'
+import {
+  parseLargeScreenImagePlan,
+  type LargeScreenImagePlan,
+  type LargeScreenImagePlanParseResult,
+} from './plan'
 import { validateReferenceFiles } from './upload'
 
 type ReferenceImage =
@@ -18,16 +27,31 @@ type ReferenceImage =
   | { kind: 'output'; imageUrl: string }
   | null
 
+type LargeScreenImageAction = 'analyze' | 'generate'
+
+type VisibleMessage = {
+  id: string | number
+  role: string
+  content: string
+  planResult: LargeScreenImagePlanParseResult
+  isStreaming?: boolean
+}
+
 const agent = ref<AgentDefinitionVO | null>(null)
 const loading = ref(true)
 const loadError = ref('')
 const prompt = ref('')
+const negativePrompt = ref('')
 const ratio = ref('16:9')
 const quality = ref('standard')
 const reference = ref<ReferenceImage>(null)
 const uploading = ref(false)
 const dragActive = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const activePlanMessageId = ref<string>('')
+const activePlan = ref<LargeScreenImagePlan | null>(null)
+const pendingAction = ref<LargeScreenImageAction | null>(null)
+const generationToolConfigured = ref(false)
 
 const agentId = computed(() => agent.value ? String(agent.value.id) : '')
 const referenceFileIds = computed(() => reference.value?.kind === 'attachment' ? [reference.value.fileId] : [])
@@ -70,21 +94,98 @@ const generatedImages = computed(() => messagesList.value.flatMap((item) =>
   item.role === 'assistant' && item.content ? parseGeneratedImages(item.content) : [],
 ))
 
-const visibleMessages = computed(() => {
-  const persisted = messagesList.value.filter((item) => item.role !== 'system' && item.role !== 'thinking' && item.content)
+function toVisibleMessage(item: { id: string | number; role: string; content?: string }): VisibleMessage {
+  const content = item.content ?? ''
+  return {
+    id: item.id,
+    role: item.role,
+    content,
+    planResult: item.role === 'assistant' ? parseLargeScreenImagePlan(content) : { kind: 'absent' },
+  }
+}
+
+const visibleMessages = computed<VisibleMessage[]>(() => {
+  const persisted = messagesList.value
+    .filter((item) => item.role !== 'system' && item.role !== 'thinking' && item.content)
+    .map(toVisibleMessage)
   if (streamingContent.value && streamingRole.value !== 'thinking') {
-    return [...persisted, { id: 'streaming', role: streamingRole.value, content: streamingContent.value }]
+    if (pendingAction.value === 'analyze' && streamingRole.value === 'assistant') {
+      return [...persisted, {
+        id: 'streaming-plan',
+        role: 'assistant',
+        content: '正在整理创作方案…',
+        planResult: { kind: 'absent' },
+        isStreaming: true,
+      }]
+    }
+    return [...persisted, {
+      id: 'streaming',
+      role: streamingRole.value,
+      content: streamingContent.value,
+      planResult: streamingRole.value === 'assistant'
+        ? parseLargeScreenImagePlan(streamingContent.value)
+        : { kind: 'absent' },
+      isStreaming: true,
+    }]
   }
   return persisted
 })
 
-function actionText(action: 'analyze' | 'generate') {
+function applyPlan(messageId: string | number, plan: LargeScreenImagePlan) {
+  activePlanMessageId.value = String(messageId)
+  activePlan.value = plan
+  prompt.value = plan.creativeBrief.prompt
+  negativePrompt.value = plan.creativeBrief.negativePrompt
+  ratio.value = plan.creativeBrief.ratio
+}
+
+function restoreActivePlan() {
+  if (activePlan.value && activePlanMessageId.value) {
+    applyPlan(activePlanMessageId.value, activePlan.value)
+  }
+}
+
+watch(messagesList, (messages) => {
+  if (pendingAction.value !== 'analyze') return
+  const latestPlanMessage = [...messages].reverse().find((item) => {
+    return item.role === 'assistant' && parseLargeScreenImagePlan(item.content ?? '').kind === 'valid'
+  })
+  if (!latestPlanMessage) return
+  const parsed = parseLargeScreenImagePlan(latestPlanMessage.content ?? '')
+  if (parsed.kind !== 'valid') return
+  if (activePlanMessageId.value !== String(latestPlanMessage.id)) {
+    applyPlan(latestPlanMessage.id, parsed.plan)
+  }
+}, { deep: true })
+
+watch(currentSessionId, () => {
+  activePlanMessageId.value = ''
+  activePlan.value = null
+  prompt.value = ''
+  negativePrompt.value = ''
+  ratio.value = '16:9'
+})
+
+async function copyPrompt() {
+  if (!navigator.clipboard) {
+    message.error('当前浏览器不支持复制，请手动复制提示词')
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(prompt.value)
+    message.success('提示词已复制')
+  } catch {
+    message.error('复制失败，请手动复制提示词')
+  }
+}
+
+function actionText(action: LargeScreenImageAction) {
   const referenceFileId = reference.value?.kind === 'attachment' ? reference.value.fileId : ''
   const referenceImageUrl = reference.value?.kind === 'output' ? reference.value.imageUrl : ''
   if (action === 'analyze') {
-    return `[large-screen-image action=analyze referenceFileId=${referenceFileId}]\n请分析这张参考图，返回可编辑的大屏生图提示词。`
+    return `[large-screen-image action=analyze ratio=${ratio.value} referenceFileId=${referenceFileId}]\n请根据当前参考图生成一份可编辑的大屏创作方案。`
   }
-  return `[large-screen-image action=generate ratio=${ratio.value} quality=${quality.value} referenceFileId=${referenceFileId} referenceImageUrl=${referenceImageUrl}]\n${prompt.value.trim()}`
+  return `[large-screen-image action=generate ratio=${ratio.value} quality=${quality.value} referenceFileId=${referenceFileId} referenceImageUrl=${referenceImageUrl}]\n正向提示词：\n${prompt.value.trim()}\n\n负向提示词：\n${negativePrompt.value.trim()}`
 }
 
 async function ensureSession() {
@@ -95,7 +196,7 @@ async function ensureSession() {
   return currentSessionId.value
 }
 
-async function sendAction(action: 'analyze' | 'generate') {
+async function sendAction(action: LargeScreenImageAction) {
   if (isRunning.value) return
   if (action === 'analyze' && reference.value?.kind !== 'attachment') {
     message.info('请先上传一张参考图')
@@ -103,6 +204,10 @@ async function sendAction(action: 'analyze' | 'generate') {
   }
   if (action === 'generate' && !prompt.value.trim()) {
     message.info('请先填写或确认生图提示词')
+    return
+  }
+  if (action === 'generate' && !generationToolConfigured.value) {
+    message.info('生图能力尚未配置；你可以继续编辑创作方案，待生成 Tool 配置完成后再生成。')
     return
   }
   const sessionId = await ensureSession()
@@ -114,16 +219,26 @@ async function sendAction(action: 'analyze' | 'generate') {
   try {
     const appended = await chatSessionApi.appendMessage(sessionId, { role: 'user', content: text })
     if (appended.data?.data) messagesList.value.push(appended.data.data)
+    pendingAction.value = action
     await sendMessage(text, [{ id: `large-screen-image-${Date.now()}`, role: 'user', content: text }] as ChatMessageVO[], referenceFileIds.value)
   } catch {
     message.error(action === 'analyze' ? '识图请求发送失败，可重试' : '生图请求发送失败，可重试')
+  } finally {
+    pendingAction.value = null
   }
+}
+
+function referenceValidationMessage(code: string) {
+  if (code === 'MULTIPLE_IMAGES') return '每次仅支持一张图片'
+  if (code === 'TOO_LARGE') return '单张图片不能超过 30 MB'
+  if (code === 'NOT_IMAGE') return '仅支持图片文件'
+  return '请选择一张图片'
 }
 
 async function uploadReference(file: File) {
   const result = validateReferenceFiles([file])
   if (!result.ok) {
-    message.error('仅支持一次上传一张图片')
+    message.error(referenceValidationMessage(result.code))
     return
   }
   uploading.value = true
@@ -145,7 +260,7 @@ function handlePicker(event: Event) {
   if (fileInput.value) fileInput.value.value = ''
   const result = validateReferenceFiles(files)
   if (!result.ok) {
-    message.error(result.code === 'MULTIPLE_IMAGES' ? '每次仅支持一张图片' : '请选择一张图片')
+    message.error(referenceValidationMessage(result.code))
     return
   }
   void uploadReference(result.file)
@@ -156,7 +271,7 @@ function handleDrop(event: DragEvent) {
   dragActive.value = false
   const result = validateReferenceFiles(Array.from(event.dataTransfer?.files ?? []))
   if (!result.ok) {
-    message.error(result.code === 'MULTIPLE_IMAGES' ? '每次仅支持拖入一张图片' : '仅支持图片文件')
+    message.error(referenceValidationMessage(result.code))
     return
   }
   void uploadReference(result.file)
@@ -166,6 +281,7 @@ async function handleNewSession() {
   disconnectStream()
   reference.value = null
   prompt.value = ''
+  negativePrompt.value = ''
   resetSession(null)
 }
 
@@ -180,6 +296,17 @@ function useOutputAsReference(imageUrl: string) {
   message.success('已选择生成图作为参考图')
 }
 
+async function loadGenerationToolState(resolvedAgentId: string) {
+  try {
+    const response = await agentApi.enabledToolsOfAgent(resolvedAgentId)
+    generationToolConfigured.value = (response.data?.data ?? []).some(
+      (tool) => tool.toolId === LARGE_SCREEN_IMAGE_GENERATION_TOOL_ID,
+    )
+  } catch {
+    generationToolConfigured.value = false
+  }
+}
+
 async function loadAgent() {
   loading.value = true
   loadError.value = ''
@@ -191,7 +318,7 @@ async function loadAgent() {
       return
     }
     agent.value = found as AgentDefinitionVO
-    await loadSessions()
+    await Promise.all([loadSessions(), loadGenerationToolState(String(found.id))])
   } catch (error) {
     loadError.value = error instanceof Error && error.message.includes('Duplicate')
       ? '检测到重复的大屏生图智能体，请联系管理员处理'
@@ -243,7 +370,44 @@ onMounted(() => { void loadAgent() })
           <p v-if="visibleMessages.length === 0" class="large-screen-image-empty">上传一张参考图，或直接描述你要生成的大屏。</p>
           <article v-for="item in visibleMessages" :key="String(item.id)" class="large-screen-image-message" :class="`is-${item.role}`">
             <span>{{ item.role === 'user' ? '你' : '智能体' }}</span>
-            <pre>{{ item.content }}</pre>
+            <template v-if="item.role === 'assistant' && item.planResult.kind === 'valid'">
+              <section class="large-screen-image-plan-card" aria-label="创作方案">
+                <header class="large-screen-image-plan-card__header">
+                  <div>
+                    <strong>{{ item.planResult.plan.title }}</strong>
+                    <span class="large-screen-image-plan-card__confidence">{{ item.planResult.plan.confidence }}</span>
+                  </div>
+                  <button type="button" @click="applyPlan(item.id, item.planResult.plan)">使用此方案</button>
+                </header>
+                <p><strong>参考图事实：</strong>{{ item.planResult.plan.observedVisualFacts.join('；') }}</p>
+                <p><strong>设计建议：</strong>{{ item.planResult.plan.designSuggestions.join('；') }}</p>
+                <div class="large-screen-image-plan-card__tags">
+                  <span v-for="tag in item.planResult.plan.creativeBrief.styleTags" :key="tag">{{ tag }}</span>
+                </div>
+                <p><strong>比例：</strong>{{ item.planResult.plan.creativeBrief.ratio }}</p>
+                <div class="large-screen-image-plan-card__palette" aria-label="配色">
+                  <i v-for="color in item.planResult.plan.creativeBrief.palette" :key="color" :style="{ backgroundColor: color }" :title="color" />
+                </div>
+                <p><strong>布局：</strong>{{ item.planResult.plan.creativeBrief.layout.join('；') }}</p>
+                <p><strong>图表：</strong>{{ item.planResult.plan.creativeBrief.chartSuggestions.join('、') }}</p>
+                <template v-if="String(item.id) === activePlanMessageId">
+                  <label>正向提示词<textarea v-model="prompt" :disabled="isRunning" /></label>
+                  <label>负向提示词<textarea v-model="negativePrompt" :disabled="isRunning" maxlength="160" /></label>
+                  <div class="large-screen-image-plan-card__actions">
+                    <button type="button" @click="copyPrompt">复制提示词</button>
+                    <button type="button" :disabled="isRunning" @click="restoreActivePlan">还原识图方案</button>
+                    <button type="button" :disabled="isRunning || uploading || reference?.kind !== 'attachment'" @click="sendAction('analyze')">重新识图</button>
+                    <button type="button" class="large-screen-image-primary" :disabled="isRunning || uploading || !prompt.trim()" @click="sendAction('generate')">生成大屏图</button>
+                  </div>
+                </template>
+                <p class="large-screen-image-plan-card__hints">{{ item.planResult.plan.creativeBrief.iterationHints.join('；') }}</p>
+              </section>
+            </template>
+            <template v-else>
+              <p v-if="item.role === 'assistant' && parseGeneratedImages(item.content).length > 0">已生成大屏图，请在右侧查看作品。</p>
+              <pre v-else>{{ item.role === 'user' && item.content.startsWith('[large-screen-image action=analyze') ? '已提交参考图识别请求' : item.role === 'user' && item.content.startsWith('[large-screen-image action=generate') ? '已提交大屏图生成请求' : item.content }}</pre>
+              <p v-if="item.role === 'assistant' && item.planResult.kind === 'invalid'" class="large-screen-image-plan-error">未能解析为创作方案，可重新识图。</p>
+            </template>
           </article>
         </div>
 
@@ -264,6 +428,12 @@ onMounted(() => { void loadAgent() })
           </label>
 
           <textarea v-model="prompt" :disabled="isRunning" placeholder="描述你要生成的数据大屏：业务主题、场景、布局、图表和视觉风格。" />
+          <textarea
+            v-model="negativePrompt"
+            :disabled="isRunning"
+            maxlength="160"
+            placeholder="负向提示词：希望避免的画面问题，例如乱码、错误图表或水印。"
+          />
           <div class="large-screen-image-controls">
             <label>比例
               <select v-model="ratio" :disabled="isRunning"><option>16:9</option><option>21:9</option><option>9:16</option></select>
@@ -329,6 +499,16 @@ onMounted(() => { void loadAgent() })
 .large-screen-image-output figcaption { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 7px; font-size: 12px; }
 .large-screen-image-state { min-height: 100vh; display: grid; place-content: center; gap: 12px; background: #f5f7fb; text-align: center; }
 .large-screen-image-state--error { color: #a12f2f; }
+.large-screen-image-plan-card { display: grid; gap: 12px; padding: 14px; border: 1px solid #c8d9fb; border-radius: 10px; background: linear-gradient(135deg, #f8fbff, #eef5ff); }
+.large-screen-image-plan-card__header, .large-screen-image-plan-card__actions, .large-screen-image-plan-card__tags, .large-screen-image-plan-card__palette { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.large-screen-image-plan-card__header { justify-content: space-between; }
+.large-screen-image-plan-card__confidence { padding: 2px 7px; border-radius: 999px; background: #dceaff; color: #1559cf; font-size: 11px; }
+.large-screen-image-plan-card__tags span { padding: 3px 8px; border-radius: 999px; background: #e7eefb; color: #3a517e; font-size: 12px; }
+.large-screen-image-plan-card__palette i { width: 22px; height: 22px; border: 1px solid rgb(23 32 51 / 16%); border-radius: 50%; }
+.large-screen-image-plan-card label { display: grid; gap: 6px; color: #3a517e; font-size: 12px; }
+.large-screen-image-plan-card textarea { box-sizing: border-box; width: 100%; min-height: 76px; padding: 9px; border: 1px solid #c8d9fb; border-radius: 7px; resize: vertical; font: inherit; }
+.large-screen-image-plan-card__hints, .large-screen-image-plan-error { margin: 0; color: #75809a; font-size: 12px; }
+.large-screen-image-plan-error { color: #a12f2f; }
 @media (max-width: 1024px) { .large-screen-image-page { grid-template-columns: 220px minmax(0, 1fr); } .large-screen-image-gallery { display: none; } }
 @media (max-width: 768px) { .large-screen-image-page { display: block; } .large-screen-image-sessions { display: none; } .large-screen-image-header, .large-screen-image-composer, .large-screen-image-messages { padding-left: 16px; padding-right: 16px; } }
 </style>
