@@ -76,6 +76,7 @@ CREATE TABLE `agent_definition` (
   `name` varchar(100) NOT NULL COMMENT '智能体名称',
   `agent_code` varchar(100) NOT NULL COMMENT '智能体代码（英文小写下划线）',
   `description` text COMMENT '智能体描述',
+  `avatar` varchar(64) NOT NULL DEFAULT 'agent-avatar-01.png' COMMENT '智能体默认头像文件名',
   `model_config_id` bigint DEFAULT NULL COMMENT '基础模型配置ID',
   `model_params_override` text COMMENT '模型参数覆盖',
   `tool_choice_strategy` enum('AUTO','NONE','REQUIRED','SPECIFIC') DEFAULT 'AUTO' COMMENT '工具选择策略',

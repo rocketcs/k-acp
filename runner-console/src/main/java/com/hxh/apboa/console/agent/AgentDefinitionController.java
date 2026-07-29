@@ -15,7 +15,6 @@ import com.hxh.apboa.common.mp.support.MP;
 import com.hxh.apboa.common.mp.support.PageParams;
 import com.hxh.apboa.common.r.R;
 import com.hxh.apboa.common.util.BeanUtils;
-import com.hxh.apboa.common.util.AgentAvatarUtils;
 import com.hxh.apboa.common.vo.AgentDefinitionVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.hxh.apboa.studio.mapper.AgentStudioMapper;
@@ -50,8 +49,6 @@ public class AgentDefinitionController {
     public R<IPage<AgentDefinitionVO>> page(PageParams pageParams, AgentDefinitionDTO query) {
         IPage<AgentDefinition> page = agentDefinitionService.page(MP.getPage(pageParams), MP.getQueryWrapper(query));
         IPage<AgentDefinitionVO> pageVo = BeanUtils.copyPage(page, AgentDefinitionVO.class);
-        pageVo.getRecords().forEach(agentVo ->
-                agentVo.setAvatar(AgentAvatarUtils.avatarForAgentId(agentVo.getId())));
         List<JobInfo> agent = iJobInfoMapper.selectList(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getType, "AGENT"));
         List<AgentStudio> agentStudios = agentStudioMapper.selectList(null);
         List<AgentLongTermMemory> agentLongTermMemories = agentLongTermMemoryMapper.selectList(null);

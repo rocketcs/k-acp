@@ -1,5 +1,7 @@
 package com.hxh.apboa.common.util;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 /**
  * 智能体默认头像工具。
  */
@@ -11,16 +13,11 @@ public final class AgentAvatarUtils {
     }
 
     /**
-     * 根据智能体 ID 稳定分配内置头像，无需数据库字段即可保持刷新前后一致。
+     * 随机选择一个内置智能体头像文件名。
      */
-    public static String avatarForAgentId(Long agentId) {
-        long mixed = agentId == null ? 0L : agentId;
-        mixed ^= mixed >>> 33;
-        mixed *= 0xff51afd7ed558ccdL;
-        mixed ^= mixed >>> 33;
-        mixed *= 0xc4ceb9fe1a85ec53L;
-        mixed ^= mixed >>> 33;
-        int index = (int) Math.floorMod(mixed, DEFAULT_AVATAR_COUNT) + 1;
+    public static String randomAvatar() {
+        int index = ThreadLocalRandom.current().nextInt(1, DEFAULT_AVATAR_COUNT + 1);
         return DEFAULT_AVATAR_PATTERN.formatted(index);
     }
+
 }

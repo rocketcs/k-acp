@@ -41,6 +41,11 @@ public class AgentDefinition extends BaseTenantEntity {
     private String description;
 
     /**
+     * 智能体默认头像文件名
+     */
+    private String avatar;
+
+    /**
      * 基础模型配置ID
      */
     private Long modelConfigId;
