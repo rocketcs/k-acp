@@ -1,4 +1,5 @@
 export const LARGE_SCREEN_IMAGE_AGENT_CODE = 'default-large-screen-image' as const
+export const LARGE_SCREEN_IMAGE_GENERATION_TOOL_ID = 'large-screen-image-generate' as const
 
 export interface LargeScreenImageAgent {
   id: string | number
@@ -8,8 +9,6 @@ export interface LargeScreenImageAgent {
 
 export function resolveLargeScreenImageAgent<T extends LargeScreenImageAgent>(records: T[]): T | null {
   const matches = records.filter((item) => item.agentCode === LARGE_SCREEN_IMAGE_AGENT_CODE)
-  if (matches.length > 1) {
-    throw new Error('Duplicate large-screen-image agents')
-  }
+  if (matches.length > 1) throw new Error('Duplicate large-screen-image agents')
   return matches[0] ?? null
 }
