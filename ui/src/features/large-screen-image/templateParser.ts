@@ -63,7 +63,7 @@ function parseTemplate(value: unknown): LargeScreenImageTemplateParseResult {
   const title = string(value.title, 48)
   if (!title) return invalid('模板标题不合法')
   if (value.confidence !== 'HIGH' && value.confidence !== 'MEDIUM' && value.confidence !== 'LOW') return invalid('置信度不合法')
-  const observedVisualFacts = strings(value.observedVisualFacts, 1, 18, 160)
+  const observedVisualFacts = strings(value.observedVisualFacts, 0, 18, 160)
   if (!observedVisualFacts) return invalid('可观察事实不合法')
 
   if (!isRecord(value.canvas) || !hasExactKeys(value.canvas, ['ratio', 'coordinateSystem', 'grid'])) return invalid('画布字段不合法')

@@ -27,6 +27,17 @@ function availableStorage(storage?: DraftStorage): DraftStorage | undefined {
   return typeof sessionStorage === 'undefined' ? undefined : sessionStorage
 }
 
+function clearSessionDrafts(sessionId: string, storage?: DraftStorage, keepKey?: string): void {
+  const target = availableStorage(storage)
+  const enumerable = target as (DraftStorage & { readonly length?: number; key?: (index: number) => string | null }) | undefined
+  if (!enumerable || typeof enumerable.length !== 'number' || typeof enumerable.key !== 'function') return
+  const prefix = `${encodeURIComponent(DRAFT_PREFIX)}:${encodeURIComponent(sessionId)}:`
+  const keys = Array.from({ length: enumerable.length }, (_, index) => enumerable.key!(index))
+  for (const key of keys) {
+    if (key && key.startsWith(prefix) && key !== keepKey) enumerable.removeItem(key)
+  }
+}
+
 function validTemplate(value: unknown): LargeScreenImageTemplateV2 | null {
   try {
     const json = JSON.stringify(value)
@@ -103,28 +114,40 @@ export function restoreLargeScreenImageTemplate(
   let latest: AnalyzeCandidate | null = null
   let latestIndex = -1
   for (let index = 0; index < messages.length; index += 1) {
-    const candidate = analyzeCandidate(messages[index]!)
+    const message = messages[index]!
+    if (message.sessionId !== sessionId) continue
+    const candidate = analyzeCandidate(message)
     if (candidate) {
       latest = candidate
       latestIndex = index
     }
   }
-  if (!latest || latest.message.sessionId !== sessionId || !latest.referenceFile) return null
+  if (!latest || !latest.referenceFile) {
+    clearSessionDrafts(sessionId, storage)
+    return null
+  }
 
   let persistedTemplate: LargeScreenImageTemplateV2 | null = null
   let templateMessageId = ''
   for (let index = latestIndex + 1; index < messages.length; index += 1) {
     const message = messages[index]!
+    if (message.sessionId !== sessionId) continue
     if (message.role !== 'assistant') continue
     const parsed = parseLargeScreenImageTemplateV2(message.content ?? '')
-    if (parsed.kind === 'invalid') return null
+    if (parsed.kind === 'invalid') {
+      clearSessionDrafts(sessionId, storage)
+      return null
+    }
     if (parsed.kind === 'valid') {
       persistedTemplate = parsed.template
       templateMessageId = String(message.id)
       break
     }
   }
-  if (!persistedTemplate) return null
+  if (!persistedTemplate) {
+    clearSessionDrafts(sessionId, storage)
+    return null
+  }
 
   const context: ActiveLargeScreenTemplateContext = {
     sessionId,
@@ -137,6 +160,7 @@ export function restoreLargeScreenImageTemplate(
   const target = availableStorage(storage)
   if (!target) return context
   const key = largeScreenImageTemplateDraftKey(context)
+  clearSessionDrafts(sessionId, target, key)
   const serialized = target.getItem(key)
   if (serialized === null) return context
   try {

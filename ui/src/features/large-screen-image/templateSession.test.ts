@@ -33,6 +33,8 @@ function memoryStorage() {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => values.set(key, value),
     removeItem: (key: string) => values.delete(key),
+    get length() { return values.size },
+    key: (index: number) => [...values.keys()][index] ?? null,
   }
 }
 
@@ -62,6 +64,15 @@ test('较新的未匹配识图请求使旧模板失效，后续生图不会抹�
   assert.equal(restoreLargeScreenImageTemplate('session-1', unmatched), null)
 })
 
+test('不会消费另一个会话的模板消息', () => {
+  const foreignPlan = { ...message('plan-foreign', 'assistant', plan), sessionId: 'session-2' }
+  const messages = [
+    message('analyze', 'user', prependChatAttachmentContent([referenceFile], analyzeEnvelope)),
+    foreignPlan,
+  ]
+  assert.equal(restoreLargeScreenImageTemplate('session-1', messages), null)
+})
+
 test('仅完整匹配四项来源的草稿覆盖持久化模板，其他草稿会被清除', () => {
   const storage = memoryStorage()
   const messages = [
@@ -77,6 +88,26 @@ test('仅完整匹配四项来源的草稿覆盖持久化模板，其他草稿�
   storage.setItem(key, JSON.stringify({ ...persisted, template, templateMessageId: 'wrong-plan' }))
   assert.equal(restoreLargeScreenImageTemplate('session-1', messages, storage)?.template.title, template.title)
   assert.equal(storage.getItem(key), null)
+})
+
+test('新图片、缺失附件、无消息和无效模板都会清理该会话的陈旧草稿', () => {
+  const established = [
+    message('analyze-old', 'user', prependChatAttachmentContent([referenceFile], analyzeEnvelope)),
+    message('plan-old', 'assistant', plan),
+  ]
+  for (const failedMessages of [
+    [...established, message('analyze-new', 'user', prependChatAttachmentContent([otherFile], analyzeEnvelope.replace(referenceFile.id, otherFile.id)))],
+    [message('analyze-missing', 'user', analyzeEnvelope)],
+    [],
+    [...established, message('analyze-invalid', 'user', prependChatAttachmentContent([referenceFile], analyzeEnvelope)), message('plan-invalid', 'assistant', '```large-screen-image-plan\n{not-json}\n```')],
+  ]) {
+    const storage = memoryStorage()
+    const context = restoreLargeScreenImageTemplate('session-1', established, storage)!
+    const key = largeScreenImageTemplateDraftKey(context)
+    saveLargeScreenImageTemplateDraft(context, storage)
+    assert.equal(restoreLargeScreenImageTemplate('session-1', failedMessages, storage), null)
+    assert.equal(storage.getItem(key), null)
+  }
 })
 
 test('外部重新识图携带 attachedFiles，空输入附件也能保留持久化前缀', () => {

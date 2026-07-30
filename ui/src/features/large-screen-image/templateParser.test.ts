@@ -120,3 +120,7 @@ test('整个 large-screen-image-plan 围栏返回新验证对象', () => {
   assert.notEqual(result.template, fixture)
   assert.notEqual(result.template.regions, fixture.regions)
 })
+
+test('可观察事实允许为空数组', () => {
+  assert.equal(parseLargeScreenImageTemplateV2(fenced({ ...fixture, observedVisualFacts: [] })).kind, 'valid')
+})
