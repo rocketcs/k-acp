@@ -244,11 +244,11 @@ onMounted(() => {
 })
 
 // 暴露方法给父组件（如果需要）
-const requestAttachmentPicker = () => {
+const requestAttachmentPicker = (options?: { replace?: boolean }) => {
   if (props.messageSize <= 1) {
-    welcomeRef.value?.requestAttachmentPicker()
+    welcomeRef.value?.requestAttachmentPicker(options)
   } else {
-    chatInputRef.value?.requestAttachmentPicker()
+    chatInputRef.value?.requestAttachmentPicker(options)
   }
 }
 

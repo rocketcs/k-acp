@@ -114,7 +114,7 @@ const handleDrop = (event: DragEvent) => {
 }
 
 /** 仅由显式暴露的功能包装器调用；普通 Chat 不会主动打开选择器。 */
-const requestAttachmentPicker = () => {
+const requestAttachmentPicker = (_options?: { replace?: boolean }) => {
   fileInputRef.value?.click()
 }
 

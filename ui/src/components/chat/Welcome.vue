@@ -58,8 +58,8 @@ const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const resolvedHeadline = computed(() => props.diyConfig?.headline || props.headline)
 const resolvedDescription = computed(() => props.diyConfig?.description || props.description)
 
-const requestAttachmentPicker = () => {
-  chatInputRef.value?.requestAttachmentPicker()
+const requestAttachmentPicker = (options?: { replace?: boolean }) => {
+  chatInputRef.value?.requestAttachmentPicker(options)
 }
 
 defineExpose({ requestAttachmentPicker })

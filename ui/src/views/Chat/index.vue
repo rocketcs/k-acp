@@ -50,7 +50,7 @@ type ChatMessageDisplayInput = {
 const props = withDefaults(defineProps<{
   showAccount: boolean
   chatAgentId: string | null | undefined
-  submissionAdapter?: (input: ChatSubmissionInput) => ChatSubmission | null
+  submissionAdapter?: (input: ChatSubmissionInput) => ChatSubmission | null | Promise<ChatSubmission | null>
   messageDisplayAdapter?: (input: ChatMessageDisplayInput) => string
   messagePresentationAdapter?: (input: ChatMessagePresentationInput) => ChatMessagePresentation
   attachmentPolicy?: ChatAttachmentPolicy
@@ -519,6 +519,7 @@ function withAttachmentPrefix(submission: ChatSubmission, attachedFiles: Uploade
 }
 
 const completedAttachmentIds = new Set<string>()
+let submissionAdapterInFlight = false
 
 const handleAttachmentUploadComplete = (uploadedFile: UploadedFileItem) => {
   if (uploadedFile.uploading || uploadedFile.id.startsWith('temp-') || completedAttachmentIds.has(uploadedFile.id)) return
@@ -554,14 +555,23 @@ const handleSend = async () => {
   if ((!text && !hasFiles) || !agentId.value || isRunning.value) return
 
   const fileIdsToSend = filesToSend.map((f) => f.id)
-  const submission = props.submissionAdapter
-    ? props.submissionAdapter({ text, fileIds: fileIdsToSend })
-    : {
+  if (props.submissionAdapter && submissionAdapterInFlight) return
+  let submission: ChatSubmission | null
+  if (props.submissionAdapter) {
+    submissionAdapterInFlight = true
+    try {
+      submission = await props.submissionAdapter({ text, fileIds: fileIdsToSend })
+    } finally {
+      submissionAdapterInFlight = false
+    }
+  } else {
+    submission = {
       displayText: text,
       runtimeText: hasFiles ? prependChatAttachmentContent(filesToSend, text) : text,
       titleText: text,
       fileIds: fileIdsToSend,
     }
+  }
   if (!submission) return
 
   inputText.value = ''
@@ -693,8 +703,13 @@ watch(isRunning, (running) => {
   runningSessions.value = next
 })
 
-const requestAttachmentPicker = () => {
-  chatMainRef.value?.requestAttachmentPicker()
+const requestAttachmentPicker = (options?: { replace?: boolean }) => {
+  if (options?.replace) {
+    inputText.value = ''
+    uploadedFiles.value = []
+    completedAttachmentIds.clear()
+  }
+  chatMainRef.value?.requestAttachmentPicker(options)
 }
 
 defineExpose({ submitExternalSubmission, requestAttachmentPicker })

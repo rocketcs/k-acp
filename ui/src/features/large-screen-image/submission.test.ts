@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { adaptLargeScreenImageSubmission, createLargeScreenAnalyzeSubmission } from './submission.ts'
+import {
+  adaptLargeScreenImageSubmission,
+  canStartLargeScreenGeneration,
+  createLargeScreenAnalyzeSubmission,
+  reconcileLargeScreenTemplateContext,
+  resolveLargeScreenTemplateCard,
+} from './submission.ts'
 import type { ActiveLargeScreenTemplateContext } from './template.ts'
 
 const activeTemplate: ActiveLargeScreenTemplateContext = {
@@ -95,6 +101,31 @@ test('does not fall back to text-to-image when a reference workflow has no valid
   assert.equal(adaptLargeScreenImageSubmission({
     text: '改为服务器管理架构', fileIds: [], activeTemplate: null, referenceWorkflowActive: true,
   }), null)
+})
+
+test('keeps a multi-edit draft editable and renders it when all four provenance values match', () => {
+  const draft = { ...activeTemplate.template, title: '服务器态势大屏', prompt: '服务器监控大屏' }
+  const current = { ...activeTemplate, template: draft }
+  const reconciled = reconcileLargeScreenTemplateContext({
+    currentSessionId: 'session-1', activeTemplate: current, restoredTemplate: activeTemplate,
+  })
+  assert.equal(reconciled, current)
+  assert.deepEqual(resolveLargeScreenTemplateCard({
+    currentSessionId: 'session-1', activeTemplate: reconciled, templateMessageId: 'template-1',
+    persistedTemplate: activeTemplate.template,
+  }), { editable: true, template: draft })
+})
+
+test('clears session A template while hydrating session B without a valid template', () => {
+  assert.equal(reconcileLargeScreenTemplateContext({
+    currentSessionId: 'session-b', activeTemplate, restoredTemplate: null,
+  }), null)
+})
+
+test('does not start another generation while an async submission is already in flight', () => {
+  assert.equal(canStartLargeScreenGeneration({ hasValidatedReference: true, submitting: false }), true)
+  assert.equal(canStartLargeScreenGeneration({ hasValidatedReference: true, submitting: true }), false)
+  assert.equal(canStartLargeScreenGeneration({ hasValidatedReference: false, submitting: false }), false)
 })
 
 test('creates a persisted v2 analysis envelope for one real reference image', () => {

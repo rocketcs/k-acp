@@ -19,6 +19,45 @@ export interface LargeScreenImageSubmission {
   attachedFiles?: UploadedFileItem[]
 }
 
+export function reconcileLargeScreenTemplateContext(input: {
+  currentSessionId: string | null
+  activeTemplate: ActiveLargeScreenTemplateContext | null
+  restoredTemplate: ActiveLargeScreenTemplateContext | null
+}): ActiveLargeScreenTemplateContext | null {
+  const { currentSessionId, activeTemplate, restoredTemplate } = input
+  if (!currentSessionId || !restoredTemplate || restoredTemplate.sessionId !== currentSessionId) return null
+  return activeTemplate && templateProvenanceMatches(activeTemplate, restoredTemplate)
+    ? activeTemplate
+    : restoredTemplate
+}
+
+export function resolveLargeScreenTemplateCard(input: {
+  currentSessionId: string | null
+  activeTemplate: ActiveLargeScreenTemplateContext | null
+  templateMessageId: string
+  persistedTemplate: ActiveLargeScreenTemplateContext['template']
+}): { editable: boolean; template: ActiveLargeScreenTemplateContext['template'] } {
+  const { currentSessionId, activeTemplate, templateMessageId, persistedTemplate } = input
+  if (!activeTemplate || activeTemplate.sessionId !== currentSessionId || activeTemplate.templateMessageId !== templateMessageId) {
+    return { editable: false, template: persistedTemplate }
+  }
+  // The active draft is identified by all four provenance fields, not by JSON equality.
+  if (!templateProvenanceMatches(activeTemplate, {
+    sessionId: currentSessionId,
+    referenceFileId: activeTemplate.referenceFileId,
+    analyzeUserMessageId: activeTemplate.analyzeUserMessageId,
+    templateMessageId,
+  })) return { editable: false, template: persistedTemplate }
+  return { editable: true, template: activeTemplate.template }
+}
+
+export function canStartLargeScreenGeneration(input: {
+  hasValidatedReference: boolean
+  submitting: boolean
+}): boolean {
+  return input.hasValidatedReference && !input.submitting
+}
+
 const REFERENCE_FILE_DISPLAY_TEXT = '已上传参考图，请基于它生成一版大屏图。'
 const REFERENCE_FILE_TITLE_TEXT = '参考图生图'
 const REFERENCE_FILE_DEFAULT_PROMPT = '请基于参考图生成一版大屏图。'
@@ -30,6 +69,16 @@ const SAFE_REFERENCE_FILE_ID = /^\d+$/
 const ANALYZE_RUNTIME_INSTRUCTION = '请根据当前参考图生成一份可编辑的大屏结构化模板 v2。'
 const ANALYZE_DISPLAY_TEXT = '已上传参考图，请分析其视觉风格并给出创作方案。'
 const ANALYZE_TITLE_TEXT = '参考图识别'
+
+function templateProvenanceMatches(
+  left: Pick<ActiveLargeScreenTemplateContext, 'sessionId' | 'referenceFileId' | 'analyzeUserMessageId' | 'templateMessageId'>,
+  right: Pick<ActiveLargeScreenTemplateContext, 'sessionId' | 'referenceFileId' | 'analyzeUserMessageId' | 'templateMessageId'>,
+) {
+  return left.sessionId === right.sessionId
+    && left.referenceFileId === right.referenceFileId
+    && left.analyzeUserMessageId === right.analyzeUserMessageId
+    && left.templateMessageId === right.templateMessageId
+}
 
 export function createLargeScreenAnalyzeSubmission(uploadedFile: UploadedFileItem): LargeScreenImageSubmission | null {
   if (!SAFE_REFERENCE_FILE_ID.test(uploadedFile.id)) return null
