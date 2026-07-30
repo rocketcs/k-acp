@@ -239,7 +239,9 @@ const displayMessages = computed<DisplayMessage[]>(() => {
     }
 
     const presentation = props.messagePresentationAdapter?.({
-      id: displayId,
+      // Presentation provenance must use the persisted source ID; displayId may bridge a
+      // just-finished stream for DOM stability and is not a message identity.
+      id: String(m.id),
       role: m.role as DisplayMessage['role'],
       content,
       rawContent: m.content,

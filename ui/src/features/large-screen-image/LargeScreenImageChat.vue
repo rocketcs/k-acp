@@ -17,6 +17,7 @@ import {
   canStartLargeScreenGeneration,
   createLargeScreenAnalyzeSubmission,
   largeScreenAnalysisResponseMatches,
+  largeScreenAnalysisStreamMatches,
   reconcileLargeScreenTemplateContext,
   resolveLargeScreenTemplateCard,
   type LargeScreenImageSubmission,
@@ -60,6 +61,7 @@ const analysisRun = ref<{
   referenceFileId: string
   analyzeUserMessageId: string | null
   responseMessageId: string | null
+  streamEligible: boolean
 } | null>(null)
 const submittingGeneration = ref(false)
 const templateValidationError = ref('')
@@ -93,6 +95,14 @@ function analysisResponseMatches(input: ChatMessagePresentationInput) {
     run: analysisRun.value,
     currentSessionId: currentSessionId.value,
     messageId: input.id,
+  })
+}
+
+function analysisStreamMatches(input: ChatMessagePresentationInput) {
+  return largeScreenAnalysisStreamMatches({
+    run: analysisRun.value,
+    currentSessionId: currentSessionId.value,
+    isStreaming: input.isStreaming,
   })
 }
 
@@ -228,6 +238,7 @@ function handleAttachmentAutoSubmit({ uploadedFile }: LargeScreenImageSubmission
     referenceFileId: uploadedFile.id,
     analyzeUserMessageId: null,
     responseMessageId: null,
+    streamEligible: false,
   }
   const submission = createLargeScreenAnalyzeSubmission(uploadedFile)
   if (!submission) {
@@ -280,8 +291,13 @@ function onSessionMessagesChanged({ sessionId, messages }: { sessionId: string |
       analyzeUserMessageId: String(matchingAnalyze.id),
     }
     const analyzeIndex = messages.findIndex((item) => String(item.id) === String(analysisRun.value?.analyzeUserMessageId))
+    const following = analyzeIndex === -1 ? [] : messages.slice(analyzeIndex + 1).filter((item) => item.sessionId === sessionId)
     const response = analyzeIndex === -1 ? null : firstResponseForAnalyze(messages, sessionId, analyzeIndex)
-    if (response) analysisRun.value = { ...analysisRun.value, responseMessageId: String(response.id) }
+    analysisRun.value = {
+      ...analysisRun.value,
+      responseMessageId: response ? String(response.id) : null,
+      streamEligible: response === null && !following.some((item) => item.role === 'user'),
+    }
   }
 
   const restored = restoreLargeScreenImageTemplate(sessionId, messages)
@@ -340,6 +356,7 @@ async function retryAnalyze() {
     referenceFileId: verified.id,
     analyzeUserMessageId: null,
     responseMessageId: null,
+    streamEligible: false,
   }
   const submission = createLargeScreenAnalyzeSubmission(verified)
   if (!submission || !await chatRef.value?.submitExternalSubmission(submission, { consumeComposerOnSuccess: true })) {
@@ -368,6 +385,7 @@ function replaceReference() {
 }
 
 function messagePresentationAdapter(input: ChatMessagePresentationInput): ChatMessagePresentation {
+  if (analysisStreamMatches(input)) return { kind: 'markdown', content: '正在识别布局与视觉系统' }
   if (String(input.role) === 'error' && analysisResponseMatches(input)) analysisRun.value = null
   const descriptor = classifyLargeScreenImagePresentation({ role: input.role, rawContent: input.rawContent })
   if (descriptor.kind === 'template') {

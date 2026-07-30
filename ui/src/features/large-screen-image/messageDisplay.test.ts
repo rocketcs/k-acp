@@ -99,3 +99,9 @@ test('ordinary synchronous and no-adapter Chat submissions retain their original
   assert.match(chat, /else \{\s*submission = \{\s*displayText: text,/)
   assert.match(chat, /if \(!submission\) return\s*\n\s*inputText\.value = ''/)
 })
+
+test('presentation provenance keeps persisted message IDs when the DOM key bridges a stream', () => {
+  const chat = readFileSync(new URL('../../views/Chat/index.vue', import.meta.url), 'utf8')
+  assert.match(chat, /let displayId = String\(m\.id\)[\s\S]*id: String\(m\.id\),/)
+  assert.match(chat, /list\.push\(\{[\s\S]*id: displayId,[\s\S]*presentation,/)
+})

@@ -5,6 +5,7 @@ import {
   canStartLargeScreenGeneration,
   createLargeScreenAnalyzeSubmission,
   largeScreenAnalysisResponseMatches,
+  largeScreenAnalysisStreamMatches,
   reconcileLargeScreenTemplateContext,
   resolveLargeScreenTemplateCard,
 } from './submission.ts'
@@ -140,6 +141,18 @@ test('only the exact analyze user/reference response may clear current analysis 
   assert.equal(largeScreenAnalysisResponseMatches({
     run: { ...run, analyzeUserMessageId: null }, currentSessionId: 'session-1', messageId: 'assistant-current',
   }), false)
+})
+
+test('shows analysis loading only for the exact pending analyze provenance', () => {
+  const run = {
+    sessionId: 'session-1', referenceFileId: '2082729274554626051',
+    analyzeUserMessageId: 'analyze-current', responseMessageId: null, streamEligible: true,
+  }
+  assert.equal(largeScreenAnalysisStreamMatches({ run, currentSessionId: 'session-1', isStreaming: true }), true)
+  assert.equal(largeScreenAnalysisStreamMatches({ run, currentSessionId: 'session-1', isStreaming: false }), false)
+  assert.equal(largeScreenAnalysisStreamMatches({ run: { ...run, streamEligible: false }, currentSessionId: 'session-1', isStreaming: true }), false)
+  assert.equal(largeScreenAnalysisStreamMatches({ run: { ...run, responseMessageId: 'other-response' }, currentSessionId: 'session-1', isStreaming: true }), false)
+  assert.equal(largeScreenAnalysisStreamMatches({ run, currentSessionId: 'session-2', isStreaming: true }), false)
 })
 
 test('creates a persisted v2 analysis envelope for one real reference image', () => {

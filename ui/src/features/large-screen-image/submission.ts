@@ -38,6 +38,20 @@ export function largeScreenAnalysisResponseMatches(input: {
     && run.responseMessageId === messageId
 }
 
+export function largeScreenAnalysisStreamMatches(input: {
+  run: (LargeScreenAnalysisRunProvenance & { streamEligible: boolean }) | null
+  currentSessionId: string | null
+  isStreaming: boolean
+}): boolean {
+  const { run, currentSessionId, isStreaming } = input
+  return isStreaming
+    && run !== null
+    && run.sessionId === currentSessionId
+    && run.analyzeUserMessageId !== null
+    && run.responseMessageId === null
+    && run.streamEligible
+}
+
 export function reconcileLargeScreenTemplateContext(input: {
   currentSessionId: string | null
   activeTemplate: ActiveLargeScreenTemplateContext | null
