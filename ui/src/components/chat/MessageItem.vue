@@ -2,30 +2,11 @@
 import { computed, ref, watch } from 'vue'
 import { LoadingOutlined, BulbOutlined, CopyOutlined, CheckOutlined, ToolOutlined, RightOutlined, DownOutlined } from '@ant-design/icons-vue'
 import MediaPreview from '@/components/common/MediaPreview.vue'
-import type { UploadedFileItem } from '@/types'
 import MediaIcon from '@/components/common/MediaIcon.vue'
 import MarkdownRenderer from "@/components/markdown/MarkdownRenderer.vue";
 import TaggedContentRenderer from './TaggedContentRenderer.vue';
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
-
-const FILE_SEP = '@==##::::##==@'
-
-/**
- * 解析用户内容，分离文件和文本
- */
-function parseUserContent(content: string): { files: UploadedFileItem[]; text: string } {
-  const idx = content.indexOf(FILE_SEP)
-  if (idx === -1) return { files: [], text: content }
-  const prefix = content.slice(0, idx)
-  const text = content.slice(idx + FILE_SEP.length)
-  try {
-    const parsed = JSON.parse(prefix) as { files?: UploadedFileItem[] }
-    const files = Array.isArray(parsed?.files) ? parsed.files : []
-    return { files, text }
-  } catch {
-    return { files: [], text: content }
-  }
-}
+import { splitChatAttachmentContent } from '@/utils/chat/messageContent'
 
 /** 从文件名解析扩展名（小写） */
 const getExtension = (fileName: string): string => {
@@ -96,7 +77,7 @@ const isAssistant = computed(() => props.role === 'assistant')
 const isTool = computed(() => props.role === 'tool')
 const isError = computed(() => props.role === 'error')
 
-const parsedUserContent = computed(() => parseUserContent(props.content))
+const parsedUserContent = computed(() => splitChatAttachmentContent(props.content))
 const formattedTime = computed(() => formatTime(props.createdAt))
 
 // 预览相关状态
