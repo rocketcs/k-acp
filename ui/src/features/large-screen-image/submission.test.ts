@@ -1,6 +1,28 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { adaptLargeScreenImageSubmission, createLargeScreenAnalyzeSubmission } from './submission.ts'
+import type { ActiveLargeScreenTemplateContext } from './template.ts'
+
+const activeTemplate: ActiveLargeScreenTemplateContext = {
+  sessionId: 'session-1',
+  referenceFileId: '2082729274554626051',
+  referenceFile: { id: '2082729274554626051', name: 'reference.jpg', extension: 'jpg', size: '1 KB' },
+  analyzeUserMessageId: 'analyze-1',
+  templateMessageId: 'template-1',
+  template: {
+    version: '2', title: '城市态势大屏', confidence: 'HIGH', observedVisualFacts: ['深蓝色'],
+    canvas: { ratio: '16:9', coordinateSystem: 'normalized-1000', grid: '12-column' },
+    visualTokens: { palette: ['#071B3A', '#00D9FF'], surface: '深蓝面板', border: '青蓝边框', typography: '无衬线数字字体' },
+    regions: [
+      { id: 'header', label: '顶部状态', bounds: { x: 0, y: 0, width: 1000, height: 100 }, layer: 1, component: 'title-status', purpose: '展示标题', locked: true, replaceable: ['title'] },
+      { id: 'left-cluster', label: '左侧集群', bounds: { x: 0, y: 100, width: 300, height: 800 }, layer: 2, component: 'topology-cluster', purpose: '展示节点', locked: true, replaceable: ['businessLabels'] },
+      { id: 'core', label: '核心拓扑', bounds: { x: 300, y: 100, width: 400, height: 800 }, layer: 2, component: 'core-topology', purpose: '展示核心关系', locked: true, replaceable: ['chartData'] },
+    ],
+    relations: [{ from: 'core', to: 'left-cluster', kind: 'topology-link', locked: true }],
+    preservation: { mode: 'preserve-layout', mustKeep: ['region-bounds', 'information-hierarchy', 'locked-relations', 'palette-proportion'], mayReplace: ['business-labels', 'chart-data'] },
+    prompt: '高质量城市大屏', negativePrompt: '水印', iterationHints: [],
+  },
+}
 
 test('returns null when neither text nor a reference file is supplied', () => {
   assert.equal(adaptLargeScreenImageSubmission({ text: '  \n ', fileIds: [] }), null)
@@ -55,6 +77,24 @@ test('keeps a text-only generation request as a natural-language brief', () => {
     titleText: '生成一张城市夜景',
     fileIds: [],
   })
+})
+
+test('compiles normal input against the active v2 template and re-forwards its reference file', () => {
+  const submission = adaptLargeScreenImageSubmission({
+    text: '改为服务器管理架构',
+    fileIds: [],
+    activeTemplate,
+  })!
+
+  assert.deepEqual(submission.fileIds, ['2082729274554626051'])
+  assert.match(submission.runtimeText, /templateVersion=2/)
+  assert.equal(submission.runtimeText.includes('改为服务器管理架构'), true)
+})
+
+test('does not fall back to text-to-image when a reference workflow has no valid active template', () => {
+  assert.equal(adaptLargeScreenImageSubmission({
+    text: '改为服务器管理架构', fileIds: [], activeTemplate: null, referenceWorkflowActive: true,
+  }), null)
 })
 
 test('creates a persisted v2 analysis envelope for one real reference image', () => {

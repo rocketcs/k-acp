@@ -11,7 +11,7 @@ const ANALYZE_INSTRUCTIONS = [
 ]
 const ANALYZE_DISPLAY_TEXT = '已上传参考图，请分析其视觉风格并给出创作方案。'
 const ANALYZE_ENVELOPE = /^\[large-screen-image action=analyze(?: [^\]\r\n]*)?\]\r?\n([\s\S]*)$/
-const GENERATE_BRIEF_ENVELOPE = /^\[large-screen-image action=generate(?: [^\]\r\n]*)?\]\r?\n用户创作需求：\r?\n([\s\S]*)$/
+const GENERATE_BRIEF_ENVELOPE = /^\[large-screen-image action=generate(?: [^\]\r\n]*)?\]\r?\n(?:[\s\S]*?\r?\n\r?\n)?用户创作需求：\r?\n([\s\S]*)$/
 const GENERATE_ENVELOPE = /^\[large-screen-image action=generate(?: [^\]\r\n]*)?\]\r?\n正向提示词：\r?\n([\s\S]*?)\r?\n\r?\n负向提示词：\r?\n[\s\S]*$/
 
 /**

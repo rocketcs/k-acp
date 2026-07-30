@@ -1,321 +1,340 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
+import Chat from '@/views/Chat/index.vue'
 import * as agentApi from '@/api/agent'
 import * as attachApi from '@/api/attach'
-import * as chatSessionApi from '@/api/chatSession'
-import { useAgentDetail } from '@/composables/chat/useAgentDetail'
-import { useChatStream } from '@/composables/chat/useChatStream'
-import { useCurrentSession } from '@/composables/chat/useCurrentSession'
-import { useSessions } from '@/composables/chat/useSessions'
-import type { AgentDefinitionVO, ChatMessageVO, ChatSessionVO } from '@/types'
+import type { ChatAttachmentPolicy } from '@/composables/chat/useChatAttachments'
+import type { Attach, ChatMessagePresentation, ChatMessagePresentationInput, ChatMessageVO, UploadedFileItem } from '@/types'
+import { splitChatAttachmentContent } from '@/utils/chat/messageContent'
 import {
   LARGE_SCREEN_IMAGE_AGENT_CODE,
   LARGE_SCREEN_IMAGE_GENERATION_TOOL_ID,
   resolveLargeScreenImageAgent,
 } from './agent'
-import { parseGeneratedImages } from './gallery'
 import {
-  parseLargeScreenImagePlan,
-  type LargeScreenImagePlan,
-  type LargeScreenImagePlanParseResult,
-} from './plan'
-import { validateReferenceFiles } from './upload'
+  adaptLargeScreenImageSubmission,
+  createLargeScreenAnalyzeSubmission,
+  type LargeScreenImageSubmission,
+  type LargeScreenImageSubmissionInput,
+} from './submission'
+import { formatLargeScreenImageMessageContent } from './messageDisplay'
+import { classifyLargeScreenImagePresentation } from './messagePresentation'
+import LargeScreenImageTemplateCard from './LargeScreenImageTemplateCard.vue'
+import LargeScreenImageTemplateErrorCard from './LargeScreenImageTemplateErrorCard.vue'
+import type { ActiveLargeScreenTemplateContext, LargeScreenImageTemplateV2 } from './template'
+import {
+  clearLargeScreenImageTemplateDraft,
+  restoreLargeScreenImageTemplate,
+  saveLargeScreenImageTemplateDraft,
+} from './templateSession'
+import { compileLargeScreenImageGeneration } from './templateCompiler.ts'
 
-type ReferenceImage =
-  | { kind: 'attachment'; fileId: string; fileName: string }
-  | { kind: 'output'; imageUrl: string }
-  | null
+const MAX_REFERENCE_IMAGE_BYTES = 30 * 1024 * 1024
+const VALID_REFERENCE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp'])
+const INVALID_REFERENCE_MESSAGE = '参考图已失效，请重新上传。'
+const ANALYZE_ENVELOPE = /^\[large-screen-image action=analyze(?: [^\]\r\n]*)? referenceFileId=(\d+)(?: [^\]\r\n]*)?\]\r?\n/
 
-type LargeScreenImageAction = 'analyze' | 'generate'
-
-type AnalyzeRequestBoundary = {
-  sessionId: string
-  userMessageId: string
+type ChatExpose = {
+  submitExternalSubmission: (submission: LargeScreenImageSubmission) => Promise<boolean>
+  requestAttachmentPicker: () => void
 }
 
-type VisibleMessage = {
-  id: string | number
-  role: string
-  content: string
-  planResult: LargeScreenImagePlanParseResult
-  isStreaming?: boolean
-}
-
-const agent = ref<AgentDefinitionVO | null>(null)
+const agentId = ref('')
 const loading = ref(true)
 const loadError = ref('')
-const prompt = ref('')
-const negativePrompt = ref('')
-const ratio = ref('16:9')
-const quality = ref('standard')
-const reference = ref<ReferenceImage>(null)
-const uploading = ref(false)
-const dragActive = ref(false)
-const fileInput = ref<HTMLInputElement | null>(null)
-const activePlanMessageId = ref<string>('')
-const activePlan = ref<LargeScreenImagePlan | null>(null)
-const pendingAction = ref<LargeScreenImageAction | null>(null)
-const pendingAnalyzeRequest = ref<AnalyzeRequestBoundary | null>(null)
 const generationToolConfigured = ref(false)
+const chatRef = ref<ChatExpose | null>(null)
+const activeTemplate = ref<ActiveLargeScreenTemplateContext | null>(null)
+const pendingReferenceFile = ref<UploadedFileItem | null>(null)
+const referenceWorkflowActive = ref(false)
+const analysisReferenceId = ref<string | null>(null)
+const submittingGeneration = ref(false)
+const templateValidationError = ref('')
+const currentSessionId = ref<string | null>(null)
 
-const agentId = computed(() => agent.value ? String(agent.value.id) : '')
-const referenceFileIds = computed(() => reference.value?.kind === 'attachment' ? [reference.value.fileId] : [])
-const memoryActive = ref(false)
-const planActive = ref(false)
-const toolProcessActive = ref(false)
-const { agentDetail } = useAgentDetail(agentId)
-const {
-  pinnedSessions,
-  otherSessions,
-  loadSessions,
-  createSession,
-  deleteSession,
-} = useSessions(agentId)
-const {
-  currentSessionId,
-  messagesList,
-  selectSession,
-  resetSession,
-} = useCurrentSession(agentId)
-const {
-  streamingContent,
-  streamingRole,
-  isRunning,
-  sendMessage,
-  disconnect: disconnectStream,
-} = useChatStream(
-  agentId,
-  agentDetail,
-  currentSessionId,
-  referenceFileIds,
-  memoryActive,
-  planActive,
-  toolProcessActive,
-  (chatMsg: ChatMessageVO) => messagesList.value.push(chatMsg),
-)
+const attachmentPolicy: ChatAttachmentPolicy = {
+  maxFileCount: 1,
+  maxFileSizeBytes: MAX_REFERENCE_IMAGE_BYTES,
+  allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
+  allowedMimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
+}
 
-const sessions = computed(() => [...pinnedSessions.value, ...otherSessions.value])
-const generatedImages = computed(() => messagesList.value.flatMap((item) =>
-  item.role === 'assistant' && item.content ? parseGeneratedImages(item.content) : [],
-))
+function templateProvenanceMatches(
+  left: Pick<ActiveLargeScreenTemplateContext, 'sessionId' | 'referenceFileId' | 'analyzeUserMessageId' | 'templateMessageId'>,
+  right: Pick<ActiveLargeScreenTemplateContext, 'sessionId' | 'referenceFileId' | 'analyzeUserMessageId' | 'templateMessageId'>,
+) {
+  return left.sessionId === right.sessionId
+    && left.referenceFileId === right.referenceFileId
+    && left.analyzeUserMessageId === right.analyzeUserMessageId
+    && left.templateMessageId === right.templateMessageId
+}
 
-function toVisibleMessage(item: { id: string | number; role: string; content?: string }): VisibleMessage {
-  const content = item.content ?? ''
+function sameTemplate(left: LargeScreenImageTemplateV2, right: LargeScreenImageTemplateV2) {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function clearTemplateContext() {
+  if (activeTemplate.value) clearLargeScreenImageTemplateDraft(activeTemplate.value)
+  activeTemplate.value = null
+  templateValidationError.value = ''
+}
+
+function normalizeExtension(value: string | undefined) {
+  return (value ?? '').trim().replace(/^\./, '').toLowerCase()
+}
+
+function uploadedReferenceFromAttach(attachment: Attach, fallback: UploadedFileItem): UploadedFileItem | null {
+  const extension = normalizeExtension(attachment.extension || fallback.extension)
+  if (!VALID_REFERENCE_EXTENSIONS.has(extension)) return null
   return {
-    id: item.id,
-    role: item.role,
-    content,
-    planResult: item.role === 'assistant' ? parseLargeScreenImagePlan(content) : { kind: 'absent' },
+    id: fallback.id,
+    name: attachment.originalName || attachment.name || fallback.name,
+    extension,
+    size: attachment.attachSize ? String(attachment.attachSize) : fallback.size,
   }
 }
 
-const visibleMessages = computed<VisibleMessage[]>(() => {
-  const persisted = messagesList.value
-    .filter((item) => (item.role === 'user' || item.role === 'assistant') && item.content)
-    .map(toVisibleMessage)
-  if (streamingContent.value && (streamingRole.value === 'user' || streamingRole.value === 'assistant')) {
-    if (pendingAction.value === 'analyze' && streamingRole.value === 'assistant') {
-      return [...persisted, {
-        id: 'streaming-plan',
-        role: 'assistant',
-        content: '正在整理创作方案…',
-        planResult: { kind: 'absent' },
-        isStreaming: true,
-      }]
+async function validateReferenceFile(reference: UploadedFileItem): Promise<UploadedFileItem | null> {
+  try {
+    const response = await attachApi.selectOne(reference.id)
+    const attachment = response.data?.data
+    if (!attachment) throw new Error('missing attachment')
+    const verified = uploadedReferenceFromAttach(attachment, reference)
+    if (!verified) throw new Error('unsupported attachment')
+    return verified
+  } catch {
+    clearTemplateContext()
+    pendingReferenceFile.value = null
+    analysisReferenceId.value = null
+    referenceWorkflowActive.value = true
+    message.error(INVALID_REFERENCE_MESSAGE)
+    return null
+  }
+}
+
+async function validateActiveReference(): Promise<UploadedFileItem | null> {
+  const context = activeTemplate.value
+  if (!context) return null
+  const verified = await validateReferenceFile(context.referenceFile)
+  if (!verified) return null
+  if (activeTemplate.value && templateProvenanceMatches(activeTemplate.value, context)) {
+    activeTemplate.value = { ...context, referenceFile: verified }
+  }
+  pendingReferenceFile.value = verified
+  return verified
+}
+
+async function submitCompiledTemplate(businessPrompt: string) {
+  if (submittingGeneration.value) return false
+  if (!generationToolConfigured.value) {
+    message.info('生图能力尚未配置；请联系管理员完成 image_generate Tool 配置。')
+    return false
+  }
+  const context = activeTemplate.value
+  if (!context) {
+    message.error('参考图识别尚未完成，请先完成识图。')
+    return false
+  }
+  submittingGeneration.value = true
+  try {
+    const referenceFile = await validateActiveReference()
+    if (!referenceFile) return false
+    const submission = compileLargeScreenImageGeneration({
+      template: context.template,
+      referenceFileId: context.referenceFileId,
+      businessPrompt,
+    })
+    if (!submission) {
+      templateValidationError.value = '模板编辑不符合结构要求，请修正后生成。'
+      message.error(templateValidationError.value)
+      return false
     }
-    return [...persisted, {
-      id: 'streaming',
-      role: streamingRole.value,
-      content: streamingContent.value,
-      planResult: streamingRole.value === 'assistant'
-        ? parseLargeScreenImagePlan(streamingContent.value)
-        : { kind: 'absent' },
-      isStreaming: true,
-    }]
-  }
-  return persisted
-})
-
-function applyPlan(messageId: string | number, plan: LargeScreenImagePlan) {
-  activePlanMessageId.value = String(messageId)
-  activePlan.value = plan
-  prompt.value = plan.creativeBrief.prompt
-  negativePrompt.value = plan.creativeBrief.negativePrompt
-  ratio.value = plan.creativeBrief.ratio
-}
-
-function restoreActivePlan() {
-  if (activePlan.value && activePlanMessageId.value) {
-    applyPlan(activePlanMessageId.value, activePlan.value)
+    templateValidationError.value = ''
+    const sent = await chatRef.value?.submitExternalSubmission(submission)
+    if (!sent) message.error('生成请求发送失败，请稍后重试。')
+    return sent === true
+  } finally {
+    submittingGeneration.value = false
   }
 }
 
-watch(messagesList, (messages) => {
-  const boundary = pendingAnalyzeRequest.value
-  if (pendingAction.value !== 'analyze' || !boundary || currentSessionId.value !== boundary.sessionId) return
-  const userMessageIndex = messages.findIndex((item) => {
-    return item.role === 'user' && String(item.id) === boundary.userMessageId
+function adaptSubmission(input: LargeScreenImageSubmissionInput) {
+  // Chat's adapter is synchronous. Active-template sends are validated and then submitted
+  // through its exposed external-submission boundary so an invalid reference can never run.
+  if (activeTemplate.value) {
+    void submitCompiledTemplate(input.text)
+    return null
+  }
+  const submission = adaptLargeScreenImageSubmission({
+    ...input,
+    referenceWorkflowActive: referenceWorkflowActive.value,
   })
-  if (userMessageIndex < 0) return
-  const planMessage = messages.slice(userMessageIndex + 1).find((item) => {
-    return item.role === 'assistant' && parseLargeScreenImagePlan(item.content ?? '').kind === 'valid'
-  })
-  if (!planMessage) return
-  const parsed = parseLargeScreenImagePlan(planMessage.content ?? '')
-  if (parsed.kind !== 'valid') return
-  applyPlan(planMessage.id, parsed.plan)
-  pendingAnalyzeRequest.value = null
-}, { deep: true })
-
-watch(currentSessionId, () => {
-  pendingAnalyzeRequest.value = null
-  activePlanMessageId.value = ''
-  activePlan.value = null
-  prompt.value = ''
-  negativePrompt.value = ''
-  ratio.value = '16:9'
-})
-
-async function copyPrompt() {
-  if (!navigator.clipboard) {
-    message.error('当前浏览器不支持复制，请手动复制提示词')
-    return
+  if (!submission) {
+    message.error(referenceWorkflowActive.value
+      ? '参考图识别尚未完成，请先完成识图。'
+      : input.fileIds.length > 0 ? '参考图数据无效，请移除后重新上传。' : '请输入生成需求或上传参考图。')
+    return null
   }
-  try {
-    await navigator.clipboard.writeText(prompt.value)
-    message.success('提示词已复制')
-  } catch {
-    message.error('复制失败，请手动复制提示词')
+  if (!generationToolConfigured.value) {
+    message.info('生图能力尚未配置；请联系管理员完成 image_generate Tool 配置。')
+    return null
   }
+  return submission
 }
 
-function actionText(action: LargeScreenImageAction) {
-  const referenceFileId = reference.value?.kind === 'attachment' ? reference.value.fileId : ''
-  const referenceImageUrl = reference.value?.kind === 'output' ? reference.value.imageUrl : ''
-  if (action === 'analyze') {
-    return `[large-screen-image action=analyze ratio=${ratio.value} referenceFileId=${referenceFileId}]\n请根据当前参考图生成一份可编辑的大屏创作方案。`
+function handleAttachmentAutoSubmit({ uploadedFile }: LargeScreenImageSubmissionInput & { uploadedFile: UploadedFileItem }) {
+  clearTemplateContext()
+  referenceWorkflowActive.value = true
+  pendingReferenceFile.value = uploadedFile
+  analysisReferenceId.value = uploadedFile.id
+  const submission = createLargeScreenAnalyzeSubmission(uploadedFile)
+  if (!submission) {
+    analysisReferenceId.value = null
+    message.error('参考图数据无效，请移除后重新上传。')
   }
-  return `[large-screen-image action=generate ratio=${ratio.value} quality=${quality.value} referenceFileId=${referenceFileId} referenceImageUrl=${referenceImageUrl}]\n正向提示词：\n${prompt.value.trim()}\n\n负向提示词：\n${negativePrompt.value.trim()}`
+  return submission
 }
 
-async function ensureSession() {
-  if (currentSessionId.value) return currentSessionId.value
-  const created = await createSession('大屏生图')
-  if (!created) return null
-  currentSessionId.value = String(created.id)
-  return currentSessionId.value
+function isAnalyzeMessage(message: ChatMessageVO) {
+  if (message.role !== 'user') return false
+  return ANALYZE_ENVELOPE.test(splitChatAttachmentContent(message.content ?? '').text)
 }
 
-async function sendAction(action: LargeScreenImageAction) {
-  if (isRunning.value) return
-  if (action === 'analyze' && reference.value?.kind !== 'attachment') {
-    message.info('请先上传一张参考图')
-    return
-  }
-  if (action === 'generate' && !prompt.value.trim()) {
-    message.info('请先填写或确认生图提示词')
-    return
-  }
-  if (action === 'generate' && !generationToolConfigured.value) {
-    message.info('生图能力尚未配置；你可以继续编辑创作方案，待生成 Tool 配置完成后再生成。')
-    return
-  }
-  const sessionId = await ensureSession()
+function onSessionMessagesChanged({ sessionId, messages }: { sessionId: string | null; messages: readonly ChatMessageVO[] }) {
+  currentSessionId.value = sessionId
   if (!sessionId) {
-    message.error('创建会话失败，请重试')
+    clearTemplateContext()
+    referenceWorkflowActive.value = false
+    pendingReferenceFile.value = null
+    analysisReferenceId.value = null
     return
   }
-  const text = actionText(action)
+  const hasReferenceWorkflow = messages.some((item) => item.sessionId === sessionId && isAnalyzeMessage(item))
+  if (!hasReferenceWorkflow && activeTemplate.value?.sessionId !== sessionId && !analysisReferenceId.value) {
+    referenceWorkflowActive.value = false
+    pendingReferenceFile.value = null
+  } else if (hasReferenceWorkflow) {
+    referenceWorkflowActive.value = true
+  }
+
+  const restored = restoreLargeScreenImageTemplate(sessionId, messages)
+  if (!restored) {
+    if (activeTemplate.value?.sessionId === sessionId) clearTemplateContext()
+    return
+  }
+  pendingReferenceFile.value = restored.referenceFile
+  if (!activeTemplate.value || !templateProvenanceMatches(activeTemplate.value, restored)) {
+    activeTemplate.value = restored
+    templateValidationError.value = ''
+  }
+  if (analysisReferenceId.value === restored.referenceFileId) analysisReferenceId.value = null
+}
+
+function handleAttachmentRemoved(file: UploadedFileItem) {
+  if (file.id !== activeTemplate.value?.referenceFileId && file.id !== pendingReferenceFile.value?.id) return
+  clearTemplateContext()
+  pendingReferenceFile.value = null
+  analysisReferenceId.value = null
+  referenceWorkflowActive.value = true
+}
+
+function updateTemplate(template: LargeScreenImageTemplateV2) {
+  const context = activeTemplate.value
+  if (!context) return
+  const next = { ...context, template }
+  activeTemplate.value = next
+  templateValidationError.value = ''
+  saveLargeScreenImageTemplateDraft(next)
+}
+
+function cardIsEditable(input: ChatMessagePresentationInput, template: LargeScreenImageTemplateV2) {
+  const context = activeTemplate.value
+  if (!context || currentSessionId.value !== context.sessionId || input.id !== context.templateMessageId) return false
+  // These are the four draft provenance values. A card becomes editable only for this exact context.
+  return templateProvenanceMatches(context, {
+    sessionId: currentSessionId.value,
+    referenceFileId: context.referenceFileId,
+    analyzeUserMessageId: context.analyzeUserMessageId,
+    templateMessageId: input.id,
+  }) && sameTemplate(context.template, template)
+}
+
+async function retryAnalyze() {
+  const reference = activeTemplate.value?.referenceFile ?? pendingReferenceFile.value
+  if (!reference) {
+    message.error(INVALID_REFERENCE_MESSAGE)
+    return
+  }
+  const verified = await validateReferenceFile(reference)
+  if (!verified) return
+  clearTemplateContext()
+  referenceWorkflowActive.value = true
+  pendingReferenceFile.value = verified
+  analysisReferenceId.value = verified.id
+  const submission = createLargeScreenAnalyzeSubmission(verified)
+  if (!submission || !await chatRef.value?.submitExternalSubmission(submission)) {
+    analysisReferenceId.value = null
+    message.error('识图请求发送失败，可重试。')
+  }
+}
+
+async function removeReference() {
+  const reference = activeTemplate.value?.referenceFile ?? pendingReferenceFile.value
+  clearTemplateContext()
+  pendingReferenceFile.value = null
+  analysisReferenceId.value = null
+  referenceWorkflowActive.value = true
+  if (!reference) return
   try {
-    const appended = await chatSessionApi.appendMessage(sessionId, { role: 'user', content: text })
-    const userMessage = appended.data?.data
-    if (userMessage) messagesList.value.push(userMessage)
-    pendingAction.value = action
-    pendingAnalyzeRequest.value = action === 'analyze' && userMessage
-      ? { sessionId, userMessageId: String(userMessage.id) }
-      : null
-    await sendMessage(text, [{ id: `large-screen-image-${Date.now()}`, role: 'user', content: text }] as ChatMessageVO[], referenceFileIds.value)
+    await attachApi.remove([reference.id])
   } catch {
-    message.error(action === 'analyze' ? '识图请求发送失败，可重试' : '生图请求发送失败，可重试')
-  } finally {
-    pendingAction.value = null
-    pendingAnalyzeRequest.value = null
+    message.warning('参考图已从当前创作中移除，附件删除失败可稍后在文件管理中处理。')
   }
 }
 
-function referenceValidationMessage(code: string) {
-  if (code === 'MULTIPLE_IMAGES') return '每次仅支持一张图片'
-  if (code === 'TOO_LARGE') return '单张图片不能超过 30 MB'
-  if (code === 'NOT_IMAGE') return '仅支持图片文件'
-  return '请选择一张图片'
+function replaceReference() {
+  chatRef.value?.requestAttachmentPicker()
 }
 
-async function uploadReference(file: File) {
-  const result = validateReferenceFiles([file])
-  if (!result.ok) {
-    message.error(referenceValidationMessage(result.code))
-    return
+function messagePresentationAdapter(input: ChatMessagePresentationInput): ChatMessagePresentation {
+  if (input.role === 'assistant' && input.isStreaming && analysisReferenceId.value) {
+    return { kind: 'markdown', content: '正在识别布局与视觉系统' }
   }
-  uploading.value = true
-  try {
-    const response = await attachApi.upload(file)
-    const fileId = response.data?.data
-    if (!fileId) throw new Error('missing file id')
-    reference.value = { kind: 'attachment', fileId: String(fileId), fileName: file.name }
-    message.success('图片已上传，可以开始识图')
-  } catch {
-    message.error('上传失败，可重试')
-  } finally {
-    uploading.value = false
+  if (String(input.role) === 'error' && analysisReferenceId.value) analysisReferenceId.value = null
+  const descriptor = classifyLargeScreenImagePresentation({ role: input.role, rawContent: input.rawContent })
+  if (descriptor.kind === 'template') {
+    const editable = cardIsEditable(input, descriptor.template)
+    return {
+      kind: 'custom',
+      component: LargeScreenImageTemplateCard,
+      props: {
+        template: descriptor.template,
+        referenceFile: editable ? activeTemplate.value?.referenceFile ?? null : null,
+        editable,
+        busy: editable && (analysisReferenceId.value === activeTemplate.value?.referenceFileId || submittingGeneration.value),
+        validationError: editable ? templateValidationError.value : '',
+        onUpdateTemplate: updateTemplate,
+        onRetryAnalyze: retryAnalyze,
+        onGenerate: () => { void submitCompiledTemplate('') },
+        onRemoveReference: () => { void removeReference() },
+        onReplaceReference: replaceReference,
+      },
+    }
   }
-}
-
-function handlePicker(event: Event) {
-  const files = Array.from((event.target as HTMLInputElement).files ?? [])
-  if (fileInput.value) fileInput.value.value = ''
-  const result = validateReferenceFiles(files)
-  if (!result.ok) {
-    message.error(referenceValidationMessage(result.code))
-    return
+  if (descriptor.kind === 'invalid-template') {
+    if (analysisReferenceId.value) analysisReferenceId.value = null
+    return {
+      kind: 'custom',
+      component: LargeScreenImageTemplateErrorCard,
+      props: {
+        reason: descriptor.reason,
+        canRetry: Boolean(pendingReferenceFile.value),
+        onRetryAnalyze: retryAnalyze,
+      },
+    }
   }
-  void uploadReference(result.file)
-}
-
-function handleDrop(event: DragEvent) {
-  event.preventDefault()
-  dragActive.value = false
-  const result = validateReferenceFiles(Array.from(event.dataTransfer?.files ?? []))
-  if (!result.ok) {
-    message.error(referenceValidationMessage(result.code))
-    return
-  }
-  void uploadReference(result.file)
-}
-
-async function handleNewSession() {
-  if (isRunning.value) return
-  disconnectStream()
-  reference.value = null
-  prompt.value = ''
-  negativePrompt.value = ''
-  resetSession(null)
-}
-
-async function handleSelectSession(session: ChatSessionVO) {
-  if (isRunning.value) return
-  await selectSession(session)
-}
-
-async function handleDelete(session: ChatSessionVO) {
-  if (isRunning.value) return
-  await deleteSession(session.id)
-  if (String(session.id) === currentSessionId.value) resetSession(null)
-}
-
-function useOutputAsReference(imageUrl: string) {
-  reference.value = { kind: 'output', imageUrl }
-  message.success('已选择生成图作为参考图')
+  return { kind: 'markdown', content: input.content }
 }
 
 async function loadGenerationToolState(resolvedAgentId: string) {
@@ -332,15 +351,16 @@ async function loadGenerationToolState(resolvedAgentId: string) {
 async function loadAgent() {
   loading.value = true
   loadError.value = ''
+  agentId.value = ''
   try {
     const response = await agentApi.page({ agentCode: LARGE_SCREEN_IMAGE_AGENT_CODE, page: 1, size: 2 })
-    const found = resolveLargeScreenImageAgent(response.data?.data?.records ?? [])
-    if (!found) {
+    const agent = resolveLargeScreenImageAgent(response.data?.data?.records ?? [])
+    if (!agent) {
       loadError.value = '大屏生图智能体尚未配置或未启用'
       return
     }
-    agent.value = found as AgentDefinitionVO
-    await Promise.all([loadSessions(), loadGenerationToolState(String(found.id))])
+    agentId.value = String(agent.id)
+    await loadGenerationToolState(agentId.value)
   } catch (error) {
     loadError.value = error instanceof Error && error.message.includes('Duplicate')
       ? '检测到重复的大屏生图智能体，请联系管理员处理'
@@ -354,184 +374,33 @@ onMounted(() => { void loadAgent() })
 </script>
 
 <template>
-  <main class="large-screen-image-page">
-    <section v-if="loading" class="large-screen-image-state">正在加载大屏生图…</section>
-    <section v-else-if="loadError" class="large-screen-image-state large-screen-image-state--error">
+  <Chat
+    v-if="agentId"
+    ref="chatRef"
+    :chat-agent-id="agentId"
+    :show-account="true"
+    :submission-adapter="adaptSubmission"
+    :message-display-adapter="formatLargeScreenImageMessageContent"
+    :message-presentation-adapter="messagePresentationAdapter"
+    :attachment-policy="attachmentPolicy"
+    :attachment-drop-enabled="true"
+    :attachment-auto-submit-adapter="handleAttachmentAutoSubmit"
+    :on-attachment-removed="handleAttachmentRemoved"
+    :on-session-messages-changed="onSessionMessagesChanged"
+  />
+  <main v-else class="chat-route-state">
+    <ASpin v-if="loading" tip="正在加载大屏生图…" />
+    <section v-else aria-live="polite">
       <p>{{ loadError }}</p>
-      <button type="button" @click="loadAgent">重新加载</button>
+      <AButton type="primary" @click="loadAgent">重新加载</AButton>
     </section>
-    <template v-else>
-      <aside class="large-screen-image-sessions" aria-label="大屏生图会话">
-        <div class="large-screen-image-panel-title">
-          <strong>大屏生图</strong>
-          <button type="button" @click="handleNewSession">新建</button>
-        </div>
-        <button
-          v-for="session in sessions"
-          :key="String(session.id)"
-          class="large-screen-image-session"
-          :class="{ 'is-active': String(session.id) === currentSessionId }"
-          type="button"
-          :disabled="isRunning"
-          @click="handleSelectSession(session)"
-        >
-          <span>{{ session.title || '新对话' }}</span>
-          <span class="large-screen-image-session-delete" @click.stop="handleDelete(session)">×</span>
-        </button>
-        <p v-if="sessions.length === 0" class="large-screen-image-empty">从一次大屏创作开始</p>
-      </aside>
-
-      <section class="large-screen-image-workspace">
-        <header class="large-screen-image-header">
-          <div>
-            <h1>{{ agentDetail?.name || '大屏生图' }}</h1>
-            <p>上传参考图、识别视觉要素，再生成可编辑的大屏设计图。</p>
-          </div>
-        </header>
-
-        <div class="large-screen-image-messages" aria-live="polite">
-          <p v-if="visibleMessages.length === 0" class="large-screen-image-empty">上传一张参考图，或直接描述你要生成的大屏。</p>
-          <article v-for="item in visibleMessages" :key="String(item.id)" class="large-screen-image-message" :class="`is-${item.role}`">
-            <span>{{ item.role === 'user' ? '你' : '智能体' }}</span>
-            <template v-if="item.role === 'assistant' && item.planResult.kind === 'valid'">
-              <section class="large-screen-image-plan-card" aria-label="创作方案">
-                <header class="large-screen-image-plan-card__header">
-                  <div>
-                    <strong>{{ item.planResult.plan.title }}</strong>
-                    <span class="large-screen-image-plan-card__confidence">{{ item.planResult.plan.confidence }}</span>
-                  </div>
-                  <button type="button" @click="applyPlan(item.id, item.planResult.plan)">使用此方案</button>
-                </header>
-                <p><strong>参考图事实：</strong>{{ item.planResult.plan.observedVisualFacts.join('；') }}</p>
-                <p><strong>设计建议：</strong>{{ item.planResult.plan.designSuggestions.join('；') }}</p>
-                <div class="large-screen-image-plan-card__tags">
-                  <span v-for="tag in item.planResult.plan.creativeBrief.styleTags" :key="tag">{{ tag }}</span>
-                </div>
-                <p><strong>比例：</strong>{{ item.planResult.plan.creativeBrief.ratio }}</p>
-                <div class="large-screen-image-plan-card__palette" aria-label="配色">
-                  <i v-for="color in item.planResult.plan.creativeBrief.palette" :key="color" :style="{ backgroundColor: color }" :title="color" />
-                </div>
-                <p><strong>布局：</strong>{{ item.planResult.plan.creativeBrief.layout.join('；') }}</p>
-                <p><strong>图表：</strong>{{ item.planResult.plan.creativeBrief.chartSuggestions.join('、') }}</p>
-                <template v-if="String(item.id) === activePlanMessageId">
-                  <label>正向提示词<textarea v-model="prompt" :disabled="isRunning" /></label>
-                  <label>负向提示词<textarea v-model="negativePrompt" :disabled="isRunning" maxlength="160" /></label>
-                  <div class="large-screen-image-plan-card__actions">
-                    <button type="button" @click="copyPrompt">复制提示词</button>
-                    <button type="button" :disabled="isRunning" @click="restoreActivePlan">还原识图方案</button>
-                    <button type="button" :disabled="isRunning || uploading || reference?.kind !== 'attachment'" @click="sendAction('analyze')">重新识图</button>
-                    <button type="button" class="large-screen-image-primary" :disabled="isRunning || uploading || !prompt.trim()" @click="sendAction('generate')">生成大屏图</button>
-                  </div>
-                </template>
-                <p class="large-screen-image-plan-card__hints">{{ item.planResult.plan.creativeBrief.iterationHints.join('；') }}</p>
-              </section>
-            </template>
-            <template v-else>
-              <p v-if="item.role === 'assistant' && parseGeneratedImages(item.content).length > 0">已生成大屏图，请在右侧查看作品。</p>
-              <pre v-else>{{ item.role === 'user' && item.content.startsWith('[large-screen-image action=analyze') ? '已提交参考图识别请求' : item.role === 'user' && item.content.startsWith('[large-screen-image action=generate') ? '已提交大屏图生成请求' : item.content }}</pre>
-              <p v-if="item.role === 'assistant' && item.planResult.kind === 'invalid'" class="large-screen-image-plan-error">未能解析为创作方案，可重新识图。</p>
-            </template>
-          </article>
-        </div>
-
-        <div class="large-screen-image-composer">
-          <label
-            class="large-screen-image-dropzone"
-            :class="{ 'is-dragging': dragActive, 'is-uploading': uploading }"
-            @dragenter.prevent="dragActive = true"
-            @dragover.prevent="dragActive = true"
-            @dragleave.prevent="dragActive = false"
-            @drop="handleDrop"
-          >
-            <input ref="fileInput" type="file" accept="image/*" :disabled="uploading || isRunning" @change="handlePicker">
-            <span v-if="uploading">正在上传图片…</span>
-            <span v-else-if="reference?.kind === 'attachment'">{{ reference.fileName }} · 点击更换</span>
-            <span v-else-if="reference?.kind === 'output'">已选当前会话生成图作为参考</span>
-            <span v-else>拖入一张图片，或点击上传参考图</span>
-          </label>
-
-          <textarea v-model="prompt" :disabled="isRunning" placeholder="描述你要生成的数据大屏：业务主题、场景、布局、图表和视觉风格。" />
-          <textarea
-            v-model="negativePrompt"
-            :disabled="isRunning"
-            maxlength="160"
-            placeholder="负向提示词：希望避免的画面问题，例如乱码、错误图表或水印。"
-          />
-          <div class="large-screen-image-controls">
-            <label>比例
-              <select v-model="ratio" :disabled="isRunning"><option>16:9</option><option>21:9</option><option>9:16</option></select>
-            </label>
-            <label>质量
-              <select v-model="quality" :disabled="isRunning"><option value="standard">标准</option><option value="high">高</option></select>
-            </label>
-            <button type="button" :disabled="isRunning || uploading || reference?.kind !== 'attachment'" @click="sendAction('analyze')">识图</button>
-            <button type="button" class="large-screen-image-primary" :disabled="isRunning || uploading || !prompt.trim()" @click="sendAction('generate')">
-              {{ isRunning ? '生成中…' : '生成大屏图' }}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <aside class="large-screen-image-gallery" aria-label="本次会话作品">
-        <div class="large-screen-image-panel-title"><strong>本次会话作品</strong></div>
-        <p v-if="generatedImages.length === 0" class="large-screen-image-empty">本次对话还没有生成图片</p>
-        <figure v-for="image in generatedImages" :key="image.imageUrl" class="large-screen-image-output">
-          <img :src="image.imageUrl" alt="大屏生图结果">
-          <figcaption>
-            <a :href="image.imageUrl" target="_blank" rel="noopener">预览 / 下载</a>
-            <button type="button" @click="useOutputAsReference(image.imageUrl)">作为参考图</button>
-          </figcaption>
-        </figure>
-      </aside>
-    </template>
   </main>
 </template>
 
 <style scoped lang="scss">
-.large-screen-image-page { min-height: 100vh; display: grid; grid-template-columns: 240px minmax(0, 1fr) 300px; background: #f5f7fb; color: #172033; }
-.large-screen-image-sessions, .large-screen-image-gallery { padding: 16px; background: #fff; overflow-y: auto; }
-.large-screen-image-sessions { border-right: 1px solid #e7ebf3; }
-.large-screen-image-gallery { border-left: 1px solid #e7ebf3; }
-.large-screen-image-workspace { min-width: 0; display: flex; flex-direction: column; }
-.large-screen-image-header, .large-screen-image-composer { padding: 20px 24px; background: #fff; }
-.large-screen-image-header { border-bottom: 1px solid #e7ebf3; }
-.large-screen-image-header h1, .large-screen-image-header p { margin: 0; }
-.large-screen-image-header p, .large-screen-image-empty { color: #75809a; font-size: 13px; }
-.large-screen-image-panel-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.large-screen-image-panel-title button, .large-screen-image-controls button, .large-screen-image-output button { border: 0; border-radius: 6px; padding: 7px 10px; cursor: pointer; background: #e9eef8; color: #25314d; }
-.large-screen-image-session { width: 100%; display: flex; justify-content: space-between; gap: 8px; padding: 10px; border: 0; border-radius: 6px; background: transparent; text-align: left; cursor: pointer; }
-.large-screen-image-session:hover, .large-screen-image-session.is-active { background: #e8f0ff; color: #1559cf; }
-.large-screen-image-session-delete { opacity: .6; }
-.large-screen-image-messages { flex: 1; overflow-y: auto; padding: 24px; }
-.large-screen-image-message { max-width: 88%; margin: 0 0 14px; padding: 12px; border-radius: 8px; background: #fff; box-shadow: 0 1px 2px rgb(22 36 63 / 6%); }
-.large-screen-image-message.is-user { margin-left: auto; background: #e8f0ff; }
-.large-screen-image-message span { font-size: 12px; color: #75809a; }
-.large-screen-image-message pre { margin: 6px 0 0; white-space: pre-wrap; font: inherit; }
-.large-screen-image-composer { border-top: 1px solid #e7ebf3; }
-.large-screen-image-dropzone { display: block; padding: 14px; border: 1px dashed #8ba7da; border-radius: 8px; color: #3f5f9e; cursor: pointer; }
-.large-screen-image-dropzone.is-dragging { background: #e8f0ff; border-color: #1559cf; }
-.large-screen-image-dropzone input { display: none; }
-.large-screen-image-composer textarea { box-sizing: border-box; width: 100%; min-height: 100px; margin: 12px 0; padding: 12px; border: 1px solid #d7deeb; border-radius: 8px; resize: vertical; }
-.large-screen-image-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.large-screen-image-controls label { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-.large-screen-image-controls select { border: 1px solid #d7deeb; border-radius: 6px; padding: 6px; }
-.large-screen-image-controls .large-screen-image-primary { background: #1559cf; color: #fff; }
-.large-screen-image-controls button:disabled { cursor: not-allowed; opacity: .55; }
-.large-screen-image-output { margin: 0 0 16px; }
-.large-screen-image-output img { display: block; width: 100%; border-radius: 8px; background: #e9eef8; }
-.large-screen-image-output figcaption { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 7px; font-size: 12px; }
-.large-screen-image-state { min-height: 100vh; display: grid; place-content: center; gap: 12px; background: #f5f7fb; text-align: center; }
-.large-screen-image-state--error { color: #a12f2f; }
-.large-screen-image-plan-card { display: grid; gap: 12px; padding: 14px; border: 1px solid #c8d9fb; border-radius: 10px; background: linear-gradient(135deg, #f8fbff, #eef5ff); }
-.large-screen-image-plan-card__header, .large-screen-image-plan-card__actions, .large-screen-image-plan-card__tags, .large-screen-image-plan-card__palette { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.large-screen-image-plan-card__header { justify-content: space-between; }
-.large-screen-image-plan-card__confidence { padding: 2px 7px; border-radius: 999px; background: #dceaff; color: #1559cf; font-size: 11px; }
-.large-screen-image-plan-card__tags span { padding: 3px 8px; border-radius: 999px; background: #e7eefb; color: #3a517e; font-size: 12px; }
-.large-screen-image-plan-card__palette i { width: 22px; height: 22px; border: 1px solid rgb(23 32 51 / 16%); border-radius: 50%; }
-.large-screen-image-plan-card label { display: grid; gap: 6px; color: #3a517e; font-size: 12px; }
-.large-screen-image-plan-card textarea { box-sizing: border-box; width: 100%; min-height: 76px; padding: 9px; border: 1px solid #c8d9fb; border-radius: 7px; resize: vertical; font: inherit; }
-.large-screen-image-plan-card__hints, .large-screen-image-plan-error { margin: 0; color: #75809a; font-size: 12px; }
-.large-screen-image-plan-error { color: #a12f2f; }
-@media (max-width: 1024px) { .large-screen-image-page { grid-template-columns: 220px minmax(0, 1fr); } .large-screen-image-gallery { display: none; } }
-@media (max-width: 768px) { .large-screen-image-page { display: block; } .large-screen-image-sessions { display: none; } .large-screen-image-header, .large-screen-image-composer, .large-screen-image-messages { padding-left: 16px; padding-right: 16px; } }
+@use '@/styles/chat/index.scss' as *;
+
+.chat-route-state { display: grid; min-height: 100dvh; place-items: center; padding: 24px; background: $chat-bg-main; color: var(--color-text-primary); text-align: center; }
+.chat-route-state section { display: grid; gap: 16px; max-width: 32rem; }
+.chat-route-state p { margin: 0; }
 </style>

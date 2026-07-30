@@ -1,8 +1,13 @@
 import type { UploadedFileItem } from '@/types'
+import type { ActiveLargeScreenTemplateContext } from './template'
+import { compileLargeScreenImageGeneration } from './templateCompiler.ts'
 
 export interface LargeScreenImageSubmissionInput {
   text: string
   fileIds: string[]
+  activeTemplate?: ActiveLargeScreenTemplateContext | null
+  /** A failed or pending reference workflow must never degrade into text-to-image. */
+  referenceWorkflowActive?: boolean
 }
 
 export interface LargeScreenImageSubmission {
@@ -42,9 +47,21 @@ export function createLargeScreenAnalyzeSubmission(uploadedFile: UploadedFileIte
 export function adaptLargeScreenImageSubmission({
   text,
   fileIds,
+  activeTemplate = null,
+  referenceWorkflowActive = false,
 }: LargeScreenImageSubmissionInput): LargeScreenImageSubmission | null {
   const trimmedText = text.trim()
   const referenceFileId = fileIds[0]
+
+  if (activeTemplate) {
+    return compileLargeScreenImageGeneration({
+      template: activeTemplate.template,
+      referenceFileId: activeTemplate.referenceFileId,
+      businessPrompt: trimmedText,
+    })
+  }
+
+  if (referenceWorkflowActive) return null
 
   if (referenceFileId && !SAFE_REFERENCE_FILE_ID.test(referenceFileId)) return null
 

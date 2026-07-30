@@ -53,6 +53,16 @@ test('hides a persisted natural-language generation envelope and shows its brief
   )
 })
 
+test('hides a compiled v2 template envelope and shows only its business request', () => {
+  assert.equal(
+    formatLargeScreenImageMessageContent({
+      role: 'user',
+      content: '[large-screen-image action=generate ratio=16:9 quality=high referenceFileId=2082729274554626051 referenceImageUrl= templateVersion=2]\n布局模板约束（系统约束，必须保留）：\n锁定布局骨架\n\n用户创作需求：\n改为服务器管理架构',
+    }),
+    '改为服务器管理架构',
+  )
+})
+
 test('leaves other messages and malformed envelopes unchanged', () => {
   assert.equal(
     formatLargeScreenImageMessageContent({ role: 'assistant', content: '[large-screen-image action=generate]' }),
