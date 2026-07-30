@@ -84,8 +84,18 @@ test('replacement clears the one-slot composer attachment before reopening the p
 
 test('async template compilation is guarded and successful submission consumes the composer once', () => {
   const chat = readFileSync(new URL('../../views/Chat/index.vue', import.meta.url), 'utf8')
+  const wrapper = readFileSync(new URL('./LargeScreenImageChat.vue', import.meta.url), 'utf8')
   assert.match(chat, /let submissionAdapterInFlight = false/)
   assert.match(chat, /if \(props\.submissionAdapter && submissionAdapterInFlight\) return/)
   assert.match(chat, /submission = await props\.submissionAdapter\(\{ text, fileIds: fileIdsToSend \}\)/)
   assert.match(chat, /if \(!submission\) return\s*\n\s*inputText\.value = ''\s*\n\s*uploadedFiles\.value = \[\]/)
+  assert.match(chat, /if \(sent && options\?\.consumeComposerOnSuccess\) \{\s*inputText\.value = ''\s*\n\s*uploadedFiles\.value = \[\]/)
+  assert.match(wrapper, /submitExternalSubmission\(submission, \{ consumeComposerOnSuccess: true \}\)/)
+})
+
+test('ordinary synchronous and no-adapter Chat submissions retain their original direct path', () => {
+  const chat = readFileSync(new URL('../../views/Chat/index.vue', import.meta.url), 'utf8')
+  assert.match(chat, /if \(props\.submissionAdapter\) \{[\s\S]*await props\.submissionAdapter/)
+  assert.match(chat, /else \{\s*submission = \{\s*displayText: text,/)
+  assert.match(chat, /if \(!submission\) return\s*\n\s*inputText\.value = ''/)
 })

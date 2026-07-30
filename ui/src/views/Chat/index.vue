@@ -520,6 +520,7 @@ function withAttachmentPrefix(submission: ChatSubmission, attachedFiles: Uploade
 
 const completedAttachmentIds = new Set<string>()
 let submissionAdapterInFlight = false
+let externalSubmissionInFlight = false
 
 const handleAttachmentUploadComplete = (uploadedFile: UploadedFileItem) => {
   if (uploadedFile.uploading || uploadedFile.id.startsWith('temp-') || completedAttachmentIds.has(uploadedFile.id)) return
@@ -538,12 +539,24 @@ const handleAttachmentRemoved = (file: UploadedFileItem) => {
   props.onAttachmentRemoved?.(file)
 }
 
-async function submitExternalSubmission(submission: ChatSubmission): Promise<boolean> {
-  if (!agentId.value || isRunning.value) return false
+async function submitExternalSubmission(
+  submission: ChatSubmission,
+  options?: { consumeComposerOnSuccess?: boolean },
+): Promise<boolean> {
+  if (!agentId.value || isRunning.value || externalSubmissionInFlight) return false
+  externalSubmissionInFlight = true
   try {
-    return await submitMessage(withAttachmentPrefix(submission, submission.attachedFiles))
+    const sent = await submitMessage(withAttachmentPrefix(submission, submission.attachedFiles))
+    if (sent && options?.consumeComposerOnSuccess) {
+      inputText.value = ''
+      uploadedFiles.value = []
+      completedAttachmentIds.clear()
+    }
+    return sent
   } catch {
     return false
+  } finally {
+    externalSubmissionInFlight = false
   }
 }
 
@@ -552,7 +565,7 @@ const handleSend = async () => {
   const text = inputText.value.trim()
   const filesToSend = uploadedFiles.value.filter((f) => !f.uploading)
   const hasFiles = filesToSend.length > 0
-  if ((!text && !hasFiles) || !agentId.value || isRunning.value) return
+  if ((!text && !hasFiles) || !agentId.value || isRunning.value || externalSubmissionInFlight) return
 
   const fileIdsToSend = filesToSend.map((f) => f.id)
   if (props.submissionAdapter && submissionAdapterInFlight) return

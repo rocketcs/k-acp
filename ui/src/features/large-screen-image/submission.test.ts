@@ -4,6 +4,7 @@ import {
   adaptLargeScreenImageSubmission,
   canStartLargeScreenGeneration,
   createLargeScreenAnalyzeSubmission,
+  largeScreenAnalysisResponseMatches,
   reconcileLargeScreenTemplateContext,
   resolveLargeScreenTemplateCard,
 } from './submission.ts'
@@ -126,6 +127,19 @@ test('does not start another generation while an async submission is already in 
   assert.equal(canStartLargeScreenGeneration({ hasValidatedReference: true, submitting: false }), true)
   assert.equal(canStartLargeScreenGeneration({ hasValidatedReference: true, submitting: true }), false)
   assert.equal(canStartLargeScreenGeneration({ hasValidatedReference: false, submitting: false }), false)
+})
+
+test('only the exact analyze user/reference response may clear current analysis state', () => {
+  const run = {
+    sessionId: 'session-1', referenceFileId: '2082729274554626051',
+    analyzeUserMessageId: 'analyze-current', responseMessageId: 'assistant-current',
+  }
+  assert.equal(largeScreenAnalysisResponseMatches({ run, currentSessionId: 'session-1', messageId: 'assistant-current' }), true)
+  assert.equal(largeScreenAnalysisResponseMatches({ run, currentSessionId: 'session-1', messageId: 'assistant-old-reference' }), false)
+  assert.equal(largeScreenAnalysisResponseMatches({ run, currentSessionId: 'session-2', messageId: 'assistant-current' }), false)
+  assert.equal(largeScreenAnalysisResponseMatches({
+    run: { ...run, analyzeUserMessageId: null }, currentSessionId: 'session-1', messageId: 'assistant-current',
+  }), false)
 })
 
 test('creates a persisted v2 analysis envelope for one real reference image', () => {

@@ -16,6 +16,7 @@ import {
   adaptLargeScreenImageSubmission,
   canStartLargeScreenGeneration,
   createLargeScreenAnalyzeSubmission,
+  largeScreenAnalysisResponseMatches,
   reconcileLargeScreenTemplateContext,
   resolveLargeScreenTemplateCard,
   type LargeScreenImageSubmission,
@@ -39,7 +40,10 @@ const INVALID_REFERENCE_MESSAGE = '参考图已失效，请重新上传。'
 const ANALYZE_ENVELOPE = /^\[large-screen-image action=analyze(?: [^\]\r\n]*)? referenceFileId=(\d+)(?: [^\]\r\n]*)?\]\r?\n/
 
 type ChatExpose = {
-  submitExternalSubmission: (submission: LargeScreenImageSubmission) => Promise<boolean>
+  submitExternalSubmission: (
+    submission: LargeScreenImageSubmission,
+    options?: { consumeComposerOnSuccess?: boolean },
+  ) => Promise<boolean>
   requestAttachmentPicker: (options?: { replace?: boolean }) => void
 }
 
@@ -51,7 +55,12 @@ const chatRef = ref<ChatExpose | null>(null)
 const activeTemplate = ref<ActiveLargeScreenTemplateContext | null>(null)
 const pendingReferenceFile = ref<UploadedFileItem | null>(null)
 const referenceWorkflowActive = ref(false)
-const analysisRun = ref<{ sessionId: string | null; referenceFileId: string } | null>(null)
+const analysisRun = ref<{
+  sessionId: string | null
+  referenceFileId: string
+  analyzeUserMessageId: string | null
+  responseMessageId: string | null
+} | null>(null)
 const submittingGeneration = ref(false)
 const templateValidationError = ref('')
 const currentSessionId = ref<string | null>(null)
@@ -79,8 +88,12 @@ function clearTemplateContext() {
   templateValidationError.value = ''
 }
 
-function analysisIsCurrentSession() {
-  return analysisRun.value !== null && analysisRun.value.sessionId === currentSessionId.value
+function analysisResponseMatches(input: ChatMessagePresentationInput) {
+  return largeScreenAnalysisResponseMatches({
+    run: analysisRun.value,
+    currentSessionId: currentSessionId.value,
+    messageId: input.id,
+  })
 }
 
 
@@ -164,7 +177,7 @@ async function submitCompiledTemplate(businessPrompt: string) {
   try {
     const submission = await compileActiveTemplateGeneration(businessPrompt)
     if (!submission) return false
-    const sent = await chatRef.value?.submitExternalSubmission(submission)
+    const sent = await chatRef.value?.submitExternalSubmission(submission, { consumeComposerOnSuccess: true })
     if (!sent) message.error('生成请求发送失败，请稍后重试。')
     return sent === true
   } finally {
@@ -210,7 +223,12 @@ function handleAttachmentAutoSubmit({ uploadedFile }: LargeScreenImageSubmission
   clearTemplateContext()
   referenceWorkflowActive.value = true
   pendingReferenceFile.value = uploadedFile
-  analysisRun.value = { sessionId: currentSessionId.value, referenceFileId: uploadedFile.id }
+  analysisRun.value = {
+    sessionId: currentSessionId.value,
+    referenceFileId: uploadedFile.id,
+    analyzeUserMessageId: null,
+    responseMessageId: null,
+  }
   const submission = createLargeScreenAnalyzeSubmission(uploadedFile)
   if (!submission) {
     analysisRun.value = null
@@ -224,6 +242,15 @@ function isAnalyzeMessage(message: ChatMessageVO) {
   return ANALYZE_ENVELOPE.test(splitChatAttachmentContent(message.content ?? '').text)
 }
 
+function firstResponseForAnalyze(messages: readonly ChatMessageVO[], sessionId: string, analyzeIndex: number) {
+  for (const message of messages.slice(analyzeIndex + 1)) {
+    if (message.sessionId !== sessionId) continue
+    if (message.role === 'user') return null
+    if (message.role === 'assistant' || String(message.role) === 'error') return message
+  }
+  return null
+}
+
 function onSessionMessagesChanged({ sessionId, messages }: { sessionId: string | null; messages: readonly ChatMessageVO[] }) {
   currentSessionId.value = sessionId
   if (!sessionId) {
@@ -234,17 +261,28 @@ function onSessionMessagesChanged({ sessionId, messages }: { sessionId: string |
     return
   }
   const hasReferenceWorkflow = messages.some((item) => item.sessionId === sessionId && isAnalyzeMessage(item))
-  if (!hasReferenceWorkflow && activeTemplate.value?.sessionId !== sessionId && !analysisIsCurrentSession()) {
+  if (!hasReferenceWorkflow && activeTemplate.value?.sessionId !== sessionId && analysisRun.value?.sessionId !== sessionId) {
     referenceWorkflowActive.value = false
     pendingReferenceFile.value = null
   } else if (hasReferenceWorkflow) {
     referenceWorkflowActive.value = true
   }
 
-  const matchingAnalyze = [...messages].reverse().find((item) => item.sessionId === sessionId
-    && isAnalyzeMessage(item)
-    && splitChatAttachmentContent(item.content ?? '').text.includes(`referenceFileId=${analysisRun.value?.referenceFileId ?? ''}`))
-  if (matchingAnalyze && analysisRun.value) analysisRun.value = { ...analysisRun.value, sessionId }
+  const matchingAnalyze = analysisRun.value?.analyzeUserMessageId
+    ? messages.find((item) => String(item.id) === analysisRun.value?.analyzeUserMessageId) ?? null
+    : [...messages].reverse().find((item) => item.sessionId === sessionId
+      && isAnalyzeMessage(item)
+      && splitChatAttachmentContent(item.content ?? '').text.includes(`referenceFileId=${analysisRun.value?.referenceFileId ?? ''}`)) ?? null
+  if (matchingAnalyze && analysisRun.value) {
+    analysisRun.value = {
+      ...analysisRun.value,
+      sessionId,
+      analyzeUserMessageId: String(matchingAnalyze.id),
+    }
+    const analyzeIndex = messages.findIndex((item) => String(item.id) === String(analysisRun.value?.analyzeUserMessageId))
+    const response = analyzeIndex === -1 ? null : firstResponseForAnalyze(messages, sessionId, analyzeIndex)
+    if (response) analysisRun.value = { ...analysisRun.value, responseMessageId: String(response.id) }
+  }
 
   const restored = restoreLargeScreenImageTemplate(sessionId, messages)
   const reconciled = reconcileLargeScreenTemplateContext({
@@ -262,7 +300,9 @@ function onSessionMessagesChanged({ sessionId, messages }: { sessionId: string |
     activeTemplate.value = reconciled
     templateValidationError.value = ''
   }
-  if (analysisRun.value?.sessionId === sessionId && analysisRun.value.referenceFileId === reconciled.referenceFileId) {
+  if (analysisRun.value?.sessionId === sessionId
+    && analysisRun.value.referenceFileId === reconciled.referenceFileId
+    && analysisRun.value.analyzeUserMessageId === reconciled.analyzeUserMessageId) {
     analysisRun.value = null
   }
 }
@@ -295,9 +335,14 @@ async function retryAnalyze() {
   clearTemplateContext()
   referenceWorkflowActive.value = true
   pendingReferenceFile.value = verified
-  analysisRun.value = { sessionId: currentSessionId.value, referenceFileId: verified.id }
+  analysisRun.value = {
+    sessionId: currentSessionId.value,
+    referenceFileId: verified.id,
+    analyzeUserMessageId: null,
+    responseMessageId: null,
+  }
   const submission = createLargeScreenAnalyzeSubmission(verified)
-  if (!submission || !await chatRef.value?.submitExternalSubmission(submission)) {
+  if (!submission || !await chatRef.value?.submitExternalSubmission(submission, { consumeComposerOnSuccess: true })) {
     analysisRun.value = null
     message.error('识图请求发送失败，可重试。')
   }
@@ -323,10 +368,7 @@ function replaceReference() {
 }
 
 function messagePresentationAdapter(input: ChatMessagePresentationInput): ChatMessagePresentation {
-  if (input.role === 'assistant' && input.isStreaming && analysisIsCurrentSession()) {
-    return { kind: 'markdown', content: '正在识别布局与视觉系统' }
-  }
-  if (String(input.role) === 'error' && analysisIsCurrentSession()) analysisRun.value = null
+  if (String(input.role) === 'error' && analysisResponseMatches(input)) analysisRun.value = null
   const descriptor = classifyLargeScreenImagePresentation({ role: input.role, rawContent: input.rawContent })
   if (descriptor.kind === 'template') {
     const card = resolveLargeScreenTemplateCard({
@@ -342,7 +384,7 @@ function messagePresentationAdapter(input: ChatMessagePresentationInput): ChatMe
         template: card.template,
         referenceFile: card.editable ? activeTemplate.value?.referenceFile ?? null : null,
         editable: card.editable,
-        busy: card.editable && (analysisIsCurrentSession() || submittingGeneration.value),
+        busy: card.editable && submittingGeneration.value,
         validationError: card.editable ? templateValidationError.value : '',
         onUpdateTemplate: updateTemplate,
         onRetryAnalyze: retryAnalyze,
@@ -353,7 +395,7 @@ function messagePresentationAdapter(input: ChatMessagePresentationInput): ChatMe
     }
   }
   if (descriptor.kind === 'invalid-template') {
-    if (analysisIsCurrentSession()) analysisRun.value = null
+    if (analysisResponseMatches(input)) analysisRun.value = null
     return {
       kind: 'custom',
       component: LargeScreenImageTemplateErrorCard,

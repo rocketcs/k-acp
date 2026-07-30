@@ -19,6 +19,25 @@ export interface LargeScreenImageSubmission {
   attachedFiles?: UploadedFileItem[]
 }
 
+export interface LargeScreenAnalysisRunProvenance {
+  sessionId: string | null
+  referenceFileId: string
+  analyzeUserMessageId: string | null
+  responseMessageId: string | null
+}
+
+export function largeScreenAnalysisResponseMatches(input: {
+  run: LargeScreenAnalysisRunProvenance | null
+  currentSessionId: string | null
+  messageId: string
+}): boolean {
+  const { run, currentSessionId, messageId } = input
+  return run !== null
+    && run.sessionId === currentSessionId
+    && run.analyzeUserMessageId !== null
+    && run.responseMessageId === messageId
+}
+
 export function reconcileLargeScreenTemplateContext(input: {
   currentSessionId: string | null
   activeTemplate: ActiveLargeScreenTemplateContext | null
