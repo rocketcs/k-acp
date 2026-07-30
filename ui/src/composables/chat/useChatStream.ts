@@ -4,6 +4,7 @@ import { useAgentClient } from '@/composables/useAgentClient'
 import { usePlanTracking } from '@/composables/chat/usePlanTracking'
 import { buildToolCallsContent } from '@/utils/chat/format'
 import { composeTenderResponse, needsTenderFallback, normalizeUIPContent } from '@/utils/chat/uip'
+import { toAguiRuntimeMessages, type RuntimeChatMessage } from '@/utils/chat/runtimeMessages'
 import type {ChatMessageVO, RawEvent, RunActivity} from '@/types'
 import { useAccountStore } from '@/stores'
 import { stopRun } from '@/api/agui'
@@ -413,7 +414,7 @@ export function useChatStream(
   // 发送消息（可选传入 fileIds 覆盖，用于发送时已清空输入框的场景）
   const sendMessage = async (
     inputText: string,
-    messagesList: ChatMessageVO[],
+    messagesList: RuntimeChatMessage[],
     overrideFileIds?: string[]
   ) => {
     const effectiveFileIds = overrideFileIds ?? fileIds?.value ?? []
@@ -426,13 +427,7 @@ export function useChatStream(
     }
 
     // 构建 client 需要的消息格式
-    client.messages = messagesList
-      .filter((m) => !['system', 'tool'].includes(m.role))
-      .map((m) => ({
-        id: String(m.id),
-        role: m.role as any,
-        content: (m.content || '') as string
-      }))
+    client.messages = toAguiRuntimeMessages(messagesList)
 
     const forwardedProps = getForwardedProps()
     if (overrideFileIds !== undefined) {

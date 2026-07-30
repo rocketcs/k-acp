@@ -27,6 +27,7 @@ import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
 import type { DiyOutputFormat, DiyPageConfig } from '@/types'
 import { buildOutputInstruction } from '@/utils/diy/questionTemplate'
 import { prependChatAttachmentContent, splitChatAttachmentContent } from '@/utils/chat/messageContent'
+import { createRuntimeUserMessage } from '@/utils/chat/runtimeMessages'
 
 type ChatSubmissionInput = {
   text: string
@@ -502,7 +503,7 @@ async function submitMessage(options: ChatSubmission): Promise<boolean> {
 
     await sendMessage(
       options.runtimeText,
-      [{ id: userMsg.data.data.id, role: 'user', content: options.runtimeText }] as ChatMessageVO[],
+      [createRuntimeUserMessage(userMsg.data.data, options.runtimeText)],
       options.fileIds,
     )
     return true

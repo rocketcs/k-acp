@@ -1,18 +1,26 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import {
+  createRuntimeUserMessage,
+  toAguiRuntimeMessages,
+} from '../../utils/chat/runtimeMessages.ts'
 
-const chatSource = readFileSync(new URL('./index.vue', import.meta.url), 'utf8')
-const streamSource = readFileSync(new URL('../../composables/chat/useChatStream.ts', import.meta.url), 'utf8')
-const submitMessageSource = chatSource.slice(
-  chatSource.indexOf('async function submitMessage'),
-  chatSource.indexOf('\nfunction withAttachmentPrefix'),
-)
+test('serializes the persisted submit-message ID into the AG-UI runtime request', () => {
+  const persistedUserMessage = { id: '2082778000000000000' }
+  const runtimeText = '[large-screen-image action=analyze ratio=16:9 referenceFileId=2082729274554626051]\n自动识图'
 
-test('forwards the persisted user-message ID to the AG-UI runtime mapper', () => {
-  assert.match(
-    submitMessageSource,
-    /await sendMessage\(\s*options\.runtimeText,\s*\[\{\s*id:\s*userMsg\.data\.data\.id,\s*role:\s*'user',\s*content:\s*options\.runtimeText\s*}\] as ChatMessageVO\[\],/s,
-  )
-  assert.match(streamSource, /id:\s*String\(m\.id\),/)
+  const runtimeUserMessage = createRuntimeUserMessage(persistedUserMessage, runtimeText)
+  const [aguiMessage] = toAguiRuntimeMessages([runtimeUserMessage])
+
+  assert.deepEqual(runtimeUserMessage, {
+    id: '2082778000000000000',
+    role: 'user',
+    content: runtimeText,
+  })
+  assert.deepEqual(aguiMessage, {
+    id: '2082778000000000000',
+    role: 'user',
+    content: runtimeText,
+  })
+  assert.notEqual(aguiMessage?.id, 'undefined')
 })
