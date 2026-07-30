@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { classifyLargeScreenImagePresentation } from './messagePresentation.ts'
 
@@ -46,4 +47,12 @@ test('预期但非法的助手方案分类为安全错误', () => {
     role: 'assistant', rawContent: '```large-screen-image-plan\n{not-json}\n```',
   })
   assert.deepEqual(result, { kind: 'invalid-template', reason: '模板 JSON 无法解析' })
+})
+
+test('历史模板的重新识图按钮保持只读', () => {
+  const card = readFileSync(new URL('./LargeScreenImageTemplateCard.vue', import.meta.url), 'utf8')
+  assert.match(
+    card,
+    /@click="onRetryAnalyze"[^>]*:disabled="!editable \|\| busy"|:disabled="!editable \|\| busy"[^>]*@click="onRetryAnalyze"/,
+  )
 })

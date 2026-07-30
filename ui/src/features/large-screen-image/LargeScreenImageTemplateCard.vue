@@ -103,7 +103,7 @@ function toggleReplaceable(field: LargeScreenTemplateReplaceableField, checked: 
       <span class="large-screen-template-reference-name">{{ referenceFile?.name ?? '未关联参考图' }}</span>
       <button class="large-screen-template-button" type="button" :disabled="!editable || busy" @click="onRemoveReference">移除参考图</button>
       <button class="large-screen-template-button" type="button" :disabled="!editable || busy" @click="onReplaceReference">更换图片</button>
-      <button class="large-screen-template-button" type="button" :disabled="busy" @click="onRetryAnalyze">重新识图</button>
+      <button class="large-screen-template-button" type="button" :disabled="!editable || busy" @click="onRetryAnalyze">重新识图</button>
       <button class="large-screen-template-button large-screen-template-button-primary" type="button" :disabled="!editable || busy" @click="onGenerate">生成当前模板</button>
     </div>
 
