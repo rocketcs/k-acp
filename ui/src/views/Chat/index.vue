@@ -14,6 +14,7 @@ import ChatMain from '@/components/chat/ChatMain.vue'
 import RenameModal from '@/components/chat/RenameModal.vue'
 import WorkspacePanel from '@/components/workspace/WorkspacePanel.vue'
 import type { DisplayMessage, ChatMessageVO, UploadedFileItem, ChatSessionVO } from '@/types'
+import type { ChatAttachmentPolicy } from '@/composables/chat/useChatAttachments'
 import * as chatSessionApi from '@/api/chatSession'
 import * as agentDiyApi from '@/api/agentDiy'
 import { getActiveRuns, getStatus } from '@/api/agui'
@@ -25,10 +26,37 @@ import {
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
 import type { DiyOutputFormat, DiyPageConfig } from '@/types'
 import { buildOutputInstruction } from '@/utils/diy/questionTemplate'
+import { prependChatAttachmentContent, splitChatAttachmentContent } from '@/utils/chat/messageContent'
+
+type ChatSubmissionInput = {
+  text: string
+  fileIds: string[]
+}
+
+type ChatSubmission = {
+  displayText: string
+  persistedText?: string
+  runtimeText: string
+  titleText: string
+  fileIds: string[]
+  attachedFiles?: UploadedFileItem[]
+}
+
+type ChatMessageDisplayInput = {
+  role: string
+  content: string
+}
 
 const props = withDefaults(defineProps<{
   showAccount: boolean
   chatAgentId: string | null | undefined
+  submissionAdapter?: (input: ChatSubmissionInput) => ChatSubmission | null
+  messageDisplayAdapter?: (input: ChatMessageDisplayInput) => string
+  attachmentPolicy?: ChatAttachmentPolicy
+  attachmentDropEnabled?: boolean
+  attachmentAutoSubmitAdapter?: (input: ChatSubmissionInput & { uploadedFile: UploadedFileItem }) => ChatSubmission | null
+  onAttachmentRemoved?: (file: UploadedFileItem) => void
+  onSessionMessagesChanged?: (input: { sessionId: string | null; messages: readonly ChatMessageVO[] }) => void
 }>(), {
   showAccount: true,
   chatAgentId: null
@@ -164,6 +192,7 @@ const {
 
 // 输入框内容
 const inputText = ref('')
+const chatMainRef = ref<InstanceType<typeof ChatMain> | null>(null)
 
 // 记录最近一次流式消息的 ID，用于 DOM key 桥接，避免流式→保存切换时的闪烁
 const lastStreamingKey = ref<string | null>(null)
@@ -174,11 +203,14 @@ watch(streamingMessageId, (newId) => {
   }
 })
 
-/** 构建文件前缀字符串 */
-function buildFilesPrefix(files: UploadedFileItem[]): string {
-  if (!files.length) return ''
-  return JSON.stringify({ files }) + '@==##::::##==@'
-}
+watch(
+  [currentSessionId, messagesList, loadingMessages],
+  ([sessionId, messages, isLoading]) => {
+    if (isLoading) return
+    props.onSessionMessagesChanged?.({ sessionId, messages })
+  },
+  { deep: true, flush: 'post' },
+)
 
 // 构建展示消息
 const displayMessages = computed<DisplayMessage[]>(() => {
@@ -186,6 +218,8 @@ const displayMessages = computed<DisplayMessage[]>(() => {
   for (let i = 0; i < messagesList.value.length; i++) {
     const m = messagesList.value[i]
     if (!m || m.role === 'system' || m.role === 'thinking' || !m.content) continue
+    const { attachmentPrefix, text } = splitChatAttachmentContent(m.content)
+    const content = attachmentPrefix + (props.messageDisplayAdapter?.({ role: m.role, content: text }) ?? text)
 
     let displayId = String(m.id)
     // key 桥接：流式刚结束时，将最后一条 assistant 消息的展示 key 替换为流式 ID
@@ -199,7 +233,7 @@ const displayMessages = computed<DisplayMessage[]>(() => {
     list.push({
       id: displayId,
       role: m.role as DisplayMessage['role'],
-      content: m.content || '',
+      content,
       createdAt: m.createdAt,
       isStreaming: false,
     })
@@ -404,24 +438,19 @@ const handleVEPRetry = async (vepCode: string) => {
   await sendMessage(retryText, [{ id: 'vep', role: 'user', content: retryText }] as ChatMessageVO[])
 }
 
-async function submitMessage(options: {
-  displayText: string
-  runtimeText: string
-  titleText: string
-  fileIds?: string[]
-}) {
-  if (!agentId.value || isRunning.value) return
+async function submitMessage(options: ChatSubmission): Promise<boolean> {
+  if (!agentId.value || isRunning.value) return false
 
   if (!currentSessionId.value) {
     const newSession = await createSession(formatSessionTitle(options.titleText || '新对话'))
-    if (!newSession) return
+    if (!newSession) return false
     currentSessionId.value = String(newSession.id)
     currentSessionTitle.value = newSession.title || '新对话'
   }
 
   const userMsg = await chatSessionApi.appendMessage(currentSessionId.value, {
     role: 'user',
-    content: options.displayText,
+    content: options.persistedText ?? options.displayText,
   })
   if (messagesList.value.length <= 1) {
     const title = formatSessionTitle(options.titleText || '新对话')
@@ -435,6 +464,40 @@ async function submitMessage(options: {
     [{ role: 'user', content: options.runtimeText }] as ChatMessageVO[],
     options.fileIds,
   )
+  return true
+}
+
+function withAttachmentPrefix(submission: ChatSubmission, attachedFiles: UploadedFileItem[] | undefined): ChatSubmission {
+  if (!attachedFiles?.length) return submission
+  return {
+    ...submission,
+    displayText: prependChatAttachmentContent(attachedFiles, submission.displayText),
+    persistedText: prependChatAttachmentContent(attachedFiles, submission.persistedText ?? submission.displayText),
+  }
+}
+
+const completedAttachmentIds = new Set<string>()
+
+const handleAttachmentUploadComplete = (uploadedFile: UploadedFileItem) => {
+  if (uploadedFile.uploading || uploadedFile.id.startsWith('temp-') || completedAttachmentIds.has(uploadedFile.id)) return
+  completedAttachmentIds.add(uploadedFile.id)
+  const submission = props.attachmentAutoSubmitAdapter?.({
+    text: inputText.value.trim(),
+    fileIds: uploadedFiles.value.filter((file) => !file.uploading).map((file) => file.id),
+    uploadedFile,
+  })
+  if (!submission) return
+  void submitMessage(withAttachmentPrefix(submission, submission.attachedFiles ?? [uploadedFile]))
+}
+
+const handleAttachmentRemoved = (file: UploadedFileItem) => {
+  completedAttachmentIds.delete(file.id)
+  props.onAttachmentRemoved?.(file)
+}
+
+async function submitExternalSubmission(submission: ChatSubmission): Promise<boolean> {
+  if (!agentId.value || isRunning.value) return false
+  return submitMessage(withAttachmentPrefix(submission, submission.attachedFiles))
 }
 
 // 发送普通输入消息
@@ -444,18 +507,22 @@ const handleSend = async () => {
   const hasFiles = filesToSend.length > 0
   if ((!text && !hasFiles) || !agentId.value || isRunning.value) return
 
-  const finalText = hasFiles ? buildFilesPrefix(filesToSend) + text : text
   const fileIdsToSend = filesToSend.map((f) => f.id)
+  const submission = props.submissionAdapter
+    ? props.submissionAdapter({ text, fileIds: fileIdsToSend })
+    : {
+      displayText: text,
+      runtimeText: hasFiles ? prependChatAttachmentContent(filesToSend, text) : text,
+      titleText: text,
+      fileIds: fileIdsToSend,
+    }
+  if (!submission) return
 
   inputText.value = ''
   uploadedFiles.value = []
+  completedAttachmentIds.clear()
 
-  await submitMessage({
-    displayText: finalText,
-    runtimeText: finalText,
-    titleText: text,
-    fileIds: fileIdsToSend,
-  })
+  await submitMessage(withAttachmentPrefix(submission, filesToSend))
 }
 
 const handleQuickSend = async (payload: { text: string; outputFormat: DiyOutputFormat }) => {
@@ -465,6 +532,7 @@ const handleQuickSend = async (payload: { text: string; outputFormat: DiyOutputF
     displayText: text,
     runtimeText: `${text}\n\n${buildOutputInstruction(payload.outputFormat)}`,
     titleText: text,
+    fileIds: [],
   })
 }
 
@@ -578,6 +646,12 @@ watch(isRunning, (running) => {
   }
   runningSessions.value = next
 })
+
+const requestAttachmentPicker = () => {
+  chatMainRef.value?.requestAttachmentPicker()
+}
+
+defineExpose({ submitExternalSubmission, requestAttachmentPicker })
 </script>
 
 <template>
@@ -631,6 +705,10 @@ watch(isRunning, (running) => {
       :enable-memory="enableMemory"
       :enable-planning="enablePlanning"
       :allow-upload-file-type="allowFileType"
+      :attachment-policy="attachmentPolicy"
+      :attachment-drop-enabled="attachmentDropEnabled"
+      :on-upload-complete="handleAttachmentUploadComplete"
+      :on-attachment-removed="handleAttachmentRemoved"
       :agent-has-result="agentHasResult"
       :show-tool-process="showToolProcess"
       :tool-process-active="toolProcessActive"

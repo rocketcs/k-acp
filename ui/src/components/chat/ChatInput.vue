@@ -10,7 +10,7 @@ import { MessageOutlined } from '@ant-design/icons-vue'
 import ChatInputAttachments from './ChatInputAttachments.vue'
 import ChatInputEditor from './ChatInputEditor.vue'
 import ChatInputToolbar from './ChatInputToolbar.vue'
-import { useChatAttachments } from '@/composables/chat/useChatAttachments'
+import { useChatAttachments, type ChatAttachmentPolicy } from '@/composables/chat/useChatAttachments'
 import type { FlatFileItem } from '@/composables/chat/useWorkspaceFiles'
 import type { UploadedFileItem } from '@/types'
 
@@ -28,6 +28,11 @@ const props = withDefaults(
     toolProcessActive?: boolean
     showToolProcess?: boolean
     allowUploadFileType?: string[]
+    attachmentPolicy?: ChatAttachmentPolicy
+    /** 仅指定场景启用拖拽附件；普通 Chat 默认保持关闭。 */
+    attachmentDropEnabled?: boolean
+    onUploadComplete?: (file: UploadedFileItem) => void
+    onAttachmentRemoved?: (file: UploadedFileItem) => void
     sessionId?: string | null
     mentionAllowed?: boolean
     needInit?: boolean
@@ -40,6 +45,7 @@ const props = withDefaults(
     enablePlanning: false,
     toolProcessActive: false,
     showToolProcess: false,
+    attachmentDropEnabled: false,
     sessionId: null,
     mentionAllowed: false,
     needInit: false
@@ -62,14 +68,55 @@ const fileInputRef = ref<HTMLInputElement | null>()
 const editorRef = ref<InstanceType<typeof ChatInputEditor> | null>()
 
 /** 附件操作集合 */
-const { fileAcceptAttr, handleFileChange, removeFile } = useChatAttachments({
+const { fileAcceptAttr, handleFiles, handleFileChange, removeFile } = useChatAttachments({
   getFiles: () => props.uploadedFiles ?? [],
   setFiles: (files) => emit('update:uploadedFiles', files),
-  getAllowedTypes: () => props.allowUploadFileType
+  getAllowedTypes: () => props.allowUploadFileType,
+  getAttachmentPolicy: () => props.attachmentPolicy,
+  onUploadComplete: props.onUploadComplete,
+  onAttachmentRemoved: props.onAttachmentRemoved,
 })
 
 /** 当前 input accept 属性值 */
 const fileAccept = computed(() => fileAcceptAttr())
+const allowMultipleFiles = computed(() => props.attachmentPolicy?.maxFileCount !== 1)
+const dropActive = ref(false)
+
+const hasDraggedFiles = (event: DragEvent) =>
+  Array.from(event.dataTransfer?.types ?? []).includes('Files')
+
+const handleDragOver = (event: DragEvent) => {
+  if (!props.attachmentDropEnabled || !hasDraggedFiles(event)) return
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+  dropActive.value = true
+}
+
+const handleDragLeave = (event: DragEvent) => {
+  if (!props.attachmentDropEnabled || !dropActive.value) return
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const { clientX, clientY } = event
+  if (
+    clientX < rect.left ||
+    clientX >= rect.right ||
+    clientY < rect.top ||
+    clientY >= rect.bottom
+  ) {
+    dropActive.value = false
+  }
+}
+
+const handleDrop = (event: DragEvent) => {
+  if (!props.attachmentDropEnabled || !hasDraggedFiles(event)) return
+  event.preventDefault()
+  dropActive.value = false
+  void handleFiles(Array.from(event.dataTransfer?.files ?? []))
+}
+
+/** 仅由显式暴露的功能包装器调用；普通 Chat 不会主动打开选择器。 */
+const requestAttachmentPicker = () => {
+  fileInputRef.value?.click()
+}
 
 /**
  * 综合判断是否允许触发发送：
@@ -104,6 +151,8 @@ onMounted(() => {
     })
   })
 })
+
+defineExpose({ requestAttachmentPicker })
 </script>
 
 <template>
@@ -116,9 +165,12 @@ onMounted(() => {
   <div class="chat-input-stage" :class="{ 'is-ready': animationsReady }">
     <div
       class="chat-input-shell"
-      :class="{ 'is-collapsed': needInit }"
+      :class="{ 'is-collapsed': needInit, 'is-drop-active': attachmentDropEnabled && dropActive }"
       role="presentation"
       @click="needInit ? emit('newSession') : undefined"
+      @dragover="handleDragOver"
+      @dragleave="handleDragLeave"
+      @drop="handleDrop"
     >
     <!-- 折叠态贴面：绝对定位，随容器同步变形 -->
     <div class="chat-welcome-face" :aria-hidden="!needInit">
@@ -129,12 +181,20 @@ onMounted(() => {
 
     <!-- 展开态内容：高度随容器裁剪，透明度与轻位移着色 -->
     <div class="chat-input-body" :inert="needInit">
+      <div
+        v-if="attachmentDropEnabled && dropActive"
+        class="chat-input-drop-hint"
+        role="status"
+        aria-live="polite"
+      >
+        松开即可上传图片
+      </div>
       <input
         ref="fileInputRef"
         type="file"
         class="chat-file-input-hidden"
         :accept="fileAccept"
-        multiple
+        :multiple="allowMultipleFiles"
         @change="handleFileChange"
       />
 
@@ -168,7 +228,7 @@ onMounted(() => {
         @memory="(v) => emit('memory', v)"
         @tool-process="(v) => emit('toolProcess', v)"
         @mention-trigger="editorRef?.triggerMention()"
-        @pick-file="fileInputRef?.click()"
+        @pick-file="requestAttachmentPicker"
         @send="emit('send')"
         @abort="emit('abort')"
       />
@@ -233,6 +293,12 @@ onMounted(() => {
   &:focus-within {
     border-color: $chat-primary;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 0 0 2px rgba($chat-primary, 0.1);
+  }
+
+  &.is-drop-active {
+    border-color: $chat-primary;
+    background-color: rgba($chat-primary, 0.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 0 0 3px rgba($chat-primary, 0.14);
   }
 
   // 折叠态：同一容器收敛为按钮形态
@@ -348,6 +414,20 @@ onMounted(() => {
   opacity: 1;
   transform: translateY(0);
   z-index: 2;
+}
+
+.chat-input-drop-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: rgba($chat-primary, 0.08);
+  color: $chat-primary;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  pointer-events: none;
 }
 
 .chat-input-stage.is-ready .chat-input-body {

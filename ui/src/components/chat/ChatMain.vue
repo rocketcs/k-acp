@@ -12,6 +12,7 @@ import ChatInput from './ChatInput.vue'
 import Welcome from './Welcome.vue'
 import PlanPanel from './PlanPanel.vue'
 import type { DisplayMessage, UploadedFileItem, PlanInfo, DiyOutputFormat, DiyPageConfig, RunActivity } from '@/types'
+import type { ChatAttachmentPolicy } from '@/composables/chat/useChatAttachments'
 import type {FlatFileItem} from "@/composables/chat/useWorkspaceFiles.ts";
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
 import WorkspaceFilePreview from "@/components/workspace/WorkspaceFilePreview.vue";
@@ -39,6 +40,10 @@ const props = defineProps<{
   toolProcessActive?: boolean
   showToolProcess?: boolean
   allowUploadFileType?: string[]
+  attachmentPolicy?: ChatAttachmentPolicy
+  attachmentDropEnabled?: boolean
+  onUploadComplete?: (file: UploadedFileItem) => void
+  onAttachmentRemoved?: (file: UploadedFileItem) => void
   agentHasResult?: boolean
   workspacePanelOpen?: boolean
   hasCodeExecutionConfig?: boolean
@@ -88,6 +93,8 @@ const savedScrollTop = ref(0)
 
 const workspaceFilePreviewVisible = ref(false)
 const workspaceFilePreviewNode = ref<FlatFileItem | null>(null)
+const welcomeRef = ref<InstanceType<typeof Welcome> | null>(null)
+const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const showRunActivity = computed(() =>
   shouldShowRunActivity(props.isDiyChat, props.isRunning, props.hasVisibleAnswer),
 )
@@ -237,9 +244,15 @@ onMounted(() => {
 })
 
 // 暴露方法给父组件（如果需要）
-defineExpose({
-  scrollToBottom
-})
+const requestAttachmentPicker = () => {
+  if (props.messageSize <= 1) {
+    welcomeRef.value?.requestAttachmentPicker()
+  } else {
+    chatInputRef.value?.requestAttachmentPicker()
+  }
+}
+
+defineExpose({ scrollToBottom, requestAttachmentPicker })
 </script>
 
 <template>
@@ -273,6 +286,7 @@ defineExpose({
 
     <div v-if="messageSize <= 1" class="chat-welcome-container">
       <Welcome
+        ref="welcomeRef"
         :message-size="messageSize"
         :headline="welcomeHeadline"
         :input-value="inputValue"
@@ -290,6 +304,10 @@ defineExpose({
         :enable-memory="enableMemory"
         :enable-planning="enablePlanning"
         :allow-upload-file-type="allowUploadFileType"
+        :attachment-policy="attachmentPolicy"
+        :attachment-drop-enabled="attachmentDropEnabled"
+        :on-upload-complete="onUploadComplete"
+        :on-attachment-removed="onAttachmentRemoved"
         :show-tool-process="showToolProcess"
         :tool-process-active="toolProcessActive"
         :session-id="sessionId"
@@ -356,6 +374,7 @@ defineExpose({
       <div class="chat-main-input-wrap" v-if="!sessionMessageTable && showInput">
         <div class="chat-input-outer">
           <ChatInput
+            ref="chatInputRef"
             :model-value="inputValue"
             :agent-id="agentId"
             :uploaded-files="uploadedFiles"
@@ -365,6 +384,10 @@ defineExpose({
             :enable-memory="enableMemory"
             :enable-planning="enablePlanning"
             :allow-upload-file-type="allowUploadFileType"
+            :attachment-policy="attachmentPolicy"
+            :attachment-drop-enabled="attachmentDropEnabled"
+            :on-upload-complete="onUploadComplete"
+            :on-attachment-removed="onAttachmentRemoved"
             :show-tool-process="showToolProcess"
             :tool-process-active="toolProcessActive"
             :session-id="sessionId"

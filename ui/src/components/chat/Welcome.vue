@@ -4,7 +4,8 @@ import { computed, ref } from 'vue'
 import DiyWelcome from './DiyWelcome.vue'
 import AgentRunActivity from './AgentRunActivity.vue'
 import AgentRunWaiting from './AgentRunWaiting.vue'
-import type { DiyOutputFormat, DiyPageConfig, RunActivity } from '@/types'
+import type { ChatAttachmentPolicy } from '@/composables/chat/useChatAttachments'
+import type { DiyOutputFormat, DiyPageConfig, RunActivity, UploadedFileItem } from '@/types'
 
 const props = defineProps<{
   messageSize: number
@@ -26,6 +27,10 @@ const props = defineProps<{
   toolProcessActive?: boolean
   showToolProcess?: boolean
   allowUploadFileType?: string[]
+  attachmentPolicy?: ChatAttachmentPolicy
+  attachmentDropEnabled?: boolean
+  onUploadComplete?: (file: UploadedFileItem) => void
+  onAttachmentRemoved?: (file: UploadedFileItem) => void
   sessionId?: string | null
   mentionAllowed?: boolean
   hasCodeExecutionConfig?: boolean
@@ -49,8 +54,15 @@ defineEmits<{
 }>()
 
 const diyFormActive = ref(false)
+const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const resolvedHeadline = computed(() => props.diyConfig?.headline || props.headline)
 const resolvedDescription = computed(() => props.diyConfig?.description || props.description)
+
+const requestAttachmentPicker = () => {
+  chatInputRef.value?.requestAttachmentPicker()
+}
+
+defineExpose({ requestAttachmentPicker })
 </script>
 
 <template>
@@ -82,6 +94,7 @@ const resolvedDescription = computed(() => props.diyConfig?.description || props
     />
     <div v-if="!diyFormActive && showInput !== false" class="chat-input-outer chat-welcome-input">
       <ChatInput
+        ref="chatInputRef"
         :model-value="inputValue"
         :agent-id="agentId"
         :uploaded-files="uploadedFiles"
@@ -92,6 +105,10 @@ const resolvedDescription = computed(() => props.diyConfig?.description || props
         :enable-memory="enableMemory"
         :enable-planning="enablePlanning"
         :allow-upload-file-type="allowUploadFileType"
+        :attachment-policy="attachmentPolicy"
+        :attachment-drop-enabled="attachmentDropEnabled"
+        :on-upload-complete="onUploadComplete"
+        :on-attachment-removed="onAttachmentRemoved"
         :show-tool-process="showToolProcess"
         :tool-process-active="toolProcessActive"
         :session-id="sessionId"
