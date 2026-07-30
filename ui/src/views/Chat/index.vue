@@ -502,7 +502,7 @@ async function submitMessage(options: ChatSubmission): Promise<boolean> {
 
     await sendMessage(
       options.runtimeText,
-      [{ role: 'user', content: options.runtimeText }] as ChatMessageVO[],
+      [{ id: userMsg.data.data.id, role: 'user', content: options.runtimeText }] as ChatMessageVO[],
       options.fileIds,
     )
     return true
