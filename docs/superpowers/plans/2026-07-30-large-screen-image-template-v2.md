@@ -549,6 +549,10 @@ git commit -m "feat: render editable large screen templates in chat"
 ## Task 5: Integrate the active template with large-screen generation
 
 **Files:**
+- Modify: ui/src/views/Chat/index.vue
+- Modify: ui/src/components/chat/ChatMain.vue
+- Modify: ui/src/components/chat/Welcome.vue
+- Modify: ui/src/components/chat/ChatInput.vue
 - Modify: ui/src/features/large-screen-image/LargeScreenImageChat.vue
 - Modify: ui/src/features/large-screen-image/submission.ts
 - Modify: ui/src/features/large-screen-image/submission.test.ts
@@ -586,9 +590,11 @@ LargeScreenImageChat owns activeTemplate and a Chat ref exposing submitExternalS
 - onAttachmentRemoved: clears a matching pending/active context and its draft;
 - messagePresentationAdapter: supplies update/retry/generate callbacks to the card.
 
-Before normal or card generation, call attachApi.selectOne(active reference ID) and permit only png/jpg/jpeg/webp. On lookup/type failure clear the context and show “参考图已失效，请重新上传。”.
+Extend the default-disabled `submissionAdapter` contract to accept `ChatSubmission | null | Promise<ChatSubmission | null>`. In Chat/index.vue, await it under a local submitting guard before clearing the composer/attachments and invoking the existing `submitMessage` path; rejected validation returns null and leaves the input editable, while a successful compilation follows the normal single-send/clear lifecycle. Ordinary synchronous adapters and the absent-adapter path remain unchanged.
 
-The card must show a reference chip with “移除参考图” and “更换图片”. Removing calls existing attachApi.remove([referenceFileId]), clears state/draft even if deletion reports an error, and does not cause a text-to-image fallback. “更换图片” calls Chat’s exposed `requestAttachmentPicker()`; its successful upload invalidates the old context before the new analysis starts. “重新识图” calls `submitExternalSubmission(createLargeScreenAnalyzeSubmission(referenceFile))`; that submission supplies `attachedFiles: [referenceFile]`. Close the visible analysis loading state when a matching template becomes valid, a matching invalid-plan card appears, the run reports an error, or the active reference is removed.
+Before normal or card generation, call `attachApi.selectOne(active reference ID)` and permit only png/jpg/jpeg/webp. On lookup/type failure clear the context and show “参考图已失效，请重新上传。”. Never compile a context whose `sessionId` differs from the current callback session. When hydration has no valid context for its current session, clear any prior session context instead of retaining it. Card editability compares all four provenance values only; for a matching active card, render its mutable active draft rather than the original persisted template. Bind analysis loading state to the session and reference ID, and only clear it for matching results.
+
+The card must show a reference chip with “移除参考图” and “更换图片”. Removing calls existing attachApi.remove([referenceFileId]), clears state/draft even if deletion reports an error, and does not cause a text-to-image fallback. `requestAttachmentPicker({ replace: true })` clears only the local composer attachment list before opening the existing picker, so maxFileCount=1 accepts the new file without deleting the current reference prematurely; its successful upload invalidates the old context before the new analysis starts. “重新识图” calls `submitExternalSubmission(createLargeScreenAnalyzeSubmission(referenceFile))`; that submission supplies `attachedFiles: [referenceFile]`. Close the visible analysis loading state when a matching template becomes valid, a matching invalid-plan card appears, the run reports an error, or the active reference is removed.
 
 - [ ] **Step 4: Compile v2 generation**
 
@@ -613,7 +619,7 @@ Expected: all feature tests pass and the existing route still resolves the same 
 - [ ] **Step 6: Commit only Task 5**
 
 ~~~bash
-git add ui/src/features/large-screen-image/LargeScreenImageChat.vue ui/src/features/large-screen-image/submission.ts ui/src/features/large-screen-image/submission.test.ts ui/src/features/large-screen-image/messageDisplay.ts ui/src/features/large-screen-image/messageDisplay.test.ts
+git add ui/src/views/Chat/index.vue ui/src/components/chat/ChatMain.vue ui/src/components/chat/Welcome.vue ui/src/components/chat/ChatInput.vue ui/src/features/large-screen-image/LargeScreenImageChat.vue ui/src/features/large-screen-image/submission.ts ui/src/features/large-screen-image/submission.test.ts ui/src/features/large-screen-image/messageDisplay.ts ui/src/features/large-screen-image/messageDisplay.test.ts
 git diff --cached --check
 git diff --cached --name-only
 git commit -m "feat: preserve large screen template across generation"
