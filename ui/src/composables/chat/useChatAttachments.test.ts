@@ -221,3 +221,22 @@ test('notifies after local removal even when the configured removal callback fai
   assert.equal(observedLocalRemoval, true)
   assert.deepEqual(files, [])
 })
+
+test('keeps completion and removal hooks opt-in when callbacks are omitted', async () => {
+  const files: Array<Record<string, unknown>> = []
+  const attachments = useChatAttachments({
+    getFiles: () => files,
+    setFiles: (updated) => {
+      files.splice(0, files.length, ...updated)
+    },
+    getAllowedTypes: () => undefined,
+    uploadFile: async () => '2082729274554626051',
+    removeFiles: async () => {},
+  })
+
+  await attachments.handleFiles([file('reference.png', 'image/png')] as File[])
+  assert.deepEqual(files.map((item) => item.id), ['2082729274554626051'])
+
+  await attachments.removeFile(files[0] as never)
+  assert.deepEqual(files, [])
+})

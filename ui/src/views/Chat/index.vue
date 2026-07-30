@@ -193,6 +193,8 @@ const {
 // 输入框内容
 const inputText = ref('')
 const chatMainRef = ref<InstanceType<typeof ChatMain> | null>(null)
+/** Newly-created sessions cannot notify feature hooks until their first persisted user message is present. */
+const createdSessionPersistedMessageIds = new Map<string, string | null>()
 
 // 记录最近一次流式消息的 ID，用于 DOM key 桥接，避免流式→保存切换时的闪烁
 const lastStreamingKey = ref<string | null>(null)
@@ -206,7 +208,12 @@ watch(streamingMessageId, (newId) => {
 watch(
   [currentSessionId, messagesList, loadingMessages],
   ([sessionId, messages, isLoading]) => {
-    if (isLoading) return
+    const persistedMessageId = sessionId === null ? undefined : createdSessionPersistedMessageIds.get(sessionId)
+    if (
+      isLoading
+      || persistedMessageId === null
+      || (persistedMessageId !== undefined && !messages.some((message) => String(message.id) === persistedMessageId))
+    ) return
     props.onSessionMessagesChanged?.({ sessionId, messages })
   },
   { deep: true, flush: 'post' },
@@ -441,30 +448,40 @@ const handleVEPRetry = async (vepCode: string) => {
 async function submitMessage(options: ChatSubmission): Promise<boolean> {
   if (!agentId.value || isRunning.value) return false
 
-  if (!currentSessionId.value) {
-    const newSession = await createSession(formatSessionTitle(options.titleText || '新对话'))
-    if (!newSession) return false
-    currentSessionId.value = String(newSession.id)
-    currentSessionTitle.value = newSession.title || '新对话'
-  }
+  let createdSessionId: string | null = null
+  try {
+    if (!currentSessionId.value) {
+      const newSession = await createSession(formatSessionTitle(options.titleText || '新对话'))
+      if (!newSession) return false
+      createdSessionId = String(newSession.id)
+      createdSessionPersistedMessageIds.set(createdSessionId, null)
+      currentSessionId.value = createdSessionId
+      currentSessionTitle.value = newSession.title || '新对话'
+    }
 
-  const userMsg = await chatSessionApi.appendMessage(currentSessionId.value, {
-    role: 'user',
-    content: options.persistedText ?? options.displayText,
-  })
-  if (messagesList.value.length <= 1) {
-    const title = formatSessionTitle(options.titleText || '新对话')
-    await updateSessionTitle(currentSessionId.value, title)
-    currentSessionTitle.value = title
-  }
-  messagesList.value.push(userMsg.data.data)
+    const userMsg = await chatSessionApi.appendMessage(currentSessionId.value, {
+      role: 'user',
+      content: options.persistedText ?? options.displayText,
+    })
+    if (createdSessionId) {
+      createdSessionPersistedMessageIds.set(createdSessionId, String(userMsg.data.data.id))
+    }
+    if (messagesList.value.length <= 1) {
+      const title = formatSessionTitle(options.titleText || '新对话')
+      await updateSessionTitle(currentSessionId.value, title)
+      currentSessionTitle.value = title
+    }
+    messagesList.value.push(userMsg.data.data)
 
-  await sendMessage(
-    options.runtimeText,
-    [{ role: 'user', content: options.runtimeText }] as ChatMessageVO[],
-    options.fileIds,
-  )
-  return true
+    await sendMessage(
+      options.runtimeText,
+      [{ role: 'user', content: options.runtimeText }] as ChatMessageVO[],
+      options.fileIds,
+    )
+    return true
+  } catch {
+    return false
+  }
 }
 
 function withAttachmentPrefix(submission: ChatSubmission, attachedFiles: UploadedFileItem[] | undefined): ChatSubmission {
@@ -491,13 +508,17 @@ const handleAttachmentUploadComplete = (uploadedFile: UploadedFileItem) => {
 }
 
 const handleAttachmentRemoved = (file: UploadedFileItem) => {
-  completedAttachmentIds.delete(file.id)
+  if (props.attachmentAutoSubmitAdapter) completedAttachmentIds.delete(file.id)
   props.onAttachmentRemoved?.(file)
 }
 
 async function submitExternalSubmission(submission: ChatSubmission): Promise<boolean> {
   if (!agentId.value || isRunning.value) return false
-  return submitMessage(withAttachmentPrefix(submission, submission.attachedFiles))
+  try {
+    return await submitMessage(withAttachmentPrefix(submission, submission.attachedFiles))
+  } catch {
+    return false
+  }
 }
 
 // 发送普通输入消息
@@ -707,8 +728,8 @@ defineExpose({ submitExternalSubmission, requestAttachmentPicker })
       :allow-upload-file-type="allowFileType"
       :attachment-policy="attachmentPolicy"
       :attachment-drop-enabled="attachmentDropEnabled"
-      :on-upload-complete="handleAttachmentUploadComplete"
-      :on-attachment-removed="handleAttachmentRemoved"
+      :on-upload-complete="attachmentAutoSubmitAdapter ? handleAttachmentUploadComplete : undefined"
+      :on-attachment-removed="attachmentAutoSubmitAdapter || onAttachmentRemoved ? handleAttachmentRemoved : undefined"
       :agent-has-result="agentHasResult"
       :show-tool-process="showToolProcess"
       :tool-process-active="toolProcessActive"
