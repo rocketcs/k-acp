@@ -13,7 +13,7 @@ import ChatSidebar from '@/components/chat/ChatSidebar.vue'
 import ChatMain from '@/components/chat/ChatMain.vue'
 import RenameModal from '@/components/chat/RenameModal.vue'
 import WorkspacePanel from '@/components/workspace/WorkspacePanel.vue'
-import type { DisplayMessage, ChatMessageVO, UploadedFileItem, ChatSessionVO } from '@/types'
+import type { DisplayMessage, ChatMessageVO, UploadedFileItem, ChatSessionVO, ChatMessagePresentation, ChatMessagePresentationInput } from '@/types'
 import type { ChatAttachmentPolicy } from '@/composables/chat/useChatAttachments'
 import * as chatSessionApi from '@/api/chatSession'
 import * as agentDiyApi from '@/api/agentDiy'
@@ -52,6 +52,7 @@ const props = withDefaults(defineProps<{
   chatAgentId: string | null | undefined
   submissionAdapter?: (input: ChatSubmissionInput) => ChatSubmission | null
   messageDisplayAdapter?: (input: ChatMessageDisplayInput) => string
+  messagePresentationAdapter?: (input: ChatMessagePresentationInput) => ChatMessagePresentation
   attachmentPolicy?: ChatAttachmentPolicy
   attachmentDropEnabled?: boolean
   attachmentAutoSubmitAdapter?: (input: ChatSubmissionInput & { uploadedFile: UploadedFileItem }) => ChatSubmission | null
@@ -237,21 +238,42 @@ const displayMessages = computed<DisplayMessage[]>(() => {
       }
     }
 
-    list.push({
+    const presentation = props.messagePresentationAdapter?.({
       id: displayId,
       role: m.role as DisplayMessage['role'],
       content,
+      rawContent: m.content,
+      isStreaming: false,
+      isCurrent: i === messagesList.value.length - 1,
+    })
+    const displayContent = presentation?.kind === 'markdown' ? presentation.content : content
+    list.push({
+      id: displayId,
+      role: m.role as DisplayMessage['role'],
+      content: displayContent,
       createdAt: m.createdAt,
       isStreaming: false,
+      presentation,
     })
   }
 
   if (streamingMessageId.value && streamingRole.value !== 'thinking') {
+    const content = streamingContent.value
+    const presentation = props.messagePresentationAdapter?.({
+      id: streamingMessageId.value,
+      role: streamingRole.value,
+      content,
+      rawContent: content,
+      isStreaming: true,
+      isCurrent: true,
+    })
+    const displayContent = presentation?.kind === 'markdown' ? presentation.content : content
     list.push({
       id: streamingMessageId.value,
       role: streamingRole.value,
-      content: streamingContent.value,
+      content: displayContent,
       isStreaming: true,
+      presentation,
     })
   }  else {
     // 响应加载动画（没有任何推理或文本内容时）
@@ -261,6 +283,9 @@ const displayMessages = computed<DisplayMessage[]>(() => {
         role: 'assistant',
         content: '',
         isStreaming: true,
+        presentation: props.messagePresentationAdapter?.({
+          id: '', role: 'assistant', content: '', rawContent: '', isStreaming: true, isCurrent: true,
+        }),
       })
     }
   }

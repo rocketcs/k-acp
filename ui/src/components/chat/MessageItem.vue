@@ -6,6 +6,7 @@ import MediaIcon from '@/components/common/MediaIcon.vue'
 import MarkdownRenderer from "@/components/markdown/MarkdownRenderer.vue";
 import TaggedContentRenderer from './TaggedContentRenderer.vue';
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
+import type { ChatMessagePresentation } from '@/types'
 import { splitChatAttachmentContent } from '@/utils/chat/messageContent'
 
 /** 从文件名解析扩展名（小写） */
@@ -62,6 +63,7 @@ const props = defineProps<{
   agentHasResult?: boolean
   isStreaming?: boolean
   isDiyChat?: boolean
+  presentation?: ChatMessagePresentation
 }>()
 
 defineEmits<{
@@ -237,7 +239,13 @@ const openPreview = (index: number) => {
         </div>
         <!-- 正文内容 -->
         <div v-if="isAssistant" class="chat-md-content">
+          <component
+            v-if="isAssistant && presentation?.kind === 'custom'"
+            :is="presentation.component"
+            v-bind="presentation.props"
+          />
           <MarkdownRenderer
+            v-else
             :content="content"
             :is-streaming="isStreaming"
             :is-diy-chat="isDiyChat"

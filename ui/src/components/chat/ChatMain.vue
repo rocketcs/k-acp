@@ -351,7 +351,7 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
           />
           <MessageList
             :agent-has-result="agentHasResult"
-            :messages="messages"
+            :messages="props.messages"
             :tool-calls="toolCalls"
             :run-activities="runActivities"
             :is-diy-chat="isDiyChat"
