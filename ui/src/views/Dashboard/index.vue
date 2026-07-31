@@ -1,11 +1,17 @@
 <script setup lang="ts">
 /**
- * 工作台页面
+ * 工作台页面：保留本地快捷入口，并渲染上游可配置数据看板。
  *
  * @author huxuehao
  */
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAccountStore } from '@/stores'
+import { EditOutlined } from '@ant-design/icons-vue'
+import { useAccountStore, useDashboardStore } from '@/stores'
+import { registerBuiltinPanels } from '@/components/dashboard/panels'
+import DashboardGrid from '@/components/dashboard/DashboardGrid.vue'
+import DashboardEmpty from '@/components/dashboard/DashboardEmpty.vue'
+import { RouteNames } from '@/router/constants'
 import agentAvatar from '@/assets/avatar/agent.png'
 import workflowAvatar from '@/assets/avatar/workflow.png'
 import knowledgeAvatar from '@/assets/avatar/knowledgebase.png'
@@ -30,8 +36,14 @@ interface EntryGroup {
   items: QuickEntry[]
 }
 
+registerBuiltinPanels()
+
 const router = useRouter()
 const accountStore = useAccountStore()
+const dashboardStore = useDashboardStore()
+
+const dsl = computed(() => dashboardStore.portal?.config || null)
+const hasPanels = computed(() => (dsl.value?.panels?.length || 0) > 0)
 
 const entryGroups: EntryGroup[] = [
   {
@@ -61,6 +73,14 @@ const entryGroups: EntryGroup[] = [
 function openEntry(item: QuickEntry) {
   router.push(item.path)
 }
+
+function goDesigner() {
+  router.push({ name: RouteNames.DASHBOARD_DESIGN })
+}
+
+onMounted(() => {
+  dashboardStore.loadPortal()
+})
 </script>
 
 <script lang="ts">
@@ -79,6 +99,31 @@ export default {
       <p class="welcome-desc">
         从常用模块开始，创建并管理您的 AI 应用。
       </p>
+    </section>
+
+    <section class="dashboard-portal">
+      <div class="portal-header">
+        <div class="portal-intro">
+          <h2 class="portal-title">数据看板</h2>
+          <p class="portal-desc text-secondary">
+            工作台是你的专属数据门户，可自由编排图表、指标与表格面板，基于数据集实时呈现关键业务视图。
+          </p>
+        </div>
+        <div class="portal-actions">
+          <a-button type="text" @click="goDesigner">
+            <template #icon><EditOutlined /></template>
+            设计器
+          </a-button>
+        </div>
+      </div>
+
+      <div class="portal-body">
+        <a-spin v-if="dashboardStore.loading" />
+        <template v-else-if="dsl && hasPanels">
+          <DashboardGrid :dsl="dsl" />
+        </template>
+        <DashboardEmpty v-else @create="goDesigner" />
+      </div>
     </section>
 
     <section
@@ -153,6 +198,53 @@ export default {
   margin: 0;
   color: #69707d;
   font-size: 14px;
+}
+
+.dashboard-portal {
+  display: flex;
+  flex-direction: column;
+  min-height: 260px;
+  margin-bottom: 24px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #eceef2;
+  border-radius: 16px;
+}
+
+.portal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 24px 8px;
+}
+
+.portal-intro {
+  flex: 1;
+  min-width: 0;
+}
+
+.portal-title {
+  margin: 0 0 var(--spacing-sm) 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+}
+
+.portal-desc {
+  max-width: 800px;
+  margin: 0;
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+}
+
+.portal-actions {
+  flex-shrink: 0;
+}
+
+.portal-body {
+  flex: 1;
+  padding: 16px 10px;
 }
 
 .entry-section {
@@ -272,6 +364,12 @@ export default {
   .welcome-section,
   .entry-section {
     padding: 20px;
+  }
+
+  .portal-header {
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px 20px 8px;
   }
 
   .entry-grid {
