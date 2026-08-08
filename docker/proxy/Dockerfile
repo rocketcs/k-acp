@@ -1,5 +1,6 @@
-ARG MAVEN_IMAGE=maven:3.9-eclipse-temurin-21
-ARG JRE_IMAGE=eclipse-temurin:21-jre
+ARG MAVEN_IMAGE=docker.m.daocloud.io/library/maven:3.9-eclipse-temurin-21
+ARG JRE_IMAGE=docker.m.daocloud.io/library/eclipse-temurin:21-jre
+ARG NODE_IMAGE=docker.m.daocloud.io/library/node:22-bookworm-slim
 # ============================================================
 # 阶段一：Maven 构建
 # ============================================================
@@ -60,6 +61,9 @@ RUN mvn dependency:go-offline -pl runner-proxy -am -DskipTests -q
 COPY . .
 RUN mvn package -pl runner-proxy -am -DskipTests -q
 
+# 国内 Node.js 运行时，避免运行镜像访问 NodeSource
+FROM ${NODE_IMAGE} AS node-runtime
+
 # ============================================================
 # 阶段二：运行镜像（JRE + Python + Node.js）
 # ============================================================
@@ -68,6 +72,14 @@ FROM ${JRE_IMAGE}
 
 WORKDIR /app
 
+# 仅复制 Node.js、npm 及其运行库，不在运行镜像中执行 NodeSource 安装脚本
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-runtime /usr/local/bin/npm /usr/local/bin/npm
+COPY --from=node-runtime /usr/local/bin/npx /usr/local/bin/npx
+COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sfn /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
+    ln -sfn /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+
 # 以非root运行可缩小内核攻击面，配合cap_drop=ALL和no-new-privileges，阻断容器→宿主机逃逸路径
 RUN groupadd -r shellproxy -g 1002 && \
     useradd -r -g shellproxy -u 1002 -m -s /sbin/nologin -d /app shellproxy && \
@@ -75,7 +87,19 @@ RUN groupadd -r shellproxy -g 1002 && \
 
 # ---------- 安装运行环境依赖 ----------
 # Python 3 + Node.js 22 + gosu（容器降权启动工具）
-RUN apt-get update && \
+RUN set -eux; \
+    for source_file in /etc/apt/sources.list /etc/apt/sources.list.d/*; do \
+        if [ -f "$source_file" ]; then \
+            sed -i \
+                -e 's|deb.debian.org|mirrors.aliyun.com|g' \
+                -e 's|security.debian.org|mirrors.aliyun.com|g' \
+                -e 's|ports.ubuntu.com/ubuntu-ports|mirrors.aliyun.com/ubuntu-ports|g' \
+                -e 's|archive.ubuntu.com/ubuntu|mirrors.aliyun.com/ubuntu|g' \
+                -e 's|security.ubuntu.com/ubuntu|mirrors.aliyun.com/ubuntu|g' \
+                "$source_file"; \
+        fi; \
+    done; \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
         python3 \
         python3-pip \
@@ -84,9 +108,8 @@ RUN apt-get update && \
         curl \
         ca-certificates \
     && ln -sf /usr/bin/python3 /usr/bin/python \
-    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # 验证运行时
 RUN python --version && node --version && npm --version && gosu --version

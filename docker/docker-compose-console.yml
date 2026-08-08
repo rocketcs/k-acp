@@ -11,8 +11,8 @@ services:
       context: ..
       dockerfile: docker/console/Dockerfile
       args:
-        MAVEN_IMAGE: ${DOCKER_REGISTRY}maven:3.9-eclipse-temurin-21
-        JRE_IMAGE: ${DOCKER_REGISTRY}eclipse-temurin:21-jre
+        MAVEN_IMAGE: docker.m.daocloud.io/library/maven:3.9-eclipse-temurin-21
+        JRE_IMAGE: docker.m.daocloud.io/library/eclipse-temurin:21-jre
     container_name: apboa-console
     restart: unless-stopped
     # root 运行（业务可信服务，容器隔离承担安全边界），无 cap/security 限制
@@ -49,8 +49,8 @@ services:
       context: ..
       dockerfile: docker/websocket/Dockerfile
       args:
-        MAVEN_IMAGE: ${DOCKER_REGISTRY}maven:3.9-eclipse-temurin-21
-        JRE_IMAGE: ${DOCKER_REGISTRY}eclipse-temurin:21-jre
+        MAVEN_IMAGE: docker.m.daocloud.io/library/maven:3.9-eclipse-temurin-21
+        JRE_IMAGE: docker.m.daocloud.io/library/eclipse-temurin:21-jre
     container_name: apboa-websocket
     restart: unless-stopped
     mem_limit: ${WEBSOCKET_MEM_LIMIT:-1g}
@@ -75,8 +75,8 @@ services:
       context: ..
       dockerfile: docker/frontend/Dockerfile
       args:
-        NODE_IMAGE: ${DOCKER_REGISTRY}node:22
-        NGINX_IMAGE: ${DOCKER_REGISTRY}nginx:alpine
+        NODE_IMAGE: docker.m.daocloud.io/library/node:22
+        NGINX_IMAGE: docker.m.daocloud.io/library/nginx:alpine
         VITE_APP_BASE_API: ${VITE_APP_BASE_API}
         VITE_APP_CONTEXT_PATH: ${VITE_APP_CONTEXT_PATH}
     container_name: apboa-frontend

@@ -1,5 +1,5 @@
-ARG NODE_IMAGE=node:22
-ARG NGINX_IMAGE=nginx:alpine
+ARG NODE_IMAGE=docker.m.daocloud.io/library/node:22
+ARG NGINX_IMAGE=docker.m.daocloud.io/library/nginx:alpine
 # ============================================================
 # 阶段一：Node 构建前端
 # ============================================================
@@ -13,6 +13,8 @@ ARG VITE_APP_BASE_API=/web
 ARG VITE_APP_CONTEXT_PATH=/web
 ENV VITE_APP_BASE_API=${VITE_APP_BASE_API}
 ENV VITE_APP_CONTEXT_PATH=${VITE_APP_CONTEXT_PATH}
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com \
+    npm_config_registry=https://registry.npmmirror.com
 
 # 安装 pnpm
 RUN corepack enable && corepack prepare pnpm@9.4.0 --activate

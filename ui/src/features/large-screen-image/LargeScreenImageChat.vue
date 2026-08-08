@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import Chat from '@/views/Chat/index.vue'
 import * as agentApi from '@/api/agent'
@@ -25,6 +25,7 @@ import LargeScreenImageTemplateErrorCard from './LargeScreenImageTemplateErrorCa
 import LargeScreenImageReferenceTag from './LargeScreenImageReferenceTag.vue'
 import LargeScreenImageGeneratedCard from './LargeScreenImageGeneratedCard.vue'
 import LargeScreenImageTimeline from './LargeScreenImageTimeline.vue'
+import LargeScreenImageWorkbench from './LargeScreenImageWorkbench.vue'
 
 const LARGE_SCREEN_IMAGE_AGENT_CODE = 'default-large-screen-image'
 TagRegistry.register({ tagName: 'large-screen-image-reference', component: LargeScreenImageReferenceTag })
@@ -64,6 +65,7 @@ const templateValidationError = ref('')
 const currentSessionId = ref<string | null>(null)
 type GeneratedImageTimelineItem = { id: string; imageUrl: string }
 const generatedImageTimeline = ref<GeneratedImageTimelineItem[]>([])
+const activeWorkbenchTemplate = computed(() => activeTemplate.value?.sessionId === currentSessionId.value ? activeTemplate.value : null)
 
 const attachmentPolicy: ChatAttachmentPolicy = {
   maxFileCount: 1,
@@ -470,6 +472,7 @@ function messagePresentationAdapter(input: ChatMessagePresentationInput): ChatMe
         versions: templateVersions.value.map(({ id, label }) => ({ id, label })),
         activeVersionId: activeTemplateVersionId.value,
         onSelectVersion: selectTemplateVersion,
+        mode: 'placeholder',
       },
     }
   }
@@ -495,6 +498,7 @@ function messagePresentationAdapter(input: ChatMessagePresentationInput): ChatMe
         messageId: input.id,
         busy: Boolean(analysisRun.value),
         onAnalyze: () => { void analyzeGeneratedImage(generatedImageUrl) },
+        mode: 'placeholder',
       },
     }
   }
@@ -528,7 +532,7 @@ onMounted(() => { void loadAgent() })
 </script>
 
 <template>
-  <section v-if="agentId" class="large-screen-image-chat-shell">
+  <section v-if="agentId" class="large-screen-image-chat-shell" :class="{ 'large-screen-image-chat-shell-workbench': Boolean(activeWorkbenchTemplate) }">
     <Chat
       class="large-screen-image-chat"
       ref="chatRef"
@@ -544,6 +548,22 @@ onMounted(() => { void loadAgent() })
       :on-session-messages-changed="onSessionMessagesChanged"
     />
     <LargeScreenImageTimeline :items="generatedImageTimeline" @select="scrollToGeneratedImage" />
+    <LargeScreenImageWorkbench
+      v-if="activeWorkbenchTemplate"
+      class="large-screen-image-workbench-dock"
+      :template="activeWorkbenchTemplate.template"
+      :reference-file="activeWorkbenchTemplate.referenceFile"
+      :busy="submittingGeneration"
+      :validation-error="templateValidationError"
+      :on-update-template="updateTemplate"
+      :on-retry-analyze="retryAnalyze"
+      :on-generate="() => { void submitCompiledTemplate('') }"
+      :on-remove-reference="() => { void removeReference() }"
+      :on-replace-reference="replaceReference"
+      :versions="templateVersions.map(({ id, label }) => ({ id, label }))"
+      :active-version-id="activeTemplateVersionId"
+      :on-select-version="selectTemplateVersion"
+    />
   </section>
   <main v-else class="chat-route-state">
     <ASpin v-if="loading" tip="正在加载大屏生图…" />
@@ -561,4 +581,10 @@ onMounted(() => { void loadAgent() })
 .chat-route-state section { display: grid; gap: 16px; max-width: 32rem; }
 .chat-route-state p { margin: 0; }
 .large-screen-image-chat-shell { min-width: 0; }
+.large-screen-image-workbench-dock { position: fixed; z-index: 18; top: 88px; bottom: 18px; left: 260px; width: min(520px, calc(100vw - 304px)); }
+:deep(.chat-message:has(.large-screen-template-card-placeholder)) { display: none; }
+:deep(.chat-message:has(.large-screen-generated-card-placeholder)) { display: none; }
+:deep(.large-screen-image-chat-shell-workbench .chat-main-input-wrap) { display: none; }
+:deep(.large-screen-image-chat-shell:has(.chat-sidebar.collapsed)) .large-screen-image-workbench-dock { left: 56px; width: min(520px, calc(100vw - 100px)); }
+@media (max-width: 760px) { .large-screen-image-workbench-dock { top: 60px; bottom: 8px; left: 0; width: min(520px, calc(100vw - 8px)); }:deep(.large-screen-image-chat-shell:has(.chat-sidebar.collapsed)) .large-screen-image-workbench-dock { left: 0; width: min(520px, calc(100vw - 8px)); } }
 </style>

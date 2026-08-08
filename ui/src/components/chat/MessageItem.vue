@@ -169,6 +169,7 @@ const openPreview = (index: number) => {
   previewCurrentIndex.value = index
   previewVisible.value = true
 }
+
 </script>
 
 <template>

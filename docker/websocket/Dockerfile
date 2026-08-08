@@ -1,5 +1,5 @@
-ARG MAVEN_IMAGE=maven:3.9-eclipse-temurin-21
-ARG JRE_IMAGE=eclipse-temurin:21-jre
+ARG MAVEN_IMAGE=docker.m.daocloud.io/library/maven:3.9-eclipse-temurin-21
+ARG JRE_IMAGE=docker.m.daocloud.io/library/eclipse-temurin:21-jre
 # ============================================================
 # 阶段一：Maven 构建
 # ============================================================

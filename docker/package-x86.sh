@@ -21,6 +21,7 @@ APPS_STOPPED=false
 WORKDIR_CREATED=false
 BUILD_OVERRIDE=""
 BUILD_BUILDER="${KACP_BUILDX_BUILDER:-${BUILDX_BUILDER:-}}"
+DOMESTIC_REGISTRY="docker.m.daocloud.io/"
 
 usage() {
   cat <<'USAGE'
@@ -314,7 +315,7 @@ build_amd64_images() {
   printf '使用 Buildx builder：%s\n' "${BUILD_BUILDER:-default}"
   write_build_override
   if [[ -n "$BUILD_BUILDER" ]]; then
-    BUILDX_BUILDER="$BUILD_BUILDER" DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose \
+    BUILDX_BUILDER="$BUILD_BUILDER" DOCKER_DEFAULT_PLATFORM=linux/amd64 DOCKER_REGISTRY="$DOMESTIC_REGISTRY" docker compose \
       --env-file "$ENV_FILE" \
       -p k-acp-amd64-build \
       -f "$COMPOSE_BASE" \
@@ -322,7 +323,7 @@ build_amd64_images() {
       -f "$BUILD_OVERRIDE" \
       build "${services[@]}"
   else
-    DOCKER_DEFAULT_PLATFORM=linux/amd64 docker compose \
+    DOCKER_DEFAULT_PLATFORM=linux/amd64 DOCKER_REGISTRY="$DOMESTIC_REGISTRY" docker compose \
       --env-file "$ENV_FILE" \
       -p k-acp-amd64-build \
       -f "$COMPOSE_BASE" \
@@ -374,6 +375,7 @@ set_env_value() {
 
 write_environment() {
   cp "$ENV_FILE" "$RELEASE_DIR/.env"
+  set_env_value "$RELEASE_DIR/.env" DOCKER_REGISTRY "$DOMESTIC_REGISTRY"
   set_env_value "$RELEASE_DIR/.env" DATA_PATH ./data
   set_env_value "$RELEASE_DIR/.env" LOG_PATH ./logs
   set_env_value "$RELEASE_DIR/.env" FRONTEND_PORT 23080
@@ -397,7 +399,7 @@ x-app-common: &app-common
 
 services:
   apboa-mysql:
-    image: mysql:8.0
+    image: docker.m.daocloud.io/library/mysql:8.0
     container_name: k-acp-mysql
     restart: unless-stopped
     environment:
@@ -416,7 +418,7 @@ services:
     networks: [k-acp]
 
   apboa-redis:
-    image: redis:7-alpine
+    image: docker.m.daocloud.io/library/redis:7-alpine
     container_name: k-acp-redis
     restart: unless-stopped
     environment:
@@ -433,7 +435,7 @@ services:
     networks: [k-acp]
 
   apboa-pgvector:
-    image: pgvector/pgvector:pg16
+    image: docker.m.daocloud.io/pgvector/pgvector:pg16
     container_name: k-acp-pgvector
     restart: unless-stopped
     environment:
@@ -653,7 +655,7 @@ gzip -dc images/k-acp-app-images.tar.gz | docker load
 echo '[2/6] 准备 Redis 和 .apboa 数据'
 cp backups/redis.rdb data/redis/dump.rdb
 tar -xzf backups/apboa-data.tar.gz -C data/apboa
-echo '[3/6] 拉取公网基础镜像'
+echo '[3/6] 拉取国内基础镜像'
 docker compose -f compose.yml pull apboa-mysql apboa-redis apboa-pgvector
 echo '[4/6] 启动数据库'
 docker compose -f compose.yml up -d apboa-mysql apboa-redis apboa-pgvector
@@ -768,7 +770,7 @@ write_source_manifest() {
       metadata="$(docker image inspect --format '{{.Architecture}}/{{.Os}} | {{.Id}} | {{.Size}} bytes' "$image")"
       printf -- '- `%s`：%s\n' "$image" "$metadata"
     done
-    printf '\n基础镜像 `mysql:8.0`、`redis:7-alpine`、`pgvector/pgvector:pg16` 不随包导出。\n'
+    printf '\n基础镜像 `docker.m.daocloud.io/library/mysql:8.0`、`docker.m.daocloud.io/library/redis:7-alpine`、`docker.m.daocloud.io/pgvector/pgvector:pg16` 不随包导出。\n'
   } > "$RELEASE_DIR/SOURCE_MANIFEST.md"
 }
 

@@ -9,7 +9,7 @@ defineProps<{
 <template>
   <section class="large-screen-template-error-card" role="alert">
     <p class="large-screen-template-error-title">识图失败，可重试</p>
-    <p class="large-screen-template-error-reason">模板结果未通过安全校验。</p>
+    <p class="large-screen-template-error-reason">{{ reason }}</p>
     <button
       v-if="canRetry && onRetryAnalyze"
       class="large-screen-template-error-retry"

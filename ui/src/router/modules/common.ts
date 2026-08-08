@@ -25,6 +25,15 @@ const commonRoutes: AppRouteRecordRaw[] = [
     },
   },
   {
+    path: RoutePaths.BIAOSHU_INTERPRETER_CHAT,
+    name: RouteNames.BIAOSHU_INTERPRETER_CHAT,
+    component: () => import('@/features/biaoshu-interpreter/BiaoshuInterpreterChat.vue'),
+    meta: {
+      title: '标书智能解读助手',
+      hidden: true,
+    },
+  },
+  {
     path: `${RoutePaths.CHAT_DIY}/:agentId`,
     name: RouteNames.CHAT_DIY,
     component: () => import('@/views/Chat/index.vue'),

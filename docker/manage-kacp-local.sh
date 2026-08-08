@@ -10,6 +10,7 @@ COMPOSE_BASE="$SCRIPT_DIR/docker-compose-simple.yml"
 COMPOSE_LOCAL="$SCRIPT_DIR/docker-compose-kacp-local.yml"
 APP_SERVICES=(apboa-console apboa-runtime apboa-proxy apboa-websocket apboa-frontend)
 DATA_SERVICES=(apboa-mysql apboa-redis apboa-pgvector)
+DOMESTIC_REGISTRY="docker.m.daocloud.io/"
 
 usage() {
   cat <<'USAGE'
@@ -53,12 +54,21 @@ require_inputs() {
 }
 
 compose() {
-  "${DOCKER[@]}" compose \
-    --project-name "$PROJECT_NAME" \
-    --env-file "$ENV_FILE" \
-    -f "$COMPOSE_BASE" \
-    -f "$COMPOSE_LOCAL" \
-    "$@"
+  if [[ "${DOCKER[0]}" == sudo ]]; then
+    sudo env DOCKER_REGISTRY="$DOMESTIC_REGISTRY" docker compose \
+      --project-name "$PROJECT_NAME" \
+      --env-file "$ENV_FILE" \
+      -f "$COMPOSE_BASE" \
+      -f "$COMPOSE_LOCAL" \
+      "$@"
+  else
+    DOCKER_REGISTRY="$DOMESTIC_REGISTRY" "${DOCKER[@]}" compose \
+      --project-name "$PROJECT_NAME" \
+      --env-file "$ENV_FILE" \
+      -f "$COMPOSE_BASE" \
+      -f "$COMPOSE_LOCAL" \
+      "$@"
+  fi
 }
 
 update() {

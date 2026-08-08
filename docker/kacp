@@ -1,0 +1,301 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# k-acp-local 快速构建与容器管理入口。
+# 只操作当前 Compose 项目的应用服务，不执行 down -v，不删除中间件数据。
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -h "$SOURCE" ]]; do
+  SOURCE_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" == /* ]] || SOURCE="$SOURCE_DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ENV_FILE="${KACP_ENV_FILE:-$SCRIPT_DIR/.env.kacp}"
+COMPOSE_BASE="$SCRIPT_DIR/docker-compose-simple.yml"
+COMPOSE_LOCAL="$SCRIPT_DIR/docker-compose-kacp-local.yml"
+PROJECT_NAME="k-acp-local"
+DOMESTIC_REGISTRY="docker.m.daocloud.io/"
+APP_SERVICES=(apboa-console apboa-runtime apboa-proxy apboa-websocket apboa-frontend)
+DATA_SERVICES=(apboa-mysql apboa-redis apboa-pgvector)
+BASE_IMAGES=(
+  docker.m.daocloud.io/library/maven:3.9-eclipse-temurin-21
+  docker.m.daocloud.io/library/eclipse-temurin:21-jre
+  docker.m.daocloud.io/library/node:22
+  docker.m.daocloud.io/library/node:22-bookworm-slim
+  docker.m.daocloud.io/library/nginx:alpine
+)
+MIDDLEWARE_IMAGES=(
+  docker.m.daocloud.io/library/mysql:8.0
+  docker.m.daocloud.io/library/redis:7-alpine
+  docker.m.daocloud.io/pgvector/pgvector:pg16
+)
+USE_SUDO=false
+SELECTED_SERVICES=()
+
+usage() {
+  cat <<'USAGE'
+用法：kacp <命令> [参数]
+
+用途：
+  管理本地 k-acp-local 容器栈。默认使用 docker/.env.kacp 和国内镜像源，
+  只管理应用容器，不会删除 MySQL、Redis、pgvector 数据卷。
+
+命令：
+  help                  显示命令、参数、服务和示例说明
+  build [--no-cache]    构建五个应用镜像，不重建容器，不操作数据容器
+  rebuild [--no-cache]  构建镜像并强制重建五个应用容器，完成后检查运行状态
+  restart [服务...]     重启已有应用容器，不重新构建镜像
+  start                 拉取缺失的数据镜像并启动完整本地容器栈
+  stop                  停止完整本地容器栈，保留容器、数据卷和配置
+  status                查看应用容器和数据容器的运行状态
+  logs [服务...]        查看应用日志，默认跟踪五个应用服务最近 200 行
+  release [参数...]     调用发布脚本生成 x86_64 离线发布包
+
+服务简称（可用于 restart、logs）：
+  console               管理控制台服务
+  runtime               AI 运行时服务
+  proxy                 Shell 执行代理服务
+  websocket             WebSocket 推送服务
+  frontend              Nginx 前端服务
+  不填写服务名          restart、logs 默认作用于全部五个应用服务
+
+环境变量：
+  KACP_ENV_FILE         指定 Compose 环境文件，默认为 docker/.env.kacp
+  KACP_STARTUP_ATTEMPTS 启动稳定性检查次数，默认 30 次
+  KACP_STARTUP_INTERVAL_SECONDS 每次检查间隔秒数，默认 2 秒
+
+镜像和数据说明：
+  - 基础镜像和中间件镜像优先使用 docker.m.daocloud.io 国内源
+  - build、rebuild 会先清理 Maven target/ 和 ui/dist* 源码构建产物
+  - 不删除 Docker 镜像、构建缓存或数据卷
+  - build、rebuild、restart、logs 不执行 down -v，不删除数据
+  - 启动失败时会输出异常应用服务的最近日志
+
+示例：
+  kacp build                         # 构建应用镜像
+  kacp build --no-cache               # 不使用缓存构建
+  kacp rebuild                        # 构建并强制重建应用容器
+  kacp restart frontend               # 只重启前端
+  kacp logs runtime                    # 查看 runtime 日志
+  kacp status                         # 查看完整栈状态
+USAGE
+}
+
+die() {
+  printf '错误：%s\n' "$*" >&2
+  exit 1
+}
+
+require_inputs() {
+  [[ -f "$ENV_FILE" ]] || die "缺少环境文件：$ENV_FILE"
+  [[ -f "$COMPOSE_BASE" ]] || die "缺少 Compose 文件：$COMPOSE_BASE"
+  [[ -f "$COMPOSE_LOCAL" ]] || die "缺少 Compose 文件：$COMPOSE_LOCAL"
+}
+
+select_docker() {
+  command -v docker >/dev/null 2>&1 || die '未找到 docker 命令'
+  if docker info >/dev/null 2>&1; then
+    return
+  fi
+  if command -v sudo >/dev/null 2>&1; then
+    sudo -v
+    sudo docker info >/dev/null 2>&1 || die 'sudo 无法访问 Docker daemon'
+    USE_SUDO=true
+    return
+  fi
+  die '当前用户无法访问 Docker，且 sudo 不可用'
+}
+
+compose() {
+  if [[ "$USE_SUDO" == true ]]; then
+    sudo env DOCKER_REGISTRY="$DOMESTIC_REGISTRY" docker compose \
+      --project-name "$PROJECT_NAME" \
+      --env-file "$ENV_FILE" \
+      -f "$COMPOSE_BASE" \
+      -f "$COMPOSE_LOCAL" \
+      "$@"
+  else
+    DOCKER_REGISTRY="$DOMESTIC_REGISTRY" docker compose \
+      --project-name "$PROJECT_NAME" \
+      --env-file "$ENV_FILE" \
+      -f "$COMPOSE_BASE" \
+      -f "$COMPOSE_LOCAL" \
+      "$@"
+  fi
+}
+
+docker_image_exists() {
+  if [[ "$USE_SUDO" == true ]]; then
+    sudo docker image inspect "$1" >/dev/null 2>&1
+  else
+    docker image inspect "$1" >/dev/null 2>&1
+  fi
+}
+
+pull_image() {
+  if [[ "$USE_SUDO" == true ]]; then
+    sudo docker pull "$1"
+  else
+    docker pull "$1"
+  fi
+}
+
+clean_source_build_artifacts() {
+  local target_dir
+  local frontend_artifact
+
+  printf '清理源码构建产物（不删除 Docker 镜像、缓存或数据卷）\n'
+
+  while IFS= read -r -d '' target_dir; do
+    rm -rf -- "$target_dir"
+  done < <(find "$PROJECT_ROOT" \
+    -path "$PROJECT_ROOT/.git" -prune -o \
+    -type d -name target -prune -print0)
+
+  for frontend_artifact in \
+    "$PROJECT_ROOT/ui/dist" \
+    "$PROJECT_ROOT/ui/dist-main" \
+    "$PROJECT_ROOT/ui/dist-doc"; do
+    if [[ -d "$frontend_artifact" ]]; then
+      rm -rf -- "$frontend_artifact"
+    fi
+  done
+}
+
+ensure_base_images() {
+  local image
+  for image in "${BASE_IMAGES[@]}"; do
+    if docker_image_exists "$image"; then
+      printf '基础镜像已在本地：%s\n' "$image"
+    else
+      printf '顺序拉取国内基础镜像：%s\n' "$image"
+      pull_image "$image"
+    fi
+  done
+}
+
+ensure_middleware_images() {
+  local image
+  for image in "${MIDDLEWARE_IMAGES[@]}"; do
+    if docker_image_exists "$image"; then
+      printf '国内数据镜像已在本地：%s\n' "$image"
+    else
+      printf '顺序拉取国内数据镜像：%s\n' "$image"
+      pull_image "$image"
+    fi
+  done
+}
+
+resolve_services() {
+  local requested
+  SELECTED_SERVICES=()
+  if [[ $# -eq 0 || "${1:-}" == all ]]; then
+    SELECTED_SERVICES=("${APP_SERVICES[@]}")
+    return
+  fi
+
+  for requested in "$@"; do
+    case "$requested" in
+      console) SELECTED_SERVICES+=(apboa-console) ;;
+      runtime) SELECTED_SERVICES+=(apboa-runtime) ;;
+      proxy) SELECTED_SERVICES+=(apboa-proxy) ;;
+      websocket) SELECTED_SERVICES+=(apboa-websocket) ;;
+      frontend) SELECTED_SERVICES+=(apboa-frontend) ;;
+      *) die "未知应用服务：$requested" ;;
+    esac
+  done
+}
+
+build_apps() {
+  clean_source_build_artifacts
+  printf '使用国内 Docker 镜像源构建应用镜像：%s\n' "$DOMESTIC_REGISTRY"
+  ensure_base_images
+  compose build "$@" "${APP_SERVICES[@]}"
+}
+
+rebuild_apps() {
+  build_apps "$@"
+  compose up -d --no-deps --force-recreate "${APP_SERVICES[@]}"
+  wait_for_applications
+  compose ps "${APP_SERVICES[@]}"
+}
+
+wait_for_applications() {
+  local attempts="${KACP_STARTUP_ATTEMPTS:-30}"
+  local interval="${KACP_STARTUP_INTERVAL_SECONDS:-2}"
+  local attempt
+  local running
+  local service
+  local all_running
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    running="$(compose ps --status running --services 2>/dev/null || true)"
+    all_running=true
+    for service in "${APP_SERVICES[@]}"; do
+      if ! grep -Fxq "$service" <<<"$running"; then
+        all_running=false
+        break
+      fi
+    done
+
+    if [[ "$all_running" == true ]]; then
+      printf '应用容器已稳定运行（第 %d/%d 次检查）。\n' "$attempt" "$attempts"
+      return 0
+    fi
+
+    if (( attempt < attempts )); then
+      sleep "$interval"
+    fi
+  done
+
+  compose ps -a "${APP_SERVICES[@]}" || true
+  printf '应用容器未能在 %s 秒内稳定运行，输出异常服务日志：\n' "$((attempts * interval))" >&2
+  for service in "${APP_SERVICES[@]}"; do
+    if ! grep -Fxq "$service" <<<"$running"; then
+      printf '\n--- %s ---\n' "$service" >&2
+      compose logs --tail=80 "$service" >&2 || true
+    fi
+  done
+  die '应用容器启动失败或持续重启'
+}
+
+restart_apps() {
+  resolve_services "$@"
+  compose restart "${SELECTED_SERVICES[@]}"
+  wait_for_applications
+  compose ps "${SELECTED_SERVICES[@]}"
+}
+
+main() {
+  local command="${1:-}"
+  shift || true
+
+  case "$command" in
+    -h|--help|help|'') usage; return ;;
+  esac
+
+  require_inputs
+  select_docker
+
+  case "$command" in
+    build) build_apps "$@" ;;
+    rebuild) rebuild_apps "$@" ;;
+    restart) restart_apps "$@" ;;
+    start)
+      ensure_middleware_images
+      compose up -d
+      wait_for_applications
+      ;;
+    stop) compose stop ;;
+    status) compose ps ;;
+    logs)
+      resolve_services "$@"
+      compose logs -f --tail=200 "${SELECTED_SERVICES[@]}"
+      ;;
+    release) exec "$SCRIPT_DIR/package-x86.sh" "$@" ;;
+    *) die "未知命令：$command；使用 --help 查看用法" ;;
+  esac
+}
+
+main "$@"

@@ -7,7 +7,7 @@
 services:
   # ==================== MySQL ====================
   apboa-mysql:
-    image: ${DOCKER_REGISTRY}mysql:8.0
+    image: docker.m.daocloud.io/library/mysql:8.0
     container_name: apboa-mysql
     restart: unless-stopped
     environment:
@@ -34,7 +34,7 @@ services:
 
   # ==================== Redis ====================
   apboa-redis:
-    image: ${DOCKER_REGISTRY}redis:7-alpine
+    image: docker.m.daocloud.io/library/redis:7-alpine
     container_name: apboa-redis
     restart: unless-stopped
     environment:
@@ -55,7 +55,7 @@ services:
 
   # ==================== pgvector（向量库） ====================
   apboa-pgvector:
-    image: ${DOCKER_REGISTRY}pgvector/pgvector:pg16
+    image: docker.m.daocloud.io/pgvector/pgvector:pg16
     container_name: apboa-pgvector
     restart: unless-stopped
     environment:

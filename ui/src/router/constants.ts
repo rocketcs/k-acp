@@ -72,6 +72,7 @@ export const RouteNames = {
   CHAT: 'Chat',
   CHAT_DIY: 'ChatDiy',
   LARGE_SCREEN_IMAGE_CHAT: 'LargeScreenImageChat',
+  BIAOSHU_INTERPRETER_CHAT: 'BiaoshuInterpreterChat',
   CHAT_HISTORY: 'ChatHistory',
   COMMUNICATION: 'Communication',
 
@@ -161,6 +162,7 @@ export const RoutePaths = {
   CHAT: '/chat',
   CHAT_DIY: '/chat/diy',
   LARGE_SCREEN_IMAGE_CHAT: '/chat/diy/large-screen-image',
+  BIAOSHU_INTERPRETER_CHAT: '/chat/diy/biaoshu-interpreter',
   CHAT_HISTORY: '/chat/history',
   COMMUNICATION: '/communication',
 

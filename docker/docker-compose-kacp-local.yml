@@ -18,6 +18,12 @@ services:
     environment:
       # 面向业务用户的对话不展示模型内部思考或查询计划。
       AGENTSCOPE_AGUI_ENABLE_REASONING: "false"
+      # AgentScope -> Langfuse/OpenTelemetry tracing. 从 Langfuse 项目页创建 API key 后启用。
+      AGENTSCOPE_TRACING_ENABLED: ${AGENTSCOPE_TRACING_ENABLED:-false}
+      AGENTSCOPE_TRACING_ENDPOINT: ${AGENTSCOPE_TRACING_ENDPOINT:-http://host.docker.internal:3000/api/public/otel/v1/traces}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_INGESTION_VERSION: ${LANGFUSE_INGESTION_VERSION:-4}
       # 高召回检索包含计划、受控搜索和批量原文解析，60 秒会在完成前中断。
       APBOA_TOOL_EXECUTION_TIMEOUT_SECONDS: "240"
     ports:

@@ -111,17 +111,17 @@ public class AguiMvcController {
                         subscribeAndTrack(emitter, threadId, runId, result);
 
                     } catch (AguiException.AgentNotFoundException e) {
-                        logger.error("Agent not found: {}", e.getMessage());
+                        logger.error("Agent not found", e);
 
                         AgentContext.clean();
 
-                        sendErrorAndComplete(emitter, threadId, runId, e.getMessage());
+                        sendErrorAndComplete(emitter, threadId, runId, safeErrorMessage(e.getMessage()));
                     } catch (Exception e) {
-                        logger.error("Error processing AG-UI request: {}", e.getMessage());
+                        logger.error("Error processing AG-UI request", e);
 
                         AgentContext.clean();
 
-                        sendErrorAndComplete(emitter, threadId, runId, e.getMessage());
+                        sendErrorAndComplete(emitter, threadId, runId, safeErrorMessage(e.getMessage()));
                     } finally {
                         // 在同一个线程中清理上下文
                         AgentContext.clean();
@@ -303,6 +303,12 @@ public class AguiMvcController {
                 logger.debug("Failed to complete emitter with error: {}", ex.getMessage());
             }
         }
+    }
+
+    static String safeErrorMessage(String errorMessage) {
+        return errorMessage == null || errorMessage.isBlank()
+                ? "An unexpected error occurred"
+                : errorMessage;
     }
 
     /**
