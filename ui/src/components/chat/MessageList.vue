@@ -157,6 +157,7 @@ function firstMessage(group: MessageGroup): DisplayMessage {
     <AgentRunActivity
       v-if="showRunActivity"
       :activities="runActivities"
+      :started-at="runStartedAt"
       @abort="$emit('abort')"
     />
     <AgentRunWaiting

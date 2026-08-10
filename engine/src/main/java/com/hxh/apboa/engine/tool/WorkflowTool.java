@@ -8,6 +8,8 @@ import com.hxh.apboa.common.util.JsonUtils;
 import com.hxh.apboa.common.vo.AccountVO;
 import com.hxh.apboa.engine.agui.AgentContext;
 import com.hxh.apboa.node.base.Node;
+import com.hxh.apboa.node.base.NodeOutput;
+import com.hxh.apboa.node.base.context.WorkflowNodeProgressListener;
 import com.hxh.apboa.common.enums.NodeType;
 import com.hxh.apboa.node.base.inputout.OutputConfig;
 import com.hxh.apboa.node.base.request.ParamItem;
@@ -23,6 +25,7 @@ import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.core.tool.AgentTool;
 import io.agentscope.core.tool.ToolCallParam;
+import io.agentscope.core.tool.ToolEmitter;
 import reactor.core.publisher.Mono;
 
 import java.util.*;
@@ -141,7 +144,8 @@ public class WorkflowTool implements AgentTool {
         return Mono.fromCallable(() -> {
             try {
                 // 执行工作流
-                WorkflowRunResult run = workflowRunService.run(workflow.getId(), getRunRequest(param), userDetail);
+                WorkflowRunResult run = workflowRunService.run(
+                        workflow.getId(), getRunRequest(param), userDetail, workflowProgressEmitter(param));
                 return ToolResultBlock.of(
                         param.getToolUseBlock().getId(),
                         param.getToolUseBlock().getName(),
@@ -155,6 +159,49 @@ public class WorkflowTool implements AgentTool {
                 );
             }
         });
+    }
+
+    private WorkflowNodeProgressListener workflowProgressEmitter(ToolCallParam param) {
+        ToolEmitter emitter = param.getEmitter();
+        return new WorkflowNodeProgressListener() {
+            @Override
+            public void onNodeStarted(NodeOutput output) {
+                emitWorkflowNodeProgress(emitter, param, output, "running");
+            }
+
+            @Override
+            public void onNodeFinished(NodeOutput output) {
+                String status = output.getStatus() == NodeOutput.ExecutionStatus.SUCCESS
+                        ? "completed" : "failed";
+                emitWorkflowNodeProgress(emitter, param, output, status);
+            }
+        };
+    }
+
+    private void emitWorkflowNodeProgress(ToolEmitter emitter, ToolCallParam param,
+                                          NodeOutput output, String status) {
+        if (emitter == null) {
+            return;
+        }
+        Map<String, Object> progress = new LinkedHashMap<>();
+        progress.put("workflowRunId", param.getContext().get(AgentContext.class).getRunId());
+        progress.put("nodeId", output.getNodeId());
+        progress.put("nodeName", output.getNodeName());
+        progress.put("nodeType", output.getNodeType().name());
+        progress.put("status", status);
+        progress.put("executionStatus", output.getStatus().name());
+        progress.put("startTime", output.getStartTime().toEpochMilli());
+        if (output.getEndTime() != null) {
+            progress.put("endTime", output.getEndTime().toEpochMilli());
+        }
+        if (output.getErrorMessage() != null) {
+            progress.put("error", output.getErrorMessage());
+        }
+        emitter.emit(ToolResultBlock.of(
+                param.getToolUseBlock().getId(),
+                param.getToolUseBlock().getName(),
+                TextBlock.builder().text(JsonUtils.toJsonStr(progress)).build(),
+                Map.of("workflow_node_progress", true)));
     }
 
     /**

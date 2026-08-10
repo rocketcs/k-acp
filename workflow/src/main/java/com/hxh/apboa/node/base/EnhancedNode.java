@@ -43,6 +43,7 @@ public abstract class EnhancedNode implements Node {
         context.resetNextNodeId();
         // 初始化输出节点
         NodeOutput output = initOutput();
+        context.notifyNodeStarted(output);
         try {
             // 解析节点输入
             Map<String, Object> inputs = resolveInputs(context);
@@ -66,6 +67,7 @@ public abstract class EnhancedNode implements Node {
             return output;
         } finally {
             context.recordExecution(output);
+            context.notifyNodeFinished(output);
         }
     }
 

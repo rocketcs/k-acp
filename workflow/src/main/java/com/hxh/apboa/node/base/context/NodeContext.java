@@ -39,6 +39,8 @@ public class NodeContext {
      * 节点执行轨迹，严格按照本次运行的节点执行顺序记录。
      */
     private final List<NodeOutput> executionTrace;
+    /** Optional observer used by interactive workflow runs to stream actual node progress. */
+    private WorkflowNodeProgressListener progressListener;
 
     public NodeContext(String workflowInstanceId) {
         this.workflowInstanceId = workflowInstanceId;
@@ -56,6 +58,18 @@ public class NodeContext {
     public void recordExecution(NodeOutput output) {
         if (output != null) {
             executionTrace.add(output);
+        }
+    }
+
+    public void notifyNodeStarted(NodeOutput output) {
+        if (progressListener != null && output != null) {
+            progressListener.onNodeStarted(output);
+        }
+    }
+
+    public void notifyNodeFinished(NodeOutput output) {
+        if (progressListener != null && output != null) {
+            progressListener.onNodeFinished(output);
         }
     }
 }

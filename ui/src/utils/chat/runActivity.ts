@@ -41,16 +41,8 @@ export interface AggregatedRunActivity {
   elapsed?: number
 }
 
-const ACTIVITY_LABELS: Record<string, string> = {
-  wren_context_instructions: '加载查询上下文',
-  wren_models: '准备分析能力',
-  wren_memory_recall: '检索相关信息',
-  wren_query: '查询业务数据',
-}
-
-/** 将技术工具名转为面向业务用户的动作；未知工具不暴露内部实现名称。 */
 export function getActivityLabel(name: string): string {
-  return ACTIVITY_LABELS[name] || '执行辅助操作'
+  return name
 }
 
 /** 合并同一工具的重复调用，保留首次出现顺序和本轮最新状态。 */
@@ -65,7 +57,7 @@ export function aggregateRunActivities(activities: RunActivity[]): AggregatedRun
   }>()
 
   for (const activity of activities) {
-    const current = grouped.get(activity.name) || {
+    const current = grouped.get(activity.id) || {
       id: activity.id,
       label: getActivityLabel(activity.name),
       count: 0,
@@ -77,7 +69,7 @@ export function aggregateRunActivities(activities: RunActivity[]): AggregatedRun
     current.elapsed += activity.elapsed || 0
     current.hasRunning ||= activity.status === 'running'
     current.hasFailed ||= activity.status === 'failed'
-    grouped.set(activity.name, current)
+    grouped.set(activity.id, current)
   }
 
   return [...grouped.values()].map((activity) => ({

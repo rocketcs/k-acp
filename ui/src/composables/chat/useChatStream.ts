@@ -226,12 +226,6 @@ export function useChatStream(
           ...toolCallsInProgress.value,
           { id: e.toolCallId, name: e.toolCallName, args: '', startTime: Date.now() }
         ]
-        runActivities.value = [
-          ...runActivities.value,
-          { id: e.toolCallId, name: e.toolCallName, args: '', status: 'running', startTime: Date.now() }
-        ]
-
-        const sid = currentSessionId.value
         // Reasoning is not user-visible and is intentionally not persisted here.
       },
       onToolCallArgs: (_e, partialArgs) => {
@@ -240,9 +234,6 @@ export function useChatStream(
 
         toolCallsInProgress.value = toolCallsInProgress.value.map((toolCall) =>
           toolCall.id === _e.toolCallId ? { ...toolCall, args: partialArgs } : toolCall,
-        )
-        runActivities.value = runActivities.value.map((activity) =>
-          activity.id === _e.toolCallId ? { ...activity, args: partialArgs } : activity,
         )
       },
       onToolCallResult: (e) => {
@@ -273,12 +264,6 @@ export function useChatStream(
               // 工具异常时继续使用外层 Agent 的正常回复，不影响其他对话。
             }
           }
-
-          runActivities.value = runActivities.value.map((activity) =>
-            activity.id === e.toolCallId
-              ? { ...activity, status: 'completed', elapsed: Date.now() - activity.startTime }
-              : activity,
-          )
 
           // 判断是否开启了显示工具调用。实时执行轨迹不受此设置影响：
           // 它只展示面向业务用户的进度，不展示工具的原始参数与结果。
@@ -356,6 +341,28 @@ export function useChatStream(
         if (event.name === 'TOOL_CONFIRM_REQUIRED') {
           const pending = (((event.value as any)?.pending) ?? []) as Array<{ toolUseId: string; name: string; input?: Record<string, unknown> }>
           restorePending(pending)
+          return
+        }
+        if (event.name === 'WORKFLOW_NODE_PROGRESS') {
+          const progress = (event.value ?? {}) as {
+            nodeId?: string
+            nodeName?: string
+            status?: RunActivity['status']
+            startTime?: number
+            endTime?: number
+          }
+          if (!progress.nodeId || !progress.nodeName || !progress.status) return
+          const startTime = progress.startTime ?? Date.now()
+          runActivities.value = [
+            ...runActivities.value.filter((activity) => activity.id !== progress.nodeId),
+            {
+              id: progress.nodeId,
+              name: progress.nodeName,
+              status: progress.status,
+              startTime,
+              elapsed: progress.endTime ? Math.max(0, progress.endTime - startTime) : undefined,
+            },
+          ]
         }
       },
       onRunError: () => {

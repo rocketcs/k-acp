@@ -32,6 +32,7 @@ import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.util.JsonException;
 import io.agentscope.core.util.JsonUtils;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.util.*;
 
@@ -272,6 +273,19 @@ public class AguiAgentAdapter {
                 }
             }
         } else if (type == EventType.TOOL_RESULT) {
+            for (ContentBlock block : msg.getContent()) {
+                if (block instanceof ToolResultBlock toolResult
+                        && Boolean.TRUE.equals(toolResult.getMetadata().get("workflow_node_progress"))) {
+                    try {
+                        Map<String, Object> progress = JsonUtils.getJsonCodec().fromJson(
+                                extractToolResultText(toolResult), new TypeReference<Map<String, Object>>() {});
+                        events.add(new AguiEvent.Custom(
+                                state.threadId, state.runId, "WORKFLOW_NODE_PROGRESS", progress));
+                    } catch (Exception ignored) {
+                        // A malformed intermediate progress chunk must not interrupt the workflow run.
+                    }
+                }
+            }
             if (event.isLast()) {
                 // Handle tool results
                 for (ContentBlock block : msg.getContent()) {

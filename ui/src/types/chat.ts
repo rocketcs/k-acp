@@ -27,7 +27,7 @@ export interface DisplayMessage {
 export interface RunActivity {
   id: string
   name: string
-  args: string
+  args?: string
   status: 'running' | 'completed' | 'failed'
   startTime: number
   elapsed?: number

@@ -26,10 +26,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
-    private static final int MAX_ITEMS = 20;
+    private static final int MAX_ITEMS = 50;
     private static final int MAX_PAGE_BYTES = 2 * 1024 * 1024;
     private static final int MAX_REDIRECTS = 5;
-    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(8);
+    private static final int MAX_PARALLEL_REQUESTS = 2;
+    private static final int MAX_REQUEST_ATTEMPTS = 4;
+    private static final long INITIAL_RETRY_BACKOFF_MILLIS = 250L;
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Pattern SOURCE_URL = Pattern.compile(
         "(?i)(?:sourceUrl|source_url)\\s*[:=]\\s*[\"']((?:\\\\.|[^\"'\\\\])*)[\"']");
@@ -47,6 +50,7 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
     private static final HttpClient CLIENT = HttpClient.newBuilder()
         .connectTimeout(REQUEST_TIMEOUT)
         .followRedirects(HttpClient.Redirect.NEVER)
+        .version(HttpClient.Version.HTTP_1_1)
         .build();
 
     @Override
@@ -55,7 +59,7 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
         JsonNode items = MAPPER.valueToTree(params == null ? null : params.get("items"));
         if (items == null || !items.isArray() || items.isEmpty() || items.size() > MAX_ITEMS) {
             response.put("success", false);
-            response.put("error", "items must be an array containing 1 to 20 records");
+            response.put("error", "items must be an array containing 1 to 50 records");
             response.put("total", items != null && items.isArray() ? items.size() : 0);
             response.put("resolved", 0);
             response.put("items", List.of());
@@ -63,7 +67,8 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
         }
 
         ConcurrentHashMap<String, FutureTask<FetchResult>> pageCache = new ConcurrentHashMap<>();
-        ExecutorService executor = Executors.newFixedThreadPool(5);
+        // The aggregation provider is sensitive to connection bursts; limit same-batch pressure.
+        ExecutorService executor = Executors.newFixedThreadPool(Math.min(MAX_PARALLEL_REQUESTS, items.size()));
         List<Callable<Map<String, Object>>> tasks = new ArrayList<>();
         items.forEach(item -> tasks.add(() -> resolveItem(item, pageCache)));
 
@@ -247,15 +252,34 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
     }
 
     private static HttpResponse<InputStream> sendWithRetry(HttpRequest request) throws Exception {
-        Exception last = null;
-        for (int attempt = 0; attempt < 2; attempt++) {
+        IOException last = null;
+        for (int attempt = 0; attempt < MAX_REQUEST_ATTEMPTS; attempt++) {
             try {
-                return CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
+                HttpResponse<InputStream> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
+                if (!isRetryableStatus(response.statusCode()) || attempt == MAX_REQUEST_ATTEMPTS - 1) {
+                    return response;
+                }
+                closeBody(response.body());
             } catch (IOException e) {
                 last = e;
+                if (attempt == MAX_REQUEST_ATTEMPTS - 1) break;
             }
+            retryBackoff(attempt);
         }
         throw last == null ? new IOException("HTTP request failed") : last;
+    }
+
+    private static boolean isRetryableStatus(int status) {
+        return status == 429 || status == 500 || status == 502 || status == 503 || status == 504;
+    }
+
+    private static void retryBackoff(int attempt) throws IOException {
+        try {
+            Thread.sleep(INITIAL_RETRY_BACKOFF_MILLIS * (1L << attempt));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("HTTP retry interrupted", e);
+        }
     }
 
     private static URI validateAggregateUri(String url) throws Exception {
@@ -375,8 +399,11 @@ public class TenderSourceUrlResolverTool implements IDynamicAgentTool {
         result.put("bid_id", bidId);
         result.put("title", title);
         result.put("original_url", originalUrl);
+        result.put("display_url", originalUrl);
         result.put("source_domain", sourceDomain);
         result.put("status", status);
+        result.put("source_status", status);
+        result.put("link_type", originalUrl == null || originalUrl.isBlank() ? null : "SOURCE");
         result.put("method", method);
         result.put("message", message == null ? "" : message);
         return result;

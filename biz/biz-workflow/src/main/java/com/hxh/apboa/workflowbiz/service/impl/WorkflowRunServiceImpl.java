@@ -14,6 +14,7 @@ import com.hxh.apboa.common.enums.WorkflowRunStatus;
 import com.hxh.apboa.common.util.UserUtils;
 import com.hxh.apboa.node.base.NodeOutput;
 import com.hxh.apboa.node.base.context.NodeContext;
+import com.hxh.apboa.node.base.context.WorkflowNodeProgressListener;
 import com.hxh.apboa.node.base.request.ParamItem;
 import com.hxh.apboa.node.base.request.RequestParams;
 import com.hxh.apboa.workflow.run.RunWorkflow;
@@ -56,11 +57,18 @@ public class WorkflowRunServiceImpl extends ServiceImpl<WorkflowRunMapper, Workf
     @Override
     @Transactional(rollbackFor = Exception.class)
     public WorkflowRunResult run(Long workflowId, WorkflowRunRequest request, UserDetail userDetail) {
+        return run(workflowId, request, userDetail, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public WorkflowRunResult run(Long workflowId, WorkflowRunRequest request, UserDetail userDetail,
+                                 WorkflowNodeProgressListener progressListener) {
         Workflow workflow = workflowMapper.selectById(workflowId);
         if (workflow == null) {
             throw new RuntimeException("workflow not found");
         }
-        return doRun(workflow, request, userDetail, true);
+        return doRun(workflow, request, userDetail, true, progressListener);
     }
 
     @Override
@@ -71,6 +79,11 @@ public class WorkflowRunServiceImpl extends ServiceImpl<WorkflowRunMapper, Workf
     }
 
     private WorkflowRunResult doRun(Workflow workflow, WorkflowRunRequest request, UserDetail userDetail, boolean publishedOnly) {
+        return doRun(workflow, request, userDetail, publishedOnly, null);
+    }
+
+    private WorkflowRunResult doRun(Workflow workflow, WorkflowRunRequest request, UserDetail userDetail,
+                                    boolean publishedOnly, WorkflowNodeProgressListener progressListener) {
         WorkflowVersion publishedVersion = publishedOnly ? latestPublishedVersion(workflow.getId()) : null;
         Object config = publishedVersion == null ? workflow.getConfig() : publishedVersion.getConfig();
         if (config == null) {
@@ -95,6 +108,7 @@ public class WorkflowRunServiceImpl extends ServiceImpl<WorkflowRunMapper, Workf
         save(run);
 
         NodeContext context = new NodeContext(String.valueOf(run.getId()));
+        context.setProgressListener(progressListener);
         context.setRequestParams(toRequestParams(request));
         if (request != null && request.getVariables() != null) {
             request.getVariables().forEach(context.getVariables()::storeVariable);
