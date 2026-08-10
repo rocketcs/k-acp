@@ -93,7 +93,8 @@ export const RouteNames = {
   REVIEW_WORKFLOW: 'ReviewWorkflow',
 
   // 错误页面
-  NOT_FOUND: 'NotFound'
+  NOT_FOUND: 'NotFound',
+  FORBIDDEN: 'Forbidden'
 } as const
 
 /**

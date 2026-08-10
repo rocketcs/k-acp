@@ -71,6 +71,15 @@ const commonRoutes: AppRouteRecordRaw[] = [
   },
   // 文档页面已迁移至 doc 子应用（doc.html）
   {
+    path: RoutePaths.FORBIDDEN,
+    name: RouteNames.FORBIDDEN,
+    component: () => import('@/pages/Forbidden.vue'),
+    meta: {
+      title: '无访问权限',
+      hidden: true,
+    },
+  },
+  {
     path: RoutePaths.NOT_FOUND,
     name: RouteNames.NOT_FOUND,
     component: () => import('@/pages/NotFound.vue'),

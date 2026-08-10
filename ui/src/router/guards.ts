@@ -8,8 +8,8 @@ import type { Router } from 'vue-router'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
 import { useAccountStore } from '@/stores'
-import { WHITE_LIST } from './constants'
-import { resolveLoginRedirect } from './loginRedirect'
+import { RoutePaths, WHITE_LIST } from './constants'
+import { isViewerAllowedChatRoute, resolveLoginRedirect } from './loginRedirect'
 
 // 配置NProgress
 NProgress.configure({
@@ -42,14 +42,15 @@ export function setupRouterGuard(router: Router): void {
     // 设置页面标题
     setPageTitle(to.meta?.title as string)
 
+    const accountStore = useAccountStore()
+
     // 放行“外置对话链接”
-    if (to.path.startsWith('/communication/')) {
+    if (to.path.startsWith('/communication/') && !accountStore.isReadOnly) {
       next()
       NProgress.done()
       return
     }
 
-    const accountStore = useAccountStore()
     const hasToken = accountStore.isLoggedIn
 
     // 已登录
@@ -59,6 +60,12 @@ export function setupRouterGuard(router: Router): void {
         next({ path: resolveLoginRedirect(to.query.redirect) })
         NProgress.done()
       } else {
+        if (accountStore.isReadOnly && !isViewerAllowedChatRoute(to.path) && to.path !== RoutePaths.FORBIDDEN) {
+          next({ path: RoutePaths.FORBIDDEN, replace: true })
+          NProgress.done()
+          return
+        }
+
         // 检查是否已获取用户信息
         if (accountStore.userInfo) {
           next()
