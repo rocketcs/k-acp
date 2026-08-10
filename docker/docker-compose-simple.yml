@@ -164,6 +164,8 @@ services:
       PIP_TARGET: /opt/tools/pylib
       PYTHONPATH: /opt/tools/pylib
       NPM_CONFIG_PREFIX: /opt/tools/npm-global
+      # Optional egress proxy used only by the authenticated Wenbiao HTTP tool.
+      WENBIAO_HTTP_PROXY: ${WENBIAO_HTTP_PROXY:-}
       TZ: Asia/Shanghai
     volumes:
       - ${LOG_PATH:-./logs}/runtime:/app/logs
