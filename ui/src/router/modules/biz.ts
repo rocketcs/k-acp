@@ -337,6 +337,15 @@ const bizRoutes: AppRouteRecordRaw[] = [
           hidden: false
         },
       },
+      {
+        path: RoutePaths.OPS_SESSION_TRACING,
+        name: RouteNames.OPS_SESSION_TRACING,
+        component: () => import('@/views/Ops/SessionTracing.vue'),
+        meta: {
+          title: '用户对话复盘',
+          hidden: false
+        },
+      },
       // 审查管理
       {
         path: RoutePaths.REVIEW_AGENT,

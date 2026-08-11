@@ -87,6 +87,7 @@ export const RouteNames = {
   // 运维管理
   OPS_MONITOR: 'OpsMonitor',
   OPS_STORAGE: 'OpsStorage',
+  OPS_SESSION_TRACING: 'OpsSessionTracing',
 
   // 审查管理
   REVIEW_AGENT: 'ReviewAgent',
@@ -178,6 +179,7 @@ export const RoutePaths = {
   // 运维管理
   OPS_MONITOR: 'ops/monitor',
   OPS_STORAGE: 'ops/storage',
+  OPS_SESSION_TRACING: 'ops/session-tracing',
 
   // 审查管理
   REVIEW_AGENT: 'review/agent',
