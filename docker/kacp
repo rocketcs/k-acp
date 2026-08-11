@@ -43,8 +43,8 @@ usage() {
 
 命令：
   help                  显示命令、参数、服务和示例说明
-  build [--no-cache]    构建五个应用镜像，不重建容器，不操作数据容器
-  rebuild [--no-cache]  构建镜像并强制重建五个应用容器，完成后检查运行状态
+  build [--no-cache]    顺序构建五个应用镜像，不重建容器，不操作数据容器
+  rebuild [--no-cache]  顺序构建镜像并强制重建五个应用容器，完成后检查运行状态
   restart [服务...]     重启已有应用容器，不重新构建镜像
   start                 拉取缺失的数据镜像并启动完整本地容器栈
   stop                  停止完整本地容器栈，保留容器、数据卷和配置
@@ -68,6 +68,7 @@ usage() {
 镜像和数据说明：
   - 基础镜像和中间件镜像优先使用 docker.m.daocloud.io 国内源
   - build、rebuild 会先清理 Maven target/ 和 ui/dist* 源码构建产物
+  - 应用镜像按服务顺序构建，避免本机内存不足时并行 Maven 构建触发 OOM
   - 不删除 Docker 镜像、构建缓存或数据卷
   - build、rebuild、restart、logs 不执行 down -v，不删除数据
   - 启动失败时会输出异常应用服务的最近日志
@@ -208,10 +209,15 @@ resolve_services() {
 }
 
 build_apps() {
+  local service
+
   clean_source_build_artifacts
   printf '使用国内 Docker 镜像源构建应用镜像：%s\n' "$DOMESTIC_REGISTRY"
   ensure_base_images
-  compose build "$@" "${APP_SERVICES[@]}"
+  for service in "${APP_SERVICES[@]}"; do
+    printf '顺序构建应用镜像：%s\n' "$service"
+    compose build "$@" "$service"
+  done
 }
 
 rebuild_apps() {
