@@ -77,4 +77,6 @@ public class TableConst {
     public static final String DASHBOARD_USER = "dashboard_user";
     public static final String DASHBOARD_DATASET = "dashboard_dataset";
     public static final String DASHBOARD_HISTORY = "dashboard_history";
+    public static final String LANGFUSE_SESSION_TRACING = "langfuse_session_tracing";
+    public static final String LANGFUSE_SESSION_TRACE_CURSOR = "langfuse_session_trace_cursor";
 }
