@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "test:diy": "node --experimental-strip-types --test src/utils/diy/questionTemplate.test.ts",
     "test:uip": "node --experimental-strip-types --test src/utils/chat/uip.test.ts",
+    "test:session-tracing": "node --experimental-strip-types --test src/utils/sessionTracing.test.ts",
     "build-only": "vite build",
     "build-only:main": "vite build --mode main",
     "build-only:doc": "vite build --mode doc",
