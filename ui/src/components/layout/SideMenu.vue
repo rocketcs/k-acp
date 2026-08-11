@@ -6,7 +6,6 @@
  */
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAccountStore } from '@/stores'
 import homeAvatar from '@/assets/avatar/home.png'
 import agentAvatar from '@/assets/avatar/agent.png'
 import workflowAvatar from '@/assets/avatar/workflow.png'
@@ -20,7 +19,6 @@ import toolAvatar from '@/assets/avatar/tool.png'
 import hookAvatar from '@/assets/avatar/hook.png'
 import promptAvatar from '@/assets/avatar/prompt.png'
 import sensitiveAvatar from '@/assets/avatar/sensitive.png'
-import chatBotAvatar from '@/assets/avatar/chat-bot.png'
 
 /**
  * Props定义
@@ -31,7 +29,6 @@ const props = defineProps<{
 
 const route = useRoute()
 const router = useRouter()
-const accountStore = useAccountStore()
 
 /**
  * 菜单项类型定义
@@ -99,13 +96,6 @@ const menuConfig: MenuItem[] = [
     type: 'menu'
   },
   {
-    key: 'session-tracing',
-    label: '对话复盘',
-    avatar: chatBotAvatar,
-    path: '/ops/session-tracing',
-    type: 'menu'
-  },
-  {
     key: 'knowledge',
     label: '知识库',
     avatar: knowledgeAvatar,
@@ -170,21 +160,13 @@ const menuConfig: MenuItem[] = [
   }
 ]
 
-const canViewSessionTracing = computed(() =>
-  accountStore.tenantRole === 'TENANT_OWNER' || accountStore.tenantRole === 'TENANT_ADMIN',
-)
-
-const visibleMenuConfig = computed(() =>
-  menuConfig.filter(item => item.key !== 'session-tracing' || canViewSessionTracing.value),
-)
-
 /**
  * 当前激活的菜单项
  */
 const activeMenu = computed(() => {
   const path = route.path
   // 找到匹配的菜单项
-  const menuItem = visibleMenuConfig.value.find(item => {
+  const menuItem = menuConfig.find(item => {
     if (item.type !== 'menu') return false
     // 精确匹配或前缀匹配
     return path === item.path || path.startsWith(item.path + '/')
@@ -205,7 +187,7 @@ const handleMenuClick = (item: MenuItem) => {
 <template>
   <div class="side-menu-wrapper" :class="{ collapsed: props.collapsed }">
     <div class="side-menu">
-      <template v-for="item in visibleMenuConfig" :key="item.key">
+      <template v-for="item in menuConfig" :key="item.key">
         <!-- 分类 -->
         <div v-if="item.type === 'category'" class="menu-category">
           {{ item.label }}
