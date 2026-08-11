@@ -1,5 +1,6 @@
 package com.hxh.apboa.workflowbiz.service.impl;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hxh.apboa.common.exception.BusinessException;
@@ -15,17 +16,21 @@ import com.hxh.apboa.workflowbiz.vo.LangfuseTracingUserVO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -181,6 +186,10 @@ class LangfuseSessionTracingServiceImplTest {
 
     @Test
     void mapperContractExposesOnlyReadOperations() {
+        InterceptorIgnore interceptorIgnore = LangfuseSessionTracingMapper.class
+            .getAnnotation(InterceptorIgnore.class);
+        assertEquals("true", interceptorIgnore.tenantLine());
+
         Set<String> methodNames = Set.of(LangfuseSessionTracingMapper.class.getDeclaredMethods()).stream()
             .map(method -> method.getName())
             .collect(Collectors.toSet());
@@ -195,6 +204,27 @@ class LangfuseSessionTracingServiceImplTest {
             "countStaleProcessing",
             "selectLastProcessedAt"
         ), methodNames);
+    }
+
+    @Test
+    void mapperXmlKeepsExplicitTenantPredicateForEverySelect() throws Exception {
+        try (InputStream xml = getClass().getClassLoader().getResourceAsStream(
+            "com/hxh/apboa/workflowbiz/mapper/LangfuseSessionTracingMapper.xml")) {
+            assertNotNull(xml);
+
+            var factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+
+            NodeList selectNodes = factory.newDocumentBuilder().parse(xml).getElementsByTagName("select");
+            assertEquals(8, selectNodes.getLength());
+            for (int i = 0; i < selectNodes.getLength(); i++) {
+                Element select = (Element) selectNodes.item(i);
+                assertTrue(select.getTextContent().contains("tenant_id = #{tenantId}"),
+                    () -> select.getAttribute("id") + " must explicitly filter tenant_id");
+            }
+        }
     }
 
     private LangfuseSessionTracingDetailRow detailRow() {

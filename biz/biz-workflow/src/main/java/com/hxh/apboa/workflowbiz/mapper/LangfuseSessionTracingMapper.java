@@ -1,5 +1,6 @@
 package com.hxh.apboa.workflowbiz.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.hxh.apboa.workflowbiz.dto.LangfuseSessionTracingQuery;
 import com.hxh.apboa.workflowbiz.mapper.row.LangfuseSessionTracingDetailRow;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
+@InterceptorIgnore(tenantLine = "true")
 public interface LangfuseSessionTracingMapper {
 
     List<LangfuseTracingUserVO> selectUsers(@Param("tenantId") Long tenantId);
