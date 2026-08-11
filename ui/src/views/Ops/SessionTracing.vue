@@ -321,6 +321,16 @@ onMounted(() => {
 }
 
 @media (max-width: 760px) {
+  :global(.app-layout:has(.tracing-page) > .sidebar) {
+    display: none;
+  }
+
+  :global(.app-layout:has(.tracing-page) > .layout-content) {
+    width: 100%;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
   .tracing-page {
     padding: 12px;
   }
