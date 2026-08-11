@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hxh.apboa.workflowbiz.vo.LangfuseConversationTurnVO;
 import com.hxh.apboa.workflowbiz.vo.LangfuseSessionTracingDetailVO;
 import com.hxh.apboa.workflowbiz.vo.LangfuseSessionTracingListVO;
+import com.hxh.apboa.workflowbiz.vo.LangfuseSessionTracingSummaryVO;
 import com.hxh.apboa.workflowbiz.vo.LangfuseTracingUserVO;
 import org.junit.jupiter.api.Test;
 
@@ -49,6 +50,15 @@ class LangfuseSessionTracingAssemblerTest {
     }
 
     @Test
+    void anyNonObjectTurnMakesWholePayloadInvalid() throws Exception {
+        assertTrue(assembler.parseTurns(parse("{\"turns\":[{\"turn\":1},null]}" )).isEmpty());
+        assertTrue(assembler.parseTurns(parse("{\"turns\":[{\"turn\":1},\"unexpected\"]}" )).isEmpty());
+        assertTrue(assembler.parseTurns(parse("{\"turns\":[{\"turn\":1},42]}" )).isEmpty());
+        assertTrue(assembler.parseTurns(parse("{\"turns\":[{\"turn\":1},true]}" )).isEmpty());
+        assertTrue(assembler.parseTurns(parse("{\"turns\":[{\"turn\":1},[]]}" )).isEmpty());
+    }
+
+    @Test
     void missingQuestionOrAnswerIsKeptAsEmptyText() throws Exception {
         List<LangfuseConversationTurnVO> turns = assembler.parseTurns(
             parse("{\"turns\":[{\"turn\":1}]}") );
@@ -68,6 +78,37 @@ class LangfuseSessionTracingAssemblerTest {
         assertEquals(1, turns.get(0).getTurn());
         assertEquals(9, turns.get(1).getTurn());
         assertEquals("问题", turns.get(1).getUserQuestion());
+    }
+
+    @Test
+    void nonTextualTimestampsAreNull() throws Exception {
+        List<LangfuseConversationTurnVO> turns = assembler.parseTurns(parse("""
+            {"turns":[
+              {"userTimestamp":42,"agentTimestamp":42},
+              {"userTimestamp":true,"agentTimestamp":false},
+              {"userTimestamp":{"value":"unexpected"},"agentTimestamp":{"value":"unexpected"}}
+            ]}
+            """));
+
+        assertEquals(3, turns.size());
+        for (LangfuseConversationTurnVO turn : turns) {
+            assertNull(turn.getUserTimestamp());
+            assertNull(turn.getAgentTimestamp());
+        }
+    }
+
+    @Test
+    void summaryKeepsNullTimestampFieldsInJson() throws Exception {
+        JsonNode summary = parse(objectMapper.writeValueAsString(new LangfuseSessionTracingSummaryVO()));
+
+        assertTrue(summary.has("firstObservationStartTime"));
+        assertTrue(summary.get("firstObservationStartTime").isNull());
+        assertTrue(summary.has("lastObservationEndTime"));
+        assertTrue(summary.get("lastObservationEndTime").isNull());
+        assertTrue(summary.has("processedAt"));
+        assertTrue(summary.get("processedAt").isNull());
+        assertTrue(summary.has("lastProcessedAt"));
+        assertTrue(summary.get("lastProcessedAt").isNull());
     }
 
     @Test

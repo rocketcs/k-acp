@@ -18,6 +18,12 @@ public class LangfuseSessionTracingAssembler {
             return List.of();
         }
 
+        for (JsonNode turnNode : turnsNode) {
+            if (turnNode == null || !turnNode.isObject()) {
+                return List.of();
+            }
+        }
+
         List<LangfuseConversationTurnVO> turns = new ArrayList<>(turnsNode.size());
         int index = 0;
         for (JsonNode turnNode : turnsNode) {
@@ -89,6 +95,6 @@ public class LangfuseSessionTracingAssembler {
             return null;
         }
         JsonNode value = node.get(fieldName);
-        return value == null || value.isNull() ? null : value.asText();
+        return value == null || !value.isTextual() ? null : value.textValue();
     }
 }
