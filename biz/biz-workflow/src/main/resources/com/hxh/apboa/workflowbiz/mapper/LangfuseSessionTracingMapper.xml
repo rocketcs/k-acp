@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hxh.apboa.workflowbiz.mapper.LangfuseSessionTracingMapper">
+
+    <resultMap id="tracingUserMap" type="com.hxh.apboa.workflowbiz.vo.LangfuseTracingUserVO">
+        <result property="userId" column="user_id"/>
+        <result property="nickname" column="nickname"/>
+        <result property="username" column="username"/>
+        <result property="email" column="email"/>
+        <result property="conversationCount" column="conversation_count"/>
+        <result property="lastProcessedAt" column="last_processed_at"/>
+    </resultMap>
+
+    <resultMap id="tracingListMap" type="com.hxh.apboa.workflowbiz.vo.LangfuseSessionTracingListVO">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="nickname" column="nickname"/>
+        <result property="username" column="username"/>
+        <result property="email" column="email"/>
+        <result property="status" column="status"/>
+        <result property="turnCount" column="turn_count"/>
+        <result property="firstUserQuestion" column="first_user_question"/>
+        <result property="lastAgentAnswer" column="last_agent_answer"/>
+        <result property="traceCount" column="trace_count"/>
+        <result property="fullObservationCount" column="full_observation_count"/>
+        <result property="processedAt" column="processed_at"/>
+    </resultMap>
+
+    <resultMap id="tracingDetailMap" type="com.hxh.apboa.workflowbiz.mapper.row.LangfuseSessionTracingDetailRow">
+        <id property="id" column="id"/>
+        <result property="sessionId" column="session_id"/>
+        <result property="projectId" column="project_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="nickname" column="nickname"/>
+        <result property="username" column="username"/>
+        <result property="email" column="email"/>
+        <result property="status" column="status"/>
+        <result property="llmAnalysisJson" column="llm_analysis_json"
+                javaType="com.fasterxml.jackson.databind.JsonNode"
+                typeHandler="com.hxh.apboa.common.config.mybatis.JsonNodeTypeHandler"/>
+        <result property="traceCount" column="trace_count"/>
+        <result property="seedObservationCount" column="seed_observation_count"/>
+        <result property="fullObservationCount" column="full_observation_count"/>
+        <result property="scoreCount" column="score_count"/>
+        <result property="qaPairCount" column="qa_pair_count"/>
+        <result property="typeCountsJson" column="type_counts_json"
+                javaType="com.fasterxml.jackson.databind.JsonNode"
+                typeHandler="com.hxh.apboa.common.config.mybatis.JsonNodeTypeHandler"/>
+        <result property="warningsJson" column="warnings_json"
+                javaType="com.fasterxml.jackson.databind.JsonNode"
+                typeHandler="com.hxh.apboa.common.config.mybatis.JsonNodeTypeHandler"/>
+        <result property="firstObservationStartTime" column="first_observation_start_time"/>
+        <result property="lastObservationEndTime" column="last_observation_end_time"/>
+        <result property="processedAt" column="processed_at"/>
+    </resultMap>
+
+    <resultMap id="tracingRawMap" type="com.hxh.apboa.workflowbiz.vo.LangfuseSessionTracingRawVO">
+        <result property="llmAnalysisJson" column="llm_analysis_json"
+                javaType="com.fasterxml.jackson.databind.JsonNode"
+                typeHandler="com.hxh.apboa.common.config.mybatis.JsonNodeTypeHandler"/>
+        <result property="qaPairsJson" column="qa_pairs_json"
+                javaType="com.fasterxml.jackson.databind.JsonNode"
+                typeHandler="com.hxh.apboa.common.config.mybatis.JsonNodeTypeHandler"/>
+        <result property="conversationJson" column="conversation_json"
+                javaType="com.fasterxml.jackson.databind.JsonNode"
+                typeHandler="com.hxh.apboa.common.config.mybatis.JsonNodeTypeHandler"/>
+        <result property="envelopeJson" column="envelope_json"
+                javaType="com.fasterxml.jackson.databind.JsonNode"
+                typeHandler="com.hxh.apboa.common.config.mybatis.JsonNodeTypeHandler"/>
+        <result property="warningsJson" column="warnings_json"
+                javaType="com.fasterxml.jackson.databind.JsonNode"
+                typeHandler="com.hxh.apboa.common.config.mybatis.JsonNodeTypeHandler"/>
+    </resultMap>
+
+    <resultMap id="statusCountMap" type="com.hxh.apboa.workflowbiz.mapper.row.LangfuseStatusCountRow">
+        <result property="status" column="status"/>
+        <result property="count" column="status_count"/>
+    </resultMap>
+
+    <sql id="firstObservationUserId">
+        SELECT observation_users.user_id
+        FROM JSON_TABLE(
+            t.envelope_json,
+            '$.observations[*]' COLUMNS (
+                user_id VARCHAR(128) PATH '$.userId' NULL ON EMPTY NULL ON ERROR
+            )
+        ) AS observation_users
+        WHERE observation_users.user_id IS NOT NULL
+          AND TRIM(observation_users.user_id) != ''
+        LIMIT 1
+    </sql>
+
+    <select id="selectUsers" resultMap="tracingUserMap">
+        SELECT extracted.user_id,
+               MAX(a.nickname) AS nickname,
+               MAX(a.username) AS username,
+               MAX(a.email) AS email,
+               COUNT(*) AS conversation_count,
+               MAX(extracted.processed_at) AS last_processed_at
+        FROM (
+            SELECT DISTINCT t.id, t.processed_at, observation_users.user_id
+            FROM langfuse_session_tracing t
+            JOIN JSON_TABLE(
+                t.envelope_json,
+                '$.observations[*]' COLUMNS (
+                    user_id VARCHAR(128) PATH '$.userId' NULL ON EMPTY NULL ON ERROR
+                )
+            ) AS observation_users
+            WHERE t.tenant_id = #{tenantId}
+              AND t.enabled = 1
+              AND observation_users.user_id IS NOT NULL
+              AND TRIM(observation_users.user_id) != ''
+        ) extracted
+        LEFT JOIN account a
+          ON CAST(a.id AS CHAR) = extracted.user_id
+         AND a.enabled = 1
+        GROUP BY extracted.user_id
+        ORDER BY last_processed_at DESC, extracted.user_id ASC
+    </select>
+
+    <select id="selectTracingPage" resultMap="tracingListMap">
+        SELECT tracing_row.id,
+               tracing_row.user_id,
+               a.nickname,
+               a.username,
+               a.email,
+               tracing_row.status,
+               tracing_row.turn_count,
+               tracing_row.first_user_question,
+               tracing_row.last_agent_answer,
+               tracing_row.trace_count,
+               tracing_row.full_observation_count,
+               tracing_row.processed_at
+        FROM (
+            SELECT t.id,
+                   (<include refid="firstObservationUserId"/>) AS user_id,
+                   t.status,
+                   COALESCE(JSON_LENGTH(t.llm_analysis_json, '$.turns'), 0) AS turn_count,
+                   COALESCE(
+                       JSON_UNQUOTE(JSON_EXTRACT(t.llm_analysis_json, '$.turns[0].userQuestion')),
+                       ''
+                   ) AS first_user_question,
+                   CASE
+                       WHEN COALESCE(JSON_LENGTH(t.llm_analysis_json, '$.turns'), 0) &gt; 0 THEN COALESCE(
+                           JSON_UNQUOTE(JSON_EXTRACT(
+                               t.llm_analysis_json,
+                               CONCAT(
+                                   '$.turns[',
+                                   JSON_LENGTH(t.llm_analysis_json, '$.turns') - 1,
+                                   '].agentAnswer'
+                               )
+                           )),
+                           ''
+                       )
+                       ELSE ''
+                   END AS last_agent_answer,
+                   t.trace_count,
+                   t.full_observation_count,
+                   t.processed_at
+            FROM langfuse_session_tracing t
+            WHERE t.tenant_id = #{tenantId}
+              AND t.enabled = 1
+            <if test="query.userId != null and query.userId != ''">
+              AND JSON_SEARCH(
+                    t.envelope_json,
+                    'one',
+                    #{query.userId},
+                    NULL,
+                    '$.observations[*].userId'
+                  ) IS NOT NULL
+            </if>
+            <if test="query.status != null and query.status != ''">
+              AND t.status = #{query.status}
+            </if>
+        ) tracing_row
+        LEFT JOIN account a
+          ON CAST(a.id AS CHAR) = tracing_row.user_id
+         AND a.enabled = 1
+        ORDER BY tracing_row.processed_at DESC, tracing_row.id DESC
+    </select>
+
+    <select id="selectDetail" resultMap="tracingDetailMap">
+        SELECT CAST(detail_row.id AS CHAR) AS id,
+               detail_row.session_id,
+               detail_row.project_id,
+               detail_row.user_id,
+               a.nickname,
+               a.username,
+               a.email,
+               detail_row.status,
+               detail_row.llm_analysis_json,
+               detail_row.trace_count,
+               detail_row.seed_observation_count,
+               detail_row.full_observation_count,
+               detail_row.score_count,
+               detail_row.qa_pair_count,
+               detail_row.type_counts_json,
+               detail_row.warnings_json,
+               detail_row.first_observation_start_time,
+               detail_row.last_observation_end_time,
+               detail_row.processed_at
+        FROM (
+            SELECT t.*,
+                   (<include refid="firstObservationUserId"/>) AS user_id
+            FROM langfuse_session_tracing t
+            WHERE t.tenant_id = #{tenantId}
+              AND t.id = #{id}
+              AND t.enabled = 1
+        ) detail_row
+        LEFT JOIN account a
+          ON CAST(a.id AS CHAR) = detail_row.user_id
+         AND a.enabled = 1
+    </select>
+
+    <select id="selectRaw" resultMap="tracingRawMap">
+        SELECT t.llm_analysis_json,
+               t.qa_pairs_json,
+               t.conversation_json,
+               t.envelope_json,
+               t.warnings_json
+        FROM langfuse_session_tracing t
+        WHERE t.tenant_id = #{tenantId}
+          AND t.id = #{id}
+          AND t.enabled = 1
+    </select>
+
+    <select id="selectResultStatusCounts" resultMap="statusCountMap">
+        SELECT t.status, COUNT(*) AS status_count
+        FROM langfuse_session_tracing t
+        WHERE t.tenant_id = #{tenantId}
+          AND t.enabled = 1
+        GROUP BY t.status
+    </select>
+
+    <select id="selectCursorStatusCounts" resultMap="statusCountMap">
+        SELECT c.status, COUNT(*) AS status_count
+        FROM langfuse_session_trace_cursor c
+        WHERE c.tenant_id = #{tenantId}
+          AND c.enabled = 1
+        GROUP BY c.status
+    </select>
+
+    <select id="countStaleProcessing" resultType="long">
+        SELECT COUNT(*)
+        FROM langfuse_session_trace_cursor c
+        WHERE c.tenant_id = #{tenantId}
+          AND c.enabled = 1
+          AND c.status = 'PROCESSING'
+          AND c.leased_until &lt; NOW(3)
+    </select>
+
+    <select id="selectLastProcessedAt" resultType="java.time.LocalDateTime">
+        SELECT MAX(t.processed_at)
+        FROM langfuse_session_tracing t
+        WHERE t.tenant_id = #{tenantId}
+          AND t.enabled = 1
+    </select>
+
+</mapper>
