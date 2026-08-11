@@ -15,17 +15,19 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
-@InterceptorIgnore(tenantLine = "true")
 public interface LangfuseSessionTracingMapper {
 
+    @InterceptorIgnore(tenantLine = "true")
     List<LangfuseTracingUserVO> selectUsers(@Param("tenantId") Long tenantId);
 
+    @InterceptorIgnore(tenantLine = "true")
     IPage<LangfuseSessionTracingListVO> selectTracingPage(
         IPage<LangfuseSessionTracingListVO> page,
         @Param("tenantId") Long tenantId,
         @Param("query") LangfuseSessionTracingQuery query
     );
 
+    @InterceptorIgnore(tenantLine = "true")
     LangfuseSessionTracingDetailRow selectDetail(
         @Param("tenantId") Long tenantId,
         @Param("id") Long id

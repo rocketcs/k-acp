@@ -343,7 +343,8 @@ const bizRoutes: AppRouteRecordRaw[] = [
         component: () => import('@/views/Ops/SessionTracing.vue'),
         meta: {
           title: '用户对话复盘',
-          hidden: false
+          hidden: false,
+          tenantAdminOnly: true,
         },
       },
       // 审查管理

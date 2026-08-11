@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -186,10 +187,6 @@ class LangfuseSessionTracingServiceImplTest {
 
     @Test
     void mapperContractExposesOnlyReadOperations() {
-        InterceptorIgnore interceptorIgnore = LangfuseSessionTracingMapper.class
-            .getAnnotation(InterceptorIgnore.class);
-        assertEquals("true", interceptorIgnore.tenantLine());
-
         Set<String> methodNames = Set.of(LangfuseSessionTracingMapper.class.getDeclaredMethods()).stream()
             .map(method -> method.getName())
             .collect(Collectors.toSet());
@@ -204,6 +201,13 @@ class LangfuseSessionTracingServiceImplTest {
             "countStaleProcessing",
             "selectLastProcessedAt"
         ), methodNames);
+
+        Set<String> tenantParserBypasses = Set.of(LangfuseSessionTracingMapper.class.getDeclaredMethods()).stream()
+            .filter(method -> method.isAnnotationPresent(InterceptorIgnore.class))
+            .peek(method -> assertEquals("true", method.getAnnotation(InterceptorIgnore.class).tenantLine()))
+            .map(method -> method.getName())
+            .collect(Collectors.toSet());
+        assertEquals(Set.of("selectUsers", "selectTracingPage", "selectDetail"), tenantParserBypasses);
     }
 
     @Test
@@ -217,13 +221,23 @@ class LangfuseSessionTracingServiceImplTest {
             factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
             factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
 
-            NodeList selectNodes = factory.newDocumentBuilder().parse(xml).getElementsByTagName("select");
+            var document = factory.newDocumentBuilder().parse(xml);
+            NodeList selectNodes = document.getElementsByTagName("select");
             assertEquals(8, selectNodes.getLength());
             for (int i = 0; i < selectNodes.getLength(); i++) {
                 Element select = (Element) selectNodes.item(i);
                 assertTrue(select.getTextContent().contains("tenant_id = #{tenantId}"),
                     () -> select.getAttribute("id") + " must explicitly filter tenant_id");
             }
+
+            Element firstUserId = (Element) document.getElementsByTagName("sql").item(0);
+            assertTrue(firstUserId.getTextContent().contains("FOR ORDINALITY"));
+            assertTrue(firstUserId.getTextContent().contains("ORDER BY observation_users.observation_index"));
+
+            Element pageSelect = (Element) selectNodes.item(1);
+            assertEquals("selectTracingPage", pageSelect.getAttribute("id"));
+            assertTrue(pageSelect.getTextContent().contains("filter_users.user_id = #{query.userId}"));
+            assertFalse(pageSelect.getTextContent().contains("JSON_SEARCH"));
         }
     }
 

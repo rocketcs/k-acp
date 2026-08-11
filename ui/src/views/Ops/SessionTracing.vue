@@ -139,9 +139,19 @@ async function loadPage(): Promise<void> {
       detail.value = null
       detailError.value = null
       detailRequestSequence++
+      detailLoading.value = false
+      rawRequestSequence++
+      rawLoading.value = false
+      rawError.value = null
       return
     }
 
+    if (nextId !== selectedId.value) {
+      rawRequestSequence++
+      rawLoading.value = false
+      rawError.value = null
+      activeTab.value = 'conversation'
+    }
     selectedId.value = nextId
     await loadDetail(nextId)
   } catch (error) {
@@ -149,6 +159,11 @@ async function loadPage(): Promise<void> {
     pageData.value = emptyPage()
     selectedId.value = null
     detail.value = null
+    detailRequestSequence++
+    detailLoading.value = false
+    rawRequestSequence++
+    rawLoading.value = false
+    rawError.value = null
     listError.value = errorText(error, '会话列表加载失败')
   } finally {
     if (requestSequence === listRequestSequence) listLoading.value = false
@@ -157,9 +172,11 @@ async function loadPage(): Promise<void> {
 
 async function selectRecord(record: TracingPageItem): Promise<void> {
   if (record.id === selectedId.value && detail.value) return
+  rawRequestSequence++
+  rawLoading.value = false
+  rawError.value = null
   selectedId.value = record.id
   activeTab.value = 'conversation'
-  rawError.value = null
   await loadDetail(record.id)
 }
 
@@ -169,7 +186,9 @@ async function resetAndReload(): Promise<void> {
   detail.value = null
   activeTab.value = 'conversation'
   detailRequestSequence++
+  detailLoading.value = false
   rawRequestSequence++
+  rawLoading.value = false
   rawError.value = null
   await loadPage()
 }
@@ -179,6 +198,11 @@ async function handlePageChange(page: number): Promise<void> {
   selectedId.value = null
   detail.value = null
   activeTab.value = 'conversation'
+  detailRequestSequence++
+  detailLoading.value = false
+  rawRequestSequence++
+  rawLoading.value = false
+  rawError.value = null
   await loadPage()
 }
 
@@ -207,7 +231,12 @@ async function handleTabChange(key: string | number): Promise<void> {
 }
 
 async function refreshAll(): Promise<void> {
+  rawRequestSequence++
+  rawLoading.value = false
+  rawError.value = null
+  rawByRecordId.value = {}
   await Promise.all([loadUsers(), loadPage(), loadSummary()])
+  if (activeTab.value === 'raw') await loadRaw(true)
 }
 
 onMounted(() => {

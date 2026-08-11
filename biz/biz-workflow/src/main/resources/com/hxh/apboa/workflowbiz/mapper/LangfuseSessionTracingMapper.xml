@@ -82,11 +82,13 @@
         FROM JSON_TABLE(
             t.envelope_json,
             '$.observations[*]' COLUMNS (
+                observation_index FOR ORDINALITY,
                 user_id VARCHAR(128) PATH '$.userId' NULL ON EMPTY NULL ON ERROR
             )
         ) AS observation_users
         WHERE observation_users.user_id IS NOT NULL
           AND TRIM(observation_users.user_id) != ''
+        ORDER BY observation_users.observation_index
         LIMIT 1
     </sql>
 
@@ -132,7 +134,7 @@
                tracing_row.full_observation_count,
                tracing_row.processed_at
         FROM (
-            SELECT t.id,
+            SELECT DISTINCT t.id,
                    (<include refid="firstObservationUserId"/>) AS user_id,
                    t.status,
                    COALESCE(JSON_LENGTH(t.llm_analysis_json, '$.turns'), 0) AS turn_count,
@@ -158,17 +160,17 @@
                    t.full_observation_count,
                    t.processed_at
             FROM langfuse_session_tracing t
+            <if test="query.userId != null and query.userId != ''">
+              JOIN JSON_TABLE(
+                    t.envelope_json,
+                    '$.observations[*]' COLUMNS (
+                        user_id VARCHAR(128) PATH '$.userId' NULL ON EMPTY NULL ON ERROR
+                    )
+                  ) AS filter_users
+                ON filter_users.user_id = #{query.userId}
+            </if>
             WHERE t.tenant_id = #{tenantId}
               AND t.enabled = 1
-            <if test="query.userId != null and query.userId != ''">
-              AND JSON_SEARCH(
-                    t.envelope_json,
-                    'one',
-                    #{query.userId},
-                    NULL,
-                    '$.observations[*].userId'
-                  ) IS NOT NULL
-            </if>
             <if test="query.status != null and query.status != ''">
               AND t.status = #{query.status}
             </if>

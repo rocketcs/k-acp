@@ -44,6 +44,15 @@ export function setupRouterGuard(router: Router): void {
 
     const accountStore = useAccountStore()
 
+    const enterAuthorizedRoute = () => {
+      if (to.meta?.tenantAdminOnly === true && !accountStore.isAdmin) {
+        next({ path: RoutePaths.FORBIDDEN, replace: true })
+        NProgress.done()
+        return
+      }
+      next()
+    }
+
     // 放行“外置对话链接”
     if (to.path.startsWith('/communication/') && !accountStore.isReadOnly) {
       next()
@@ -68,12 +77,12 @@ export function setupRouterGuard(router: Router): void {
 
         // 检查是否已获取用户信息
         if (accountStore.userInfo) {
-          next()
+          enterAuthorizedRoute()
         } else {
           try {
             // 获取用户信息
             await accountStore.fetchCurrentUserInfo()
-            next()
+            enterAuthorizedRoute()
           } catch (error) {
             // 获取用户信息失败，清除token并重定向到登录页
             await accountStore.logout()
