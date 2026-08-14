@@ -99,7 +99,7 @@ function hideTooltip() {
 }
 
 function zoomIn() { cy?.zoom({ level: Math.min(2.4, cy.zoom() + 0.16), renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }) }
-function zoomOut() { cy?.zoom({ level: Math.max(0.45, cy.zoom() - 0.16), renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }) }
+function zoomOut() { cy?.zoom({ level: Math.max(0.3, cy.zoom() - 0.16), renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }) }
 function fit() { cy?.fit(cy.elements(), props.fullscreen ? 32 : 16) }
 function relayout() { render(true) }
 function toggleViewMode() {
@@ -111,7 +111,7 @@ function initialize() {
   cy = cytoscape({
     container: canvas.value,
     elements: buildElements(),
-    minZoom: 0.45,
+    minZoom: 0.3,
     maxZoom: 2.4,
     wheelSensitivity: 0.16,
     style: [
