@@ -11,7 +11,9 @@ export function focusSelection(
 ): Set<string> {
   const { lineageDepth = 2 } = opts
   const nodeById = new Map(nodes.map((node) => [node.id, node]))
-  const product = nodes.find((node) => node.kind === 'product')
+  const product =
+    nodes.find((node) => node.kind === 'product' && edges.some((edge) => edge.kind === 'query' && edge.target === node.id))
+    ?? nodes.find((node) => node.kind === 'product')
   const visible = new Set<string>()
   if (!product) {
     nodes.forEach((node) => {

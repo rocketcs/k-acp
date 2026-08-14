@@ -40,3 +40,24 @@ test('lineageDepth 0 stops the provenance chain at the catalog record', () => {
   assert.equal(visible.has('source_file'), false)
   assert.equal(visible.has('catalog_record'), true)
 })
+
+test('with two products, focuses the query-edge target product, not the array-first one', () => {
+  const twoProductNodes: GraphifyEvidenceNode[] = [
+    { id: 'product-first', label: '商品甲', kind: 'product' },
+    { id: 'product-second', label: '商品乙', kind: 'product' },
+    { id: 'registration-second', label: '注册乙', kind: 'registration' },
+    { id: 'catalog_record-second', label: '目录记录乙', kind: 'catalog_record' },
+    { id: 'source_file-second', label: '来源乙', kind: 'source_file' },
+  ]
+  const twoProductEdges: GraphifyEvidenceEdge[] = [
+    { id: 'q1', source: 'model', target: 'product-second', label: '查询返回', kind: 'query' },
+    { id: 'b1', source: 'product-second', target: 'registration-second', label: '对应', kind: 'business' },
+    { id: 'p1', source: 'product-second', target: 'catalog_record-second', label: '证据支持', kind: 'provenance' },
+    { id: 'p2', source: 'catalog_record-second', target: 'source_file-second', label: '包含', kind: 'provenance' },
+  ]
+  const visible = focusSelection(twoProductNodes, twoProductEdges, { lineageDepth: 2 })
+  assert.equal(visible.has('product-first'), false, 'non-queried product must not be included')
+  assert.equal(visible.has('product-second'), true)
+  assert.equal(visible.has('registration-second'), true)
+  assert.equal(visible.has('source_file-second'), true)
+})

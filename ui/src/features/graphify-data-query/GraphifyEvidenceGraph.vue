@@ -155,6 +155,7 @@ function initialize() {
       { selector: 'node:selected', style: { 'border-width': 3, 'border-color': '#2f80c5', 'background-color': '#e6f2fb', 'underlay-color': '#5a9fd0', 'underlay-opacity': 0.24, 'underlay-padding': 6 } },
       { selector: 'node.hover', style: { 'border-width': 3, 'border-color': '#e8a23a' } },
       { selector: 'node.dimmed', style: { opacity: 0.15 } },
+      { selector: 'edge.dimmed', style: { opacity: 0.15 } },
       { selector: 'edge', style: { width: 1.5, 'curve-style': 'bezier', 'line-color': '#8faec6', 'target-arrow-color': '#8faec6', 'target-arrow-shape': 'triangle', 'arrow-scale': 0.7, label: 'data(label)', 'font-size': 9, 'font-family': 'PingFang SC, Microsoft YaHei, sans-serif', color: '#4d6675', 'text-background-color': '#f3f8fc', 'text-background-opacity': 0.92, 'text-background-padding': '2px', 'text-rotation': 'autorotate' } },
       { selector: 'edge[kind = "business"]', style: { 'line-color': '#4c9db8', 'target-arrow-color': '#4c9db8' } },
       { selector: 'edge[kind = "provenance"]', style: { 'line-color': '#7d9cbb', 'target-arrow-color': '#7d9cbb', 'line-style': 'dashed' } },
@@ -168,11 +169,14 @@ function initialize() {
     const node = event.target
     const keep = node.closedNeighborhood().union(node)
     cy?.nodes().forEach((n) => { if (!keep.has(n)) n.addClass('dimmed') })
+    const keepEdges = node.connectedEdges()
+    cy?.edges().forEach((edge) => { if (!keepEdges.has(edge)) edge.addClass('dimmed') })
     node.addClass('hover')
     showTooltip(event)
   })
   cy.on('mouseout', 'node', () => {
     cy?.nodes().removeClass('dimmed hover')
+    cy?.edges().removeClass('dimmed')
     hideTooltip()
   })
   cy.on('tap', 'node', (event) => select(event.target.id()))

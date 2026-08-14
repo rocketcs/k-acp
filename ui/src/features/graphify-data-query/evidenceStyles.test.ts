@@ -15,6 +15,11 @@ test('unknown kinds fall back to the default entity visual', () => {
   assert.equal(nodeVisual('whatever').heading, '业务实体')
 })
 
+test('prototype members do not leak through the kind lookup', () => {
+  assert.equal(nodeVisual('__proto__').heading, '业务实体')
+  assert.equal(nodeVisual('toString').heading, '业务实体')
+})
+
 test('classifies business entities and source kinds', () => {
   assert.equal(isBusinessEntity('product'), true)
   assert.equal(isBusinessEntity('organization'), true)

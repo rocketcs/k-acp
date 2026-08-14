@@ -29,7 +29,7 @@ const KIND_VISUALS: Record<string, NodeVisual> = {
 const DEFAULT_VISUAL: NodeVisual = { shape: 'round-rectangle', fill: '#eef7fb', border: '#2f8fb0', color: '#146a85', heading: '业务实体' }
 
 export function nodeVisual(kind: string): NodeVisual {
-  return KIND_VISUALS[kind] ?? DEFAULT_VISUAL
+  return Object.prototype.hasOwnProperty.call(KIND_VISUALS, kind) ? KIND_VISUALS[kind]! : DEFAULT_VISUAL
 }
 
 export function isBusinessEntity(kind: string): boolean {
