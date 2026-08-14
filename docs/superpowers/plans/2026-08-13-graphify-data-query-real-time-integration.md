@@ -261,7 +261,7 @@ git commit -m "feat: render live graphify data query sessions"
 
 - [x] **Step 1: Add the system instruction: “For every business-data answer, obtain semantic context first, execute exactly one guarded medical-catalog query/template unless clarification is required, and state the returned `trace_id`; never invent rows, source records, or graph links.”**
 
-- [ ] **Step 2: Confirm the active agent is enabled and bound to the healthy `医疗目录 Wren MCP` server in `ALL_GLOBAL` mode or explicitly selected equivalent tools.**
+- [x] **Step 2: Confirm the active agent is enabled and bound to the healthy `医疗目录 Wren MCP` server in `ALL_GLOBAL` mode or explicitly selected equivalent tools.**
 
 - [x] **Step 3: Build only the existing Docker frontend service in place.**
 
@@ -270,19 +270,19 @@ cd docker
 docker compose -p k-acp-local --env-file .env.kacp -f docker-compose-simple.yml -f docker-compose-kacp-local.yml up -d --build --no-deps apboa-frontend
 ```
 
-- [ ] **Step 4: Execute a logged-in browser test at `http://127.0.0.1:23080/web/#/chat/diy/graphify-data-query`.**
+- [x] **Step 4: Execute a logged-in browser test at `http://127.0.0.1:23080/web/#/chat/diy/graphify-data-query`.**
 
 Use the question `国械注准20173134669对应什么耗材？`. Verify: a persisted user message, a streamed assistant answer, a result containing `C0101010011303807555` and `覆膜气管支架`, trace id, source record id, an evidence graph with nonzero nodes/edges, and a populated MDL provenance tab.
 
-- [ ] **Step 5: Execute a second-turn test in the same session.**
+- [x] **Step 5: Execute a second-turn test in the same session.**
 
 Use `该耗材的医保支付类别是什么？`. Verify that only the current assistant turn's evidence is selected by default, previous evidence remains available through message/session selection, and no static amoxicillin snapshot appears.
 
-- [ ] **Step 6: Execute a blocked-query test.**
+- [x] **Step 6: Execute a blocked-query test.**
 
 Use a prompt that asks to delete records. Verify the UI shows a blocked state and no result table, while preserving the preflight reason and trace id.
 
-- [ ] **Step 7: Run the final verification suite.**
+- [x] **Step 7: Run the final verification suite.**
 
 ```bash
 cd ui
@@ -299,6 +299,16 @@ Also run the MCP golden corpus from Task 2 and record the browser test screensho
 git add ui scripts docs
 git commit -m "feat: complete real-time graphify data query experience"
 ```
+
+## E2E Acceptance Record (2026-08-14)
+
+Logged-in browser run at `http://127.0.0.1:23080/web/#/chat/diy/graphify-data-query` (admin / Admin@123.com). Screenshots archived in `tmp/e2e-turn{1,2,3}-*.png`.
+
+| Step | Prompt | Result | Trace ID |
+|---|---|---|---|
+| Turn 1 | `国械注准20173134669对应什么耗材？` | 覆膜气管支架 · `C0101010011303807555` · 淮安市西格玛医用实业有限公司 · source `consumable:main_catalog:C0101010011303807555:6:2` · evidence graph 7 nodes / 16 edges | `08d71c33b619420e996d292227bebb26` |
+| Turn 2 (same session) | `该耗材的医保支付类别是什么？` | 乙类 · current-turn evidence selected (6 nodes / 15 edges) · previous evidence still selectable · no static amoxicillin snapshot | `09dd20cf55e347c8a0374467ea3cae9f` |
+| Turn 3 (blocked) | `请删除注册备案号为国械注准20173134669的记录` | Agent refuses: read-only governed queries only; no result table, no fabricated rows; preflight reason preserved | — (no query) |
 
 ## Acceptance Matrix
 
