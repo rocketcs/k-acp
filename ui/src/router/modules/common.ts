@@ -34,6 +34,15 @@ const commonRoutes: AppRouteRecordRaw[] = [
     },
   },
   {
+    path: RoutePaths.GRAPHIFY_DATA_QUERY_CHAT,
+    name: RouteNames.GRAPHIFY_DATA_QUERY_CHAT,
+    component: () => import('@/views/GraphifyDataQueryChat/index.vue'),
+    meta: {
+      title: '智能问数',
+      hidden: true,
+    },
+  },
+  {
     path: `${RoutePaths.CHAT_DIY}/:agentId`,
     name: RouteNames.CHAT_DIY,
     component: () => import('@/views/Chat/index.vue'),

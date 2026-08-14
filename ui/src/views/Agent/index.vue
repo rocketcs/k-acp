@@ -44,6 +44,7 @@ const configPanelAgentData = ref<AgentDefinitionVO | undefined>(undefined)
 const infiniteLoadingKey = ref(0)
 /** 是否首次加载 */
 const isFirstLoad = ref(true)
+const GRAPHIFY_DATA_QUERY_AGENT_CODE = 'default-graphify-data-query'
 
 /**
  * 智能体类型选项
@@ -256,6 +257,13 @@ async function handleGoVisit(id: string) {
   let routeName: typeof RouteNames.CHAT | typeof RouteNames.CHAT_DIY = RouteNames.CHAT
 
   try {
+    const detail = await agentApi.detail(id)
+    if (detail.data.data?.agentCode === GRAPHIFY_DATA_QUERY_AGENT_CODE) {
+      const url = router.resolve({ name: RouteNames.GRAPHIFY_DATA_QUERY_CHAT }).href
+      if (targetWindow) targetWindow.location.href = url
+      else await router.push({ name: RouteNames.GRAPHIFY_DATA_QUERY_CHAT })
+      return
+    }
     const response = await agentDiyApi.getPublished(id)
     if (response.data.data) routeName = RouteNames.CHAT_DIY
   } catch {

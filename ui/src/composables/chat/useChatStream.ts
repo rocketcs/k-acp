@@ -30,7 +30,10 @@ export function useChatStream(
   memoryActive?: import('vue').Ref<boolean>,
   planActive?: import('vue').Ref<boolean>,
   toolProcessActive?: import('vue').Ref<boolean>,
-  onMessageSaved?: (chatMsg: ChatMessageVO) => void) {
+  onMessageSaved?: (chatMsg: ChatMessageVO) => void,
+  options?: {
+    onToolResult?: (event: { toolCallId: string; toolName: string; args: string; content: string; messageId: string }) => void
+  }) {
 
   const { userInfo } = useAccountStore()
 
@@ -239,6 +242,7 @@ export function useChatStream(
       onToolCallResult: (e) => {
         // 计划追踪：处理工具结果
         onPlanToolResult(e.toolCallId)
+        const activeTool = toolCallsInProgress.value.find((item) => item.id === e.toolCallId)
 
         try {
           if (agentDetail.value?.agentCode === 'default-tender') {
@@ -293,6 +297,13 @@ export function useChatStream(
             }
           }
         } finally {
+          options?.onToolResult?.({
+            toolCallId: e.toolCallId,
+            toolName: activeTool?.name ?? '',
+            args: activeTool?.args ?? '',
+            content: e.content,
+            messageId: e.messageId,
+          })
           // 清空进行中的工具调用（可根据需要保留，此处清空）
           toolCallsInProgress.value = []
         }

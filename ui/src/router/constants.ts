@@ -73,6 +73,7 @@ export const RouteNames = {
   CHAT_DIY: 'ChatDiy',
   LARGE_SCREEN_IMAGE_CHAT: 'LargeScreenImageChat',
   BIAOSHU_INTERPRETER_CHAT: 'BiaoshuInterpreterChat',
+  GRAPHIFY_DATA_QUERY_CHAT: 'GraphifyDataQueryChat',
   CHAT_HISTORY: 'ChatHistory',
   COMMUNICATION: 'Communication',
 
@@ -165,6 +166,7 @@ export const RoutePaths = {
   CHAT_DIY: '/chat/diy',
   LARGE_SCREEN_IMAGE_CHAT: '/chat/diy/large-screen-image',
   BIAOSHU_INTERPRETER_CHAT: '/chat/diy/biaoshu-interpreter',
+  GRAPHIFY_DATA_QUERY_CHAT: '/chat/diy/graphify-data-query',
   CHAT_HISTORY: '/chat/history',
   COMMUNICATION: '/communication',
 

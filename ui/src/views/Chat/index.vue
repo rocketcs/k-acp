@@ -13,6 +13,7 @@ import ChatSidebar from '@/components/chat/ChatSidebar.vue'
 import ChatMain from '@/components/chat/ChatMain.vue'
 import RenameModal from '@/components/chat/RenameModal.vue'
 import WorkspacePanel from '@/components/workspace/WorkspacePanel.vue'
+import { GraphifyDataQueryPage } from '@/features/graphify-data-query'
 import type { DisplayMessage, ChatMessageVO, UploadedFileItem, ChatSessionVO, ChatMessagePresentation, ChatMessagePresentationInput } from '@/types'
 import type { ChatAttachmentPolicy } from '@/composables/chat/useChatAttachments'
 import * as chatSessionApi from '@/api/chatSession'
@@ -72,9 +73,11 @@ const userInfo = computed(() => accountStore.userInfo)
 const agentId = computed(() => (props.chatAgentId || route.params.agentId) as string || '')
 const isDiyRoute = computed(() => route.name === RouteNames.CHAT_DIY)
 const diyConfig = ref<DiyPageConfig | null>(null)
+const GRAPHIFY_DATA_QUERY_AGENT_CODE = 'default-graphify-data-query'
 
 // 智能体详情
 const { agentDetail, allowFileType } = useAgentDetail(agentId)
+const isGraphifyDataQueryAgent = computed(() => agentDetail.value?.agentCode === GRAPHIFY_DATA_QUERY_AGENT_CODE)
 
 // 记忆/规划是否可用（由 agentDetail 决定）
 const accountId = computed(() => accountStore.userInfo?.id)
@@ -756,7 +759,8 @@ defineExpose({ submitExternalSubmission, requestAttachmentPicker })
 </script>
 
 <template>
-  <div class="chat-page">
+  <GraphifyDataQueryPage v-if="isGraphifyDataQueryAgent" :agent-id="agentId" />
+  <div v-else class="chat-page">
     <ChatSidebar
       :collapsed="sidebarCollapsed"
       :agent-name="agentDetail?.name"
