@@ -77,7 +77,7 @@ export type GraphifyEvidenceEnvelope = {
 - Produces `toVueFlowEvidence(evidence: GraphifyEvidenceEnvelope): { nodes: Node[]; edges: Edge[] }` — historical name kept for compatibility; it lays out cytoscape elements with dagre and returns plain `{ nodes, edges }` data consumed by `GraphifyEvidenceGraph.vue`.
 - Consumes AG-UI tool event name and raw JSON content.
 
-- [ ] **Step 1: Write failing parser tests for a final query, an invalid payload, and a non-query tool.**
+- [x] **Step 1: Write failing parser tests for a final query, an invalid payload, and a non-query tool.**
 
 ```ts
 import test from 'node:test'
@@ -99,7 +99,7 @@ test('rejects a legacy bare result without evidence', () => {
 })
 ```
 
-- [ ] **Step 2: Add `test:graphify-data-query` to `ui/package.json` and run it.**
+- [x] **Step 2: Add `test:graphify-data-query` to `ui/package.json` and run it.**
 
 ```json
 "test:graphify-data-query": "node --experimental-strip-types --test src/features/graphify-data-query/evidenceAdapter.test.ts"
@@ -108,7 +108,7 @@ test('rejects a legacy bare result without evidence', () => {
 Run: `npm run test:graphify-data-query` from `ui/`.
 Expected: FAIL until the parser exists.
 
-- [ ] **Step 3: Implement schema guards and cytoscape element mapping without accepting partial or untrusted shapes.**
+- [x] **Step 3: Implement schema guards and cytoscape element mapping without accepting partial or untrusted shapes.**
 
 ```ts
 export function parseGraphifyEvidence(toolName: string, content: string): GraphifyEvidenceEnvelope | null {
@@ -123,12 +123,12 @@ export function parseGraphifyEvidence(toolName: string, content: string): Graphi
 }
 ```
 
-- [ ] **Step 4: Run unit tests and type checking.**
+- [x] **Step 4: Run unit tests and type checking.**
 
 Run: `npm run test:graphify-data-query && npm run type-check` from `ui/`.
 Expected: PASS.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add ui/package.json ui/src/features/graphify-data-query/types.ts ui/src/features/graphify-data-query/evidenceAdapter.ts ui/src/features/graphify-data-query/evidenceAdapter.test.ts
@@ -149,22 +149,22 @@ git commit -m "feat: define graphify query evidence contract"
 - `run_template_query` and `query` for `medical_catalog` return `GraphifyEvidenceEnvelope` after successful execution.
 - Existing fields remain available inside `result`; no non-medical dataset contract is changed.
 
-- [ ] **Step 1: Add failing MCP tests requiring trace id, result columns/rows, semantic provenance, source ids, and nonempty graph edges for a known catalog record.**
+- [x] **Step 1: Add failing MCP tests requiring trace id, result columns/rows, semantic provenance, source ids, and nonempty graph edges for a known catalog record.**
 
-- [ ] **Step 2: Implement `build_evidence_envelope(trace_id, question, result, semantic_context)` in `dataset_protocol.py`.**
+- [x] **Step 2: Implement `build_evidence_envelope(trace_id, question, result, semantic_context)` in `dataset_protocol.py`.**
 
 The implementation must build graph nodes from `medical_catalog`, each `source_record_id`, related semantic terms, and source provenance; it must build edges only from actual dictionary/Neo4j relationships. Do not synthesize enterprise, version, or import-batch nodes when the source record does not supply them.
 
-- [ ] **Step 3: Return `status: 'blocked'` unchanged for guard/preflight failures and use `status: 'unavailable'` with a safe reason for graph lookup failures.**
+- [x] **Step 3: Return `status: 'blocked'` unchanged for guard/preflight failures and use `status: 'unavailable'` with a safe reason for graph lookup failures.**
 
-- [ ] **Step 4: Extend golden corpus expected values for `trace_id`, `source_record_id`, and evidence node/edge counts.**
+- [x] **Step 4: Extend golden corpus expected values for `trace_id`, `source_record_id`, and evidence node/edge counts.**
 
-- [ ] **Step 5: Run MCP unit tests and golden evaluation against `http://127.0.0.1:8765/mcp`.**
+- [x] **Step 5: Run MCP unit tests and golden evaluation against `http://127.0.0.1:8765/mcp`.**
 
 Run: `python /app/scripts/evaluate_mcp_service.py --url http://127.0.0.1:8765/mcp --corpus /app/evaluation/mcp_service_golden_cases.json --output /tmp/mcp-e2e-result.json --trace /app/logs/query-traces.jsonl` from the MCP container.
 Expected: all cases pass and trace validation has no failures.
 
-- [ ] **Step 6: Commit in the Wren MCP repository.**
+- [x] **Step 6: Commit in the Wren MCP repository.**
 
 ### Task 3: Expose Tool Results to the Dedicated Page Without Changing Generic Chat
 
@@ -176,9 +176,9 @@ Expected: all cases pass and trace validation has no failures.
 - Add optional `onToolResult?: (event: { toolCallId: string; toolName: string; args: string; content: string }) => void` as the final parameter/options field of `useChatStream`.
 - `useGraphifyDataQueryChat(agentId)` produces session list, selected session, persisted messages, `sendQuestion(question)`, `isRunning`, and `evidenceByMessageId`.
 
-- [ ] **Step 1: Add a failing adapter test that sends two tool events from different assistant turns and asserts evidence stays attached to the correct turn.**
+- [x] **Step 1: Add a failing adapter test that sends two tool events from different assistant turns and asserts evidence stays attached to the correct turn.**
 
-- [ ] **Step 2: Call the observer from the existing `onToolCallResult` handler after existing plan/tender handling.**
+- [x] **Step 2: Call the observer from the existing `onToolCallResult` handler after existing plan/tender handling.**
 
 ```ts
 onToolCallResult: (event) => {
@@ -192,15 +192,15 @@ onToolCallResult: (event) => {
 }
 ```
 
-- [ ] **Step 3: Compose `useAgentDetail`, `useSessions`, `useCurrentSession`, `useChatStream`, `chatSessionApi.appendMessage`, and `createRuntimeUserMessage` in the dedicated composable.**
+- [x] **Step 3: Compose `useAgentDetail`, `useSessions`, `useCurrentSession`, `useChatStream`, `chatSessionApi.appendMessage`, and `createRuntimeUserMessage` in the dedicated composable.**
 
 `sendQuestion` must create a session when absent, persist the user message, call `sendMessage`, disable duplicate submits while running, and bind parsed evidence to the current assistant message id. It must not call MCP from the browser directly.
 
-- [ ] **Step 4: Handle disconnect, session changes, stale tool results, abort, blocked replies, and unavailable evidence.**
+- [x] **Step 4: Handle disconnect, session changes, stale tool results, abort, blocked replies, and unavailable evidence.**
 
-- [ ] **Step 5: Run `npm run test:graphify-data-query && npm run type-check`.**
+- [x] **Step 5: Run `npm run test:graphify-data-query && npm run type-check`.**
 
-- [ ] **Step 6: Commit.**
+- [x] **Step 6: Commit.**
 
 ```bash
 git add ui/src/composables/chat/useChatStream.ts ui/src/features/graphify-data-query/useGraphifyDataQueryChat.ts ui/src/features/graphify-data-query/evidenceAdapter.test.ts
@@ -217,9 +217,9 @@ git commit -m "feat: stream MCP evidence into graphify chat"
 - Consumes `useGraphifyDataQueryChat` and `GraphifyEvidenceEnvelope`.
 - Renders `QueryResultState = 'idle' | 'running' | 'executed' | 'blocked' | 'unavailable'`.
 
-- [ ] **Step 1: Remove the `contexts` static snapshots from the live path. Keep optional fixtures only in a test-only module, never imported by production code.**
+- [x] **Step 1: Remove the `contexts` static snapshots from the live path. Keep optional fixtures only in a test-only module, never imported by production code.**
 
-- [ ] **Step 2: Replace the read-only input with a controlled `textarea` and submit form.**
+- [x] **Step 2: Replace the read-only input with a controlled `textarea` and submit form.**
 
 ```vue
 <form class="composer" @submit.prevent="sendQuestion">
@@ -230,19 +230,19 @@ git commit -m "feat: stream MCP evidence into graphify chat"
 </form>
 ```
 
-- [ ] **Step 3: Render user and assistant messages from the selected persisted session plus streaming content. Render a waiting state while a tool call is active.**
+- [x] **Step 3: Render user and assistant messages from the selected persisted session plus streaming content. Render a waiting state while a tool call is active.**
 
-- [ ] **Step 4: Render result-table columns and rows only from `activeEvidence.result`. Render the trace id, truncation indicator, preflight warnings, and source record ids in the evidence panel.**
+- [x] **Step 4: Render result-table columns and rows only from `activeEvidence.result`. Render the trace id, truncation indicator, preflight warnings, and source record ids in the evidence panel.**
 
-- [ ] **Step 5: Render cytoscape nodes and edges only from `activeEvidence.evidence`; preserve zoom, filtering, node selection, fullscreen, MDL tab, and mobile layout.**
+- [x] **Step 5: Render cytoscape nodes and edges only from `activeEvidence.evidence`; preserve zoom, filtering, node selection, fullscreen, MDL tab, and mobile layout.**
 
-- [ ] **Step 6: Make the MDL tab show `semantic_context.recommended_models`, `recommended_columns`, rules, and provenance, rather than hard-coded field names.**
+- [x] **Step 6: Make the MDL tab show `semantic_context.recommended_models`, `recommended_columns`, rules, and provenance, rather than hard-coded field names.**
 
-- [ ] **Step 7: Add explicit empty states:** no selected assistant answer, no MCP evidence in a normal answer, blocked query, unavailable graph evidence, and no result rows.
+- [x] **Step 7: Add explicit empty states:** no selected assistant answer, no MCP evidence in a normal answer, blocked query, unavailable graph evidence, and no result rows.
 
-- [ ] **Step 8: Run `npm run type-check && npm run build:main`.**
+- [x] **Step 8: Run `npm run type-check && npm run build:main`.**
 
-- [ ] **Step 9: Commit.**
+- [x] **Step 9: Commit.**
 
 ```bash
 git add ui/src/features/graphify-data-query/GraphifyDataQueryPage.vue ui/src/views/GraphifyDataQueryChat/index.vue
@@ -259,11 +259,11 @@ git commit -m "feat: render live graphify data query sessions"
 - The agent calls `semantic_context`, then one guarded `query` or `run_template_query`, and gives a concise answer citing `trace_id`.
 - The final query tool call returns the contract from Task 2.
 
-- [ ] **Step 1: Add the system instruction: “For every business-data answer, obtain semantic context first, execute exactly one guarded medical-catalog query/template unless clarification is required, and state the returned `trace_id`; never invent rows, source records, or graph links.”**
+- [x] **Step 1: Add the system instruction: “For every business-data answer, obtain semantic context first, execute exactly one guarded medical-catalog query/template unless clarification is required, and state the returned `trace_id`; never invent rows, source records, or graph links.”**
 
 - [ ] **Step 2: Confirm the active agent is enabled and bound to the healthy `医疗目录 Wren MCP` server in `ALL_GLOBAL` mode or explicitly selected equivalent tools.**
 
-- [ ] **Step 3: Build only the existing Docker frontend service in place.**
+- [x] **Step 3: Build only the existing Docker frontend service in place.**
 
 ```bash
 cd docker
@@ -293,7 +293,7 @@ npm run build:main
 
 Also run the MCP golden corpus from Task 2 and record the browser test screenshots/trace ids in the pull request.
 
-- [ ] **Step 8: Commit.**
+- [x] **Step 8: Commit.**
 
 ```bash
 git add ui scripts docs
