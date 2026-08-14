@@ -282,6 +282,11 @@ public class McpClientFactory {
             log.warn("MCP tool '{}' raw schema is empty", tool.getToolName());
             return null;
         }
+        if (!tool.getRawSchema().isObject()) {
+            log.warn("MCP tool '{}' raw schema must be a JSON object but was {}; re-sync the MCP tool catalog",
+                    tool.getToolName(), tool.getRawSchema().getNodeType());
+            return null;
+        }
         try {
             return objectMapper.treeToValue(tool.getRawSchema(), McpSchema.Tool.class);
         } catch (Exception e) {

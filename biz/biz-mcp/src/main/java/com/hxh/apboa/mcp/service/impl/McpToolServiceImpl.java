@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.hxh.apboa.common.entity.McpServer;
 import com.hxh.apboa.common.entity.McpTool;
 import com.hxh.apboa.common.util.BeanUtils;
@@ -82,7 +83,8 @@ public class McpToolServiceImpl extends ServiceImpl<McpToolMapper, McpTool> impl
         Map<String, McpTool> existingMap = existing.stream().collect(Collectors.toMap(
                 McpTool::getToolName,
                 Function.identity(),
-                (left, right) -> left,
+                // Prefer a current row over a stale duplicate left by an older sync.
+                (left, right) -> Boolean.FALSE.equals(left.getMissing()) ? left : right,
                 LinkedHashMap::new));
 
         LocalDateTime now = LocalDateTime.now();
@@ -101,9 +103,9 @@ public class McpToolServiceImpl extends ServiceImpl<McpToolMapper, McpTool> impl
             entity.setMcpServerId(mcpServer.getId());
             entity.setToolName(tool.name());
             entity.setDescription(tool.description());
-            entity.setInputSchema(toJsonNode(tool.inputSchema()));
+            entity.setInputSchema(canonicalJsonSchema(objectMapper, tool.inputSchema()));
             entity.setOutputSchema(toJsonNode(tool.outputSchema()));
-            entity.setRawSchema(toJsonNode(tool));
+            entity.setRawSchema(canonicalToolSchema(objectMapper, tool));
             entity.setSchemaHash(buildSchemaHash(tool));
             entity.setMissing(false);
             entity.setSort(i + 1);
@@ -126,7 +128,10 @@ public class McpToolServiceImpl extends ServiceImpl<McpToolMapper, McpTool> impl
         }
 
         List<McpTool> disappearedTools = existing.stream()
-                .filter(item -> !currentNames.contains(item.getToolName()))
+                // A previous broken sync can leave more than one row with the same tool name.
+                // Keep the row selected above; retire every other duplicate as well.
+                .filter(item -> !currentNames.contains(item.getToolName())
+                        || existingMap.get(item.getToolName()) != item)
                 .toList();
         disappearedTools.forEach(item -> {
             McpTool update = new McpTool();
@@ -255,7 +260,59 @@ public class McpToolServiceImpl extends ServiceImpl<McpToolMapper, McpTool> impl
         return value == null ? null : objectMapper.valueToTree(value);
     }
 
+    /**
+     * The application ObjectMapper has custom serialization for SDK records. Persisting a
+     * McpSchema.Tool directly can therefore produce a base64 JSON scalar instead of an MCP
+     * Tool object. Store only the stable MCP protocol fields used by the runtime.
+     */
+    static JsonNode canonicalToolSchema(ObjectMapper objectMapper, McpSchema.Tool tool) {
+        ObjectNode node = objectMapper.createObjectNode();
+        node.put("name", tool.name());
+        if (tool.title() != null) {
+            node.put("title", tool.title());
+        }
+        if (tool.description() != null) {
+            node.put("description", tool.description());
+        }
+        if (tool.inputSchema() != null) {
+            node.set("inputSchema", canonicalJsonSchema(objectMapper, tool.inputSchema()));
+        }
+        if (tool.outputSchema() != null) {
+            node.set("outputSchema", objectMapper.valueToTree(tool.outputSchema()));
+        }
+        if (tool.meta() != null && !tool.meta().isEmpty()) {
+            node.set("_meta", objectMapper.valueToTree(tool.meta()));
+        }
+        return node;
+    }
+
+    static JsonNode canonicalJsonSchema(ObjectMapper objectMapper, McpSchema.JsonSchema schema) {
+        if (schema == null) {
+            return null;
+        }
+        ObjectNode node = objectMapper.createObjectNode();
+        if (schema.type() != null) {
+            node.put("type", schema.type());
+        }
+        if (schema.properties() != null) {
+            node.set("properties", objectMapper.valueToTree(schema.properties()));
+        }
+        if (schema.required() != null) {
+            node.set("required", objectMapper.valueToTree(schema.required()));
+        }
+        if (schema.additionalProperties() != null) {
+            node.put("additionalProperties", schema.additionalProperties());
+        }
+        if (schema.defs() != null) {
+            node.set("$defs", objectMapper.valueToTree(schema.defs()));
+        }
+        if (schema.definitions() != null) {
+            node.set("definitions", objectMapper.valueToTree(schema.definitions()));
+        }
+        return node;
+    }
+
     private String buildSchemaHash(McpSchema.Tool tool) {
-        return CryptoUtils.md5(toJsonNode(tool).toString(), SCHEMA_HASH_SALT);
+        return CryptoUtils.md5(canonicalToolSchema(objectMapper, tool).toString(), SCHEMA_HASH_SALT);
     }
 }
