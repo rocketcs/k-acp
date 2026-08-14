@@ -742,7 +742,7 @@ function initialize() {
         selector: 'node[?diamond]',
         style: { shape: 'diamond', 'border-color': '#5d8fb5', 'background-color': '#f0f6fb', color: '#2b5d80' },
       },
-      { selector: 'node:selected', style: { 'border-width': 3, 'border-color': '#2f80c5', 'background-color': '#e6f2fb', underlay: { color: '#5a9fd0', opacity: 0.24, padding: 6 } } },
+      { selector: 'node:selected', style: { 'border-width': 3, 'border-color': '#2f80c5', 'background-color': '#e6f2fb', 'underlay-color': '#5a9fd0', 'underlay-opacity': 0.24, 'underlay-padding': 6 } },
       { selector: 'node.hover', style: { 'border-width': 3, 'border-color': '#e8a23a' } },
       { selector: 'node.dimmed', style: { opacity: 0.15 } },
       { selector: 'edge', style: { width: 1.5, 'curve-style': 'bezier', 'line-color': '#8faec6', 'target-arrow-color': '#8faec6', 'target-arrow-shape': 'triangle', 'arrow-scale': 0.7, label: 'data(label)', 'font-size': 9, 'font-family': 'PingFang SC, Microsoft YaHei, sans-serif', color: '#4d6675', 'text-background-color': '#f3f8fc', 'text-background-opacity': 0.92, 'text-background-padding': 2, 'text-rotation': 'autorotate' } },
