@@ -90,23 +90,23 @@ function positions(nodeIds: Set<string>) {
     const place = new Map<string, { x: number; y: number }>()
     const model = nodes.find((node) => node.kind === 'model')
     const product = selectedProductId.value ? nodes.find((node) => node.id === selectedProductId.value) : undefined
-    if (model) place.set(model.id, { x: 82, y: 236 })
-    if (product) place.set(product.id, { x: 302, y: 236 })
+    if (model) place.set(model.id, { x: 58, y: 208 })
+    if (product) place.set(product.id, { x: 236, y: 208 })
 
     const business = product ? props.evidence.evidence.edges
       .filter((edge) => edge.source === product.id && edge.kind === 'business' && nodeIds.has(edge.target))
       .map((edge) => nodes.find((node) => node.id === edge.target))
       .filter((node): node is GraphifyEvidenceNode => Boolean(node)) : []
-    business.forEach((node, index) => place.set(node.id, { x: 525, y: 145 + index * 160 }))
+    business.forEach((node, index) => place.set(node.id, { x: 414, y: 132 + index * 112 }))
 
     const catalog = product ? props.evidence.evidence.edges
       .filter((edge) => edge.source === product.id && edge.kind === 'provenance' && nodeIds.has(edge.target))
       .map((edge) => nodes.find((node) => node.id === edge.target))
       .find((node) => node?.kind === 'catalog_record') : undefined
     if (catalog) {
-      place.set(catalog.id, { x: 300, y: 432 })
+      place.set(catalog.id, { x: 234, y: 392 })
       let current = catalog.id
-      const lineagePositions = [{ x: 82, y: 578 }, { x: 302, y: 578 }]
+      const lineagePositions = [{ x: 58, y: 512 }, { x: 236, y: 512 }]
       lineagePositions.forEach((position) => {
         const next = props.evidence.evidence.edges.find((edge) => edge.source === current && edge.kind === 'provenance' && nodeIds.has(edge.target))?.target
         if (!next) return
@@ -114,7 +114,7 @@ function positions(nodeIds: Set<string>) {
         current = next
       })
     }
-    nodes.filter((node) => !place.has(node.id)).forEach((node, index) => place.set(node.id, { x: 525, y: 465 + index * 80 }))
+    nodes.filter((node) => !place.has(node.id)).forEach((node, index) => place.set(node.id, { x: 414, y: 430 + index * 64 }))
     return place
   }
   const resultNodes = nodes.filter((node) => queryResultIds.value.has(node.id))
@@ -122,24 +122,24 @@ function positions(nodeIds: Set<string>) {
   const byCategory = (value: ReturnType<typeof category>) => others.filter((node) => category(node) === value)
   const place = new Map<string, { x: number; y: number }>()
   const model = byCategory('mdl')[0]
-  if (model) place.set(model.id, { x: queryResultsExpanded.value ? 205 : 68, y: queryResultsExpanded.value ? 184 : 182 })
+  if (model) place.set(model.id, { x: queryResultsExpanded.value ? 172 : 56, y: queryResultsExpanded.value ? 158 : 160 })
   const primary = byCategory('query')[0] ?? byCategory('entity')[0]
-  if (primary) place.set(primary.id, { x: queryResultsExpanded.value ? 205 : 204, y: queryResultsExpanded.value ? 286 : 182 })
+  if (primary) place.set(primary.id, { x: queryResultsExpanded.value ? 172 : 198, y: queryResultsExpanded.value ? 250 : 160 })
 
   byCategory('entity').filter((node) => node.id !== primary?.id).forEach((node, index) => {
-    place.set(node.id, { x: 350, y: (queryResultsExpanded.value ? 244 : 76) + index * 88 })
+    place.set(node.id, { x: 290, y: (queryResultsExpanded.value ? 212 : 66) + index * 74 })
   })
   byCategory('provenance').forEach((node, index) => {
     const column = index % 2
     const row = Math.floor(index / 2)
-    place.set(node.id, { x: 70 + column * 170, y: (queryResultsExpanded.value ? 372 : 280) + row * 72 })
+    place.set(node.id, { x: 56 + column * 142, y: (queryResultsExpanded.value ? 322 : 246) + row * 60 })
   })
   resultNodes.forEach((node, index) => {
     if (index === 0 && !queryResultsExpanded.value) return
     const offset = queryResultsExpanded.value ? index : 0
-    place.set(node.id, { x: 46 + (offset % 4) * 110, y: 58 + Math.floor(offset / 4) * 62 })
+    place.set(node.id, { x: 40 + (offset % 4) * 92, y: 50 + Math.floor(offset / 4) * 52 })
   })
-  nodes.filter((node) => !place.has(node.id)).forEach((node, index) => place.set(node.id, { x: 352, y: 112 + index * 60 }))
+  nodes.filter((node) => !place.has(node.id)).forEach((node, index) => place.set(node.id, { x: 290, y: 98 + index * 52 }))
   return place
 }
 
@@ -168,8 +168,8 @@ function layout(animate = true) {
       name: 'breadthfirst',
       directed: true,
       roots: cy.nodes('[category = "mdl"]').map((node) => node.id()),
-      spacingFactor: 1.65,
-      padding: props.fullscreen ? 48 : 28,
+      spacingFactor: 1.22,
+      padding: props.fullscreen ? 32 : 18,
       animate,
       animationDuration: 300,
     }).run()
@@ -177,7 +177,7 @@ function layout(animate = true) {
   }
   const coordinates = positions(visibleNodeIds.value)
   const positionMap = Object.fromEntries(coordinates)
-  cy.layout({ name: 'preset', positions: positionMap, fit: true, padding: props.fullscreen ? 48 : 24, animate, animationDuration: 300 }).run()
+  cy.layout({ name: 'preset', positions: positionMap, fit: true, padding: props.fullscreen ? 32 : 16, animate, animationDuration: 300 }).run()
 }
 
 function render(animate = false) {
@@ -209,7 +209,7 @@ function toggleQueryResults() {
 
 function zoomIn() { cy?.zoom({ level: Math.min(2.4, cy.zoom() + 0.16), renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }) }
 function zoomOut() { cy?.zoom({ level: Math.max(0.45, cy.zoom() - 0.16), renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }) }
-function fit() { cy?.fit(cy.elements(), props.fullscreen ? 48 : 24) }
+function fit() { cy?.fit(cy.elements(), props.fullscreen ? 32 : 16) }
 function relayout() { layout(true) }
 
 function initialize() {
