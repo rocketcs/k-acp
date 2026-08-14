@@ -2,7 +2,6 @@
 import cytoscape, { type Core } from 'cytoscape'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { evidenceGraphModel } from './evidenceGraphModel'
-import { nodeVisual } from './evidenceStyles'
 import { focusSelection } from './focusSelection'
 import type { GraphifyEvidenceEnvelope } from './types'
 
@@ -87,8 +86,12 @@ function showTooltip(event: cytoscape.EventObject) {
   tooltipEl.value.textContent = `${node.data('heading')}：${node.data('fullLabel')}`
   tooltipEl.value.style.display = 'block'
   const box = (event.cy.container() as HTMLElement).getBoundingClientRect()
-  tooltipEl.value.style.left = `${Math.min(Math.max(event.renderedPosition.x - 80, 4), box.width - 170)}px`
-  tooltipEl.value.style.top = `${Math.max(event.renderedPosition.y - 42, 4)}px`
+  const width = tooltipEl.value.offsetWidth || 220
+  const height = tooltipEl.value.offsetHeight || 32
+  const left = Math.min(Math.max(event.renderedPosition.x - 80, 4), box.width - width - 4)
+  const top = Math.min(Math.max(event.renderedPosition.y - 42, 4), box.height - height - 4)
+  tooltipEl.value.style.left = `${left}px`
+  tooltipEl.value.style.top = `${top}px`
 }
 function hideTooltip() {
   if (!tooltipEl.value) return
@@ -139,7 +142,7 @@ function initialize() {
       },
       {
         selector: 'node[category = "entity"]',
-        style: { 'border-style': 'dashed', 'border-color': '#b9cbd6', 'background-color': '#f7fafc', color: '#5a7184', 'font-size': 10.5 },
+        style: { 'border-style': 'dashed', 'border-color': '#b9cbd6', 'background-color': '#f7fafc', color: '#5a7184', 'font-size': 11 },
       },
       {
         selector: 'node[category = "model"]',
@@ -153,9 +156,9 @@ function initialize() {
       { selector: 'node.hover', style: { 'border-width': 3, 'border-color': '#e8a23a' } },
       { selector: 'node.dimmed', style: { opacity: 0.15 } },
       { selector: 'edge', style: { width: 1.5, 'curve-style': 'bezier', 'line-color': '#8faec6', 'target-arrow-color': '#8faec6', 'target-arrow-shape': 'triangle', 'arrow-scale': 0.7, label: 'data(label)', 'font-size': 9, 'font-family': 'PingFang SC, Microsoft YaHei, sans-serif', color: '#4d6675', 'text-background-color': '#f3f8fc', 'text-background-opacity': 0.92, 'text-background-padding': '2px', 'text-rotation': 'autorotate' } },
-      { selector: 'edge[category = "business"]', style: { 'line-color': '#4c9db8', 'target-arrow-color': '#4c9db8' } },
-      { selector: 'edge[category = "provenance"]', style: { 'line-color': '#7d9cbb', 'target-arrow-color': '#7d9cbb', 'line-style': 'dashed' } },
-      { selector: 'edge[category = "semantic"]', style: { 'line-color': '#b7c8d6', 'target-arrow-color': '#b7c8d6', 'line-style': 'dotted' } },
+      { selector: 'edge[kind = "business"]', style: { 'line-color': '#4c9db8', 'target-arrow-color': '#4c9db8' } },
+      { selector: 'edge[kind = "provenance"]', style: { 'line-color': '#7d9cbb', 'target-arrow-color': '#7d9cbb', 'line-style': 'dashed' } },
+      { selector: 'edge[kind = "semantic"]', style: { 'line-color': '#b7c8d6', 'target-arrow-color': '#b7c8d6', 'line-style': 'dotted' } },
       { selector: '.filtered-out', style: { display: 'none' } },
     ],
     layout: { name: 'preset' },
