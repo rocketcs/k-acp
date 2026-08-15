@@ -54,6 +54,15 @@ test('full view without fields omits semantic entities', () => {
   assert.equal(all.includes('field'), false)
 })
 
+test('full view keeps the model attached via a business edge, not an orphan', () => {
+  const elements = evidenceGraphModel(envelope, { viewMode: 'full', showFields: false })
+  const modelEdges = elements
+    .filter((e) => e.data?.source === 'model')
+    .map((e) => ({ kind: String(e.data!.kind), label: String(e.data!.label) }))
+  assert.ok(modelEdges.some((e) => e.kind === 'business' && e.label === '业务模型'), 'model must attach to the core entity as a business relation')
+  assert.equal(modelEdges.some((e) => e.kind === 'query'), false, 'query-action edges stay hidden')
+})
+
 test('core entity node label is the business name, not a query-action heading', () => {
   const elements = evidenceGraphModel(envelope, { viewMode: 'focused', showFields: false })
   const product = elements.find((e) => e.data?.id === 'product')

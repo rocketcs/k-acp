@@ -64,8 +64,19 @@ export function evidenceGraphModel(envelope: GraphifyEvidenceEnvelope, opts: Gra
     ? allNodes.filter((node) => opts.visibleIds!.has(node.id))
     : allNodes
   const nodeIds = new Set(nodes.map((node) => node.id))
-  const edges = envelope.evidence.edges.filter((edge) =>
-    edge.kind !== 'query' && nodeIds.has(edge.source) && nodeIds.has(edge.target))
+  const modelId = nodes.find((node) => node.kind === 'model')?.id
+  // A query edge from the model root to a business entity *defines* that
+  // entity in this model. Keep it as a business relation from the model so
+  // the model is never rendered as an isolated node; other query edges
+  // (query-time actions) are dropped.
+  const edges = envelope.evidence.edges.flatMap((edge) => {
+    const within = nodeIds.has(edge.source) && nodeIds.has(edge.target)
+    if (!within) return []
+    if (edge.kind === 'query' && modelId && edge.source === modelId) {
+      return [{ ...edge, kind: 'business' as const, label: '业务模型' }]
+    }
+    return edge.kind === 'query' ? [] : [edge]
+  })
   const position = opts.viewMode === 'full'
     ? fullViewPositions(nodes)
     : dagrePositions(nodes, edges, { rankdir: 'LR' })
