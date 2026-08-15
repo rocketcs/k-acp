@@ -11,6 +11,46 @@ export type GraphModelOptions = {
 
 const QUERY_PROCESS_KINDS = new Set(['record', 'source'])
 
+/**
+ * Full-view layout: a compact two-tier arrangement that dagre would stack
+ * vertically (many same-rank siblings) or spread horizontally (TB). Zones:
+ * - left column: model + core product
+ * - middle column: key business facts (organization / registration / base)
+ * - upper-right grid: mapping concepts (up to 3 columns)
+ * - lower-right chain: catalog record -> source file -> import batch
+ */
+function fullViewPositions(nodes: GraphifyEvidenceNode[]): Map<string, { x: number; y: number }> {
+  const place = new Map<string, { x: number; y: number }>()
+  const model = nodes.find((node) => node.kind === 'model')
+  const product = nodes.find((node) => node.kind === 'product')
+  if (model) place.set(model.id, { x: 60, y: 150 })
+  if (product) place.set(product.id, { x: 60, y: 300 })
+
+  const facts = nodes.filter((node) => ['organization', 'registration', 'base'].includes(node.kind))
+  facts.forEach((node, index) => place.set(node.id, { x: 230, y: 50 + index * 110 }))
+
+  const concepts = nodes.filter((node) => node.kind === 'concept')
+  const cols = Math.min(3, Math.max(1, Math.ceil(concepts.length / 2)))
+  concepts.forEach((node, index) => {
+    const col = index % cols
+    const row = Math.floor(index / cols)
+    place.set(node.id, { x: 420 + col * 140, y: 50 + row * 110 })
+  })
+
+  const catalogRecord = nodes.find((node) => node.kind === 'catalog_record')
+  const sourceFile = nodes.find((node) => node.kind === 'source_file')
+  const importBatch = nodes.find((node) => node.kind === 'import_batch')
+  if (catalogRecord) place.set(catalogRecord.id, { x: 230, y: 400 })
+  if (sourceFile) place.set(sourceFile.id, { x: 420, y: 400 })
+  if (importBatch) place.set(importBatch.id, { x: 610, y: 400 })
+
+  // Anything else (e.g. semantic fields) drops into the lower-right column.
+  nodes
+    .filter((node) => !place.has(node.id))
+    .forEach((node, index) => place.set(node.id, { x: 610, y: 80 + index * 110 }))
+  return place
+}
+
 function nodeVisible(node: GraphifyEvidenceNode, opts: GraphModelOptions): boolean {
   if (QUERY_PROCESS_KINDS.has(node.kind)) return false
   if (node.kind === 'model') return opts.viewMode === 'full'
@@ -26,25 +66,9 @@ export function evidenceGraphModel(envelope: GraphifyEvidenceEnvelope, opts: Gra
   const nodeIds = new Set(nodes.map((node) => node.id))
   const edges = envelope.evidence.edges.filter((edge) =>
     edge.kind !== 'query' && nodeIds.has(edge.source) && nodeIds.has(edge.target))
-  // Focused view: narrow layered LR chain (core left, sources right).
-  // Full view: LR chain, then re-layout same-rank concept siblings into a
-  // compact multi-column grid so many concepts do not stack into one column.
-  const position = dagrePositions(nodes, edges, { rankdir: 'LR' })
-  if (opts.viewMode === 'full') {
-    const conceptIds = nodes.filter((node) => node.kind === 'concept').map((node) => node.id)
-    if (conceptIds.length > 2) {
-      const productNode = nodes.find((node) => node.kind === 'product')
-      const anchor = productNode ? position.get(productNode.id) : undefined
-      if (anchor) {
-        const cols = Math.min(3, Math.ceil(Math.sqrt(conceptIds.length)))
-        conceptIds.forEach((id, index) => {
-          const col = index % cols
-          const row = Math.floor(index / cols)
-          position.set(id, { x: Math.round(anchor.x + 70 + col * 138), y: Math.round(anchor.y - 60 + row * 70) })
-        })
-      }
-    }
-  }
+  const position = opts.viewMode === 'full'
+    ? fullViewPositions(nodes)
+    : dagrePositions(nodes, edges, { rankdir: 'LR' })
 
   const nodeElements: ElementDefinition[] = nodes.map((node) => {
     const visual = nodeVisual(node.kind)
