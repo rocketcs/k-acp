@@ -14,7 +14,7 @@ export function dagrePositions(
   edges: GraphifyEvidenceEdge[],
   opts: DagreOptions = {},
 ): Map<string, { x: number; y: number }> {
-  const { nodeWidth = 150, nodeHeight = 56, nodesep = 30, ranksep = 56, rankdir = 'LR' } = opts
+  const { nodeWidth = 132, nodeHeight = 50, nodesep = 22, ranksep = 44, rankdir = 'LR' } = opts
   const graph = new Graph({ multigraph: true })
   graph.setGraph({ rankdir, nodesep, ranksep, edgesep: 14, marginx: 16, marginy: 16 })
   graph.setDefaultEdgeLabel(() => ({}))
