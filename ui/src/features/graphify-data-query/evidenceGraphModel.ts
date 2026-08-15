@@ -30,10 +30,13 @@ export function evidenceGraphModel(envelope: GraphifyEvidenceEnvelope, opts: Gra
 
   const nodeElements: ElementDefinition[] = nodes.map((node) => {
     const visual = nodeVisual(node.kind)
+    // Core entity shows its business name directly; related entities show
+    // their relation type above the concrete value.
+    const label = node.kind === 'product' ? node.label : `${visual.heading}\n${node.label}`
     return {
       data: {
         id: node.id,
-        label: `${visual.heading}\n${node.label}`,
+        label,
         fullLabel: node.label,
         kind: node.kind,
         category: node.kind,

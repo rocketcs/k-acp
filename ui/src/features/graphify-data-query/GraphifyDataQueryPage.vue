@@ -34,7 +34,13 @@ const selectedNodeSummary = computed(() => {
   const node = selectedNode.value
   if (!evidence || !node) return null
   const nodeById = new Map(evidence.evidence.nodes.map((item) => [item.id, item]))
-  const edges = evidence.evidence.edges.filter((edge) => edge.source === node.id || edge.target === node.id)
+  // Relation summaries show business relations only — never the query action
+  // edges or query-process nodes (record/source).
+  const edges = evidence.evidence.edges.filter((edge) =>
+    (edge.source === node.id || edge.target === node.id)
+    && edge.kind !== 'query'
+    && nodeById.get(edge.source)?.kind !== 'record' && nodeById.get(edge.source)?.kind !== 'source'
+    && nodeById.get(edge.target)?.kind !== 'record' && nodeById.get(edge.target)?.kind !== 'source')
   const relations = [...new Set(edges.map((edge) => {
     const related = nodeById.get(edge.source === node.id ? edge.target : edge.source)
     if (!related) return ''
@@ -43,7 +49,7 @@ const selectedNodeSummary = computed(() => {
     return `${direction}${displayGraphifyNodeLabel(related)}（${relation}）`
   }).filter(Boolean))]
   return {
-    type: ({ model: '业务模型', record: '查询记录', entity: '业务实体', source: '来源记录', product: '查询目录项', registration: '注册备案', organization: '耗材企业', base: '基础耗材', concept: '映射概念', catalog_record: '原始目录记录', source_file: '来源工作簿', import_batch: '导入批次' } as Record<string, string>)[node.kind] ?? '业务实体',
+    type: ({ model: '业务模型', record: '查询记录', entity: '业务实体', source: '来源记录', product: '耗材', registration: '注册备案', organization: '耗材企业', base: '基础耗材', concept: '映射概念', catalog_record: '原始目录记录', source_file: '来源工作簿', import_batch: '导入批次' } as Record<string, string>)[node.kind] ?? '业务实体',
     label: displayGraphifyNodeLabel(node),
     edgeCount: edges.length,
     relations: relations.slice(0, 4),

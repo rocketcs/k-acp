@@ -54,6 +54,15 @@ test('full view without fields omits semantic entities', () => {
   assert.equal(all.includes('field'), false)
 })
 
+test('core entity node label is the business name, not a query-action heading', () => {
+  const elements = evidenceGraphModel(envelope, { viewMode: 'focused', showFields: false })
+  const product = elements.find((e) => e.data?.id === 'product')
+  assert.equal(product?.data?.label, '覆膜气管支架')
+  assert.equal(String(product?.data?.label).includes('查询'), false)
+  const registration = elements.find((e) => e.data?.id === 'registration')
+  assert.equal(String(registration?.data?.label).includes('\n'), true, 'relation-type entities keep heading + value')
+})
+
 test('nodes carry positions from dagre', () => {
   const elements = evidenceGraphModel(envelope, { viewMode: 'focused', showFields: false })
   const product = elements.find((e) => e.data?.id === 'product')
