@@ -26,7 +26,12 @@ export function evidenceGraphModel(envelope: GraphifyEvidenceEnvelope, opts: Gra
   const nodeIds = new Set(nodes.map((node) => node.id))
   const edges = envelope.evidence.edges.filter((edge) =>
     edge.kind !== 'query' && nodeIds.has(edge.source) && nodeIds.has(edge.target))
-  const position = dagrePositions(nodes, edges)
+  // Focused view: narrow layered LR chain (core left, sources right).
+  // Full view: TB spreads many same-rank siblings (concepts/entities) across
+  // columns instead of stacking them vertically.
+  const position = dagrePositions(nodes, edges, {
+    rankdir: opts.viewMode === 'full' ? 'TB' : 'LR',
+  })
 
   const nodeElements: ElementDefinition[] = nodes.map((node) => {
     const visual = nodeVisual(node.kind)
