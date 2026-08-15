@@ -27,7 +27,12 @@ export function focusSelection(
   const outgoing = (source: string, kind?: 'business' | 'provenance') => edges
     .filter((edge) => edge.source === source && (!kind || edge.kind === kind))
     .map((edge) => edge.target)
-  outgoing(product.id, 'business').forEach((id) => visible.add(id))
+  // Focused view keeps the key business facts around the core entity;
+  // mapping concepts stay available in the full view.
+  const KEY_FACT_KINDS = new Set(['organization', 'registration', 'base'])
+  outgoing(product.id, 'business')
+    .filter((id) => KEY_FACT_KINDS.has(nodeById.get(id)?.kind ?? ''))
+    .forEach((id) => visible.add(id))
   const catalogRecord = outgoing(product.id, 'provenance').find((id) => nodeById.get(id)?.kind === 'catalog_record')
   if (catalogRecord) {
     visible.add(catalogRecord)

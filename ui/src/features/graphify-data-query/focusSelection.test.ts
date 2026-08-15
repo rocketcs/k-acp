@@ -23,10 +23,11 @@ const edges: GraphifyEvidenceEdge[] = [
   { id: 'p3', source: 'source_file', target: 'import_batch', label: '包含', kind: 'provenance' },
 ]
 
-test('focused selection keeps product, direct business links and 2-deep lineage', () => {
+test('focused selection keeps product, key business facts and 2-deep lineage', () => {
   const visible = focusSelection(nodes, edges, { lineageDepth: 2 })
-  assert.deepEqual([...visible].sort(), ['catalog_record', 'concept', 'import_batch', 'organization', 'product', 'registration', 'source_file'])
+  assert.deepEqual([...visible].sort(), ['catalog_record', 'import_batch', 'organization', 'product', 'registration', 'source_file'])
   assert.equal(visible.has('model'), false, 'model is hidden in focused view')
+  assert.equal(visible.has('concept'), false, 'mapping concepts stay in the full view')
 })
 
 test('without a product, focused selection returns all business/source nodes', () => {
