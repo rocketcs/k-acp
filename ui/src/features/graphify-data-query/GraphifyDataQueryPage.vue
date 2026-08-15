@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 import {
-  AimOutlined, BranchesOutlined, CompressOutlined, DatabaseOutlined, DeploymentUnitOutlined, ExperimentOutlined, FieldStringOutlined, FilterOutlined,
+  AimOutlined, CompressOutlined, DatabaseOutlined, DeploymentUnitOutlined, ExperimentOutlined, FieldStringOutlined, FilterOutlined,
   FullscreenExitOutlined, FullscreenOutlined, MedicineBoxOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SendOutlined,
   ShareAltOutlined, ZoomInOutlined, ZoomOutOutlined,
 } from '@ant-design/icons-vue'
@@ -26,7 +26,6 @@ const relationFilter = ref<'all' | 'business' | 'provenance' | 'semantic'>('all'
 const mdlSearch = ref('')
 const selectedId = ref<string | null>(null)
 const graphRef = ref<InstanceType<typeof GraphifyEvidenceGraph> | null>(null)
-const viewMode = ref<'focused' | 'full'>('focused')
 const showFields = ref(false)
 const selectedNode = computed(() => activeEvidence.value?.evidence.nodes.find((node) => node.id === selectedId.value) ?? activeEvidence.value?.evidence.nodes[0])
 const selectedNodeSummary = computed(() => {
@@ -87,10 +86,6 @@ async function focusGraph() {
   activeTab.value = 'graph'
   await nextTick()
   graphRef.value?.fit()
-}
-function onViewModeChange(mode: 'focused' | 'full') {
-  viewMode.value = mode
-  nextTick(() => graphRef.value?.relayout())
 }
 function onResizeStart(event: PointerEvent) {
   const initial = panelWidth.value
@@ -161,7 +156,7 @@ function onResizeStart(event: PointerEvent) {
           <template v-if="activeEvidence">
             <header v-if="!fullscreen" class="question-summary"><small>当前对话轮次 · {{ activeEvidence.trace_id }}</small><strong>{{ activeEvidence.question }}</strong><span>{{ activeEvidence.result.rows.length }} 条结果 · {{ activeEvidence.evidence.source_record_ids.length }} 条来源记录</span></header>
             <div class="legend"><span><DatabaseOutlined class="blue" /> Wren MDL</span><span><MedicineBoxOutlined class="teal" /> 业务实体</span><span><ShareAltOutlined class="green" /> 来源追溯</span><span><DeploymentUnitOutlined class="plum" /> 业务关系</span></div>
-            <div class="graph-workspace"><GraphifyEvidenceGraph ref="graphRef" :evidence="activeEvidence" :relation-filter="relationFilter" :fullscreen="fullscreen" :view-mode="viewMode" :show-fields="showFields" @select="selectedId = $event" @update:view-mode="onViewModeChange" /><div class="graph-tools" aria-label="图谱工具栏"><button class="icon-btn" title="放大" @click="graphRef?.zoomIn()"><ZoomInOutlined /></button><button class="icon-btn" title="缩小" @click="graphRef?.zoomOut()"><ZoomOutOutlined /></button><button class="icon-btn" title="适应画布" @click="graphRef?.fit()"><AimOutlined /></button><button class="icon-btn" title="重新布局" @click="graphRef?.relayout()"><ReloadOutlined /></button><button class="icon-btn" :class="{ active: viewMode === 'full' }" :title="viewMode === 'full' ? '收起为聚焦视图' : `查看全部 ${activeEvidence.evidence.nodes.filter((n) => n.kind !== 'record' && n.kind !== 'source').length} 个节点`" @click="viewMode = viewMode === 'full' ? 'focused' : 'full'"><BranchesOutlined /></button><button class="icon-btn" :class="{ active: showFields }" title="显示/隐藏语义字段" @click="showFields = !showFields"><FieldStringOutlined /></button><button class="icon-btn" :title="fullscreen ? '退出图谱大屏' : '图谱大屏查看'" @click="fullscreen = !fullscreen"><FullscreenExitOutlined v-if="fullscreen" /><FullscreenOutlined v-else /></button></div><div class="graph-actions"><label><FilterOutlined /><select v-model="relationFilter" aria-label="筛选图谱关系"><option value="all">全部关系</option><option value="business">业务关系</option><option value="provenance">来源追溯</option><option value="semantic">语义关系</option></select></label></div></div>
+            <div class="graph-workspace"><GraphifyEvidenceGraph ref="graphRef" :evidence="activeEvidence" :relation-filter="relationFilter" :fullscreen="fullscreen" :show-fields="showFields" @select="selectedId = $event" /><div class="graph-tools" aria-label="图谱工具栏"><button class="icon-btn" title="放大" @click="graphRef?.zoomIn()"><ZoomInOutlined /></button><button class="icon-btn" title="缩小" @click="graphRef?.zoomOut()"><ZoomOutOutlined /></button><button class="icon-btn" title="适应画布" @click="graphRef?.fit()"><AimOutlined /></button><button class="icon-btn" title="重新布局" @click="graphRef?.relayout()"><ReloadOutlined /></button><button class="icon-btn" :class="{ active: showFields }" title="显示/隐藏语义字段" @click="showFields = !showFields"><FieldStringOutlined /></button><button class="icon-btn" :title="fullscreen ? '退出图谱大屏' : '图谱大屏查看'" @click="fullscreen = !fullscreen"><FullscreenExitOutlined v-if="fullscreen" /><FullscreenOutlined v-else /></button></div><div class="graph-actions"><label><FilterOutlined /><select v-model="relationFilter" aria-label="筛选图谱关系"><option value="all">全部关系</option><option value="business">业务关系</option><option value="provenance">来源追溯</option><option value="semantic">语义关系</option></select><span class="graph-hint">点击节点展开下一级</span></label></div></div>
             <section v-if="!fullscreen && selectedNodeSummary" class="node-summary"><header><span class="node-summary-type">{{ selectedNodeSummary.type }}</span><b>已选节点</b><span class="node-summary-count">{{ selectedNodeSummary.edgeCount }} 个关联</span></header><h3>{{ selectedNodeSummary.label }}</h3><div v-if="selectedNodeSummary.relations.length" class="node-summary-relations"><span v-for="relation in selectedNodeSummary.relations" :key="relation">{{ relation }}</span><span v-if="selectedNodeSummary.extraCount">另有 {{ selectedNodeSummary.extraCount }} 条关联</span></div><p v-else>当前节点暂无可展示的关联。</p></section>
           </template>
           <section v-else class="panel-empty"><DatabaseOutlined /><p>{{ activeOutcome ? '当前问题没有可展示的图谱证据。' : '选择一个带 MCP 查询证据的回答后，图谱将在这里显示。' }}</p></section>

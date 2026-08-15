@@ -2,7 +2,7 @@
 import cytoscape, { type Core } from 'cytoscape'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { evidenceGraphModel } from './evidenceGraphModel'
-import { focusSelection } from './focusSelection'
+import { expandSelection } from './expandSelection'
 import type { GraphifyEvidenceEnvelope } from './types'
 
 type RelationFilter = 'all' | 'business' | 'provenance' | 'semantic'
@@ -11,41 +11,39 @@ const props = withDefaults(defineProps<{
   evidence: GraphifyEvidenceEnvelope
   relationFilter: RelationFilter
   fullscreen: boolean
-  viewMode: 'focused' | 'full'
+  viewMode?: 'focused' | 'full'
   showFields?: boolean
-}>(), { showFields: false })
+}>(), { showFields: false, viewMode: 'focused' })
 const emit = defineEmits<{
   select: [nodeId: string]
-  'update:viewMode': [mode: 'focused' | 'full']
 }>()
 
 const canvas = ref<HTMLElement>()
 const tooltipEl = ref<HTMLElement>()
 let cy: Core | undefined
 const selectedId = ref<string | null>(null)
+const expandedIds = ref<ReadonlySet<string>>(new Set())
 
-const visibleNodeCount = computed(() => {
-  const ids = props.viewMode === 'focused'
-    ? focusSelection(props.evidence.evidence.nodes, props.evidence.evidence.edges, { lineageDepth: 2 })
-    : new Set(props.evidence.evidence.nodes
-        .filter((node) => {
-          if (node.kind === 'record' || node.kind === 'source') return false
-          if (node.kind === 'entity') return props.showFields
-          return true
-        })
-        .map((node) => node.id))
-  return ids.size
-})
+const visibleNodeCount = computed(() => expandSelection(
+  props.evidence.evidence.nodes,
+  props.evidence.evidence.edges,
+  expandedIds.value,
+).size)
 const totalNodeCount = computed(() => props.evidence.evidence.nodes
   .filter((node) => node.kind !== 'record' && node.kind !== 'source')
   .length)
 
 function buildElements() {
-  const visibleIds = props.viewMode === 'focused'
-    ? focusSelection(props.evidence.evidence.nodes, props.evidence.evidence.edges, { lineageDepth: 2 })
-    : undefined
+  const showAll = props.showFields
+  const visibleIds = showAll
+    ? undefined
+    : expandSelection(
+        props.evidence.evidence.nodes,
+        props.evidence.evidence.edges,
+        expandedIds.value,
+      )
   return evidenceGraphModel(props.evidence, {
-    viewMode: props.viewMode,
+    viewMode: showAll ? 'full' : 'focused',
     showFields: props.showFields,
     visibleIds,
   })
@@ -69,14 +67,29 @@ function render(animate = false) {
   if (selected && selected.length) selected.select()
   else {
     const first = cy.nodes().first()
-    if (first.length) select(first.id())
+    if (first.length) select(first.id(), false)
   }
 }
 
-function select(id: string) {
+/**
+ * 选中节点。`expand=true`（默认）用于用户点击交互：把节点并入展开集，
+ * 显露其下一级邻居；由渲染内部自动选中时传 `false`，避免重启递归。
+ */
+function select(id: string, expand = true) {
   selectedId.value = id
-  cy?.nodes().unselect()
-  cy?.getElementById(id).select()
+  const needExpand = id && expand
+    && !expandSelection(
+      props.evidence.evidence.nodes,
+      props.evidence.evidence.edges,
+      expandedIds.value,
+    ).has(id)
+  if (needExpand) {
+    expandedIds.value = new Set([...expandedIds.value, id])
+    nextTick(() => render(true))
+  } else {
+    cy?.nodes().unselect()
+    cy?.getElementById(id).select()
+  }
   emit('select', id)
 }
 
@@ -102,9 +115,6 @@ function zoomIn() { cy?.zoom({ level: Math.min(2.4, cy.zoom() + 0.16), renderedP
 function zoomOut() { cy?.zoom({ level: Math.max(0.3, cy.zoom() - 0.16), renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }) }
 function fit() { cy?.fit(cy.elements(), props.fullscreen ? 32 : 16) }
 function relayout() { render(true) }
-function toggleViewMode() {
-  emit('update:viewMode', props.viewMode === 'focused' ? 'full' : 'focused')
-}
 
 function initialize() {
   if (!canvas.value) return
@@ -185,7 +195,7 @@ function initialize() {
     hideTooltip()
   })
   cy.on('tap', 'node', (event) => select(event.target.id()))
-  cy.on('dbltap', 'node', toggleViewMode)
+  cy.on('dbltap', 'node', relayout)
   cy.on('tap', (event) => {
     if (event.target === cy) {
       cy?.nodes().unselect()
@@ -195,18 +205,20 @@ function initialize() {
   })
   render(false)
   const first = cy.nodes().first()
-  if (first.length) select(first.id())
+  if (first.length) select(first.id(), false)
 }
 
-watch(() => props.evidence.trace_id, () => { selectedId.value = null; nextTick(() => render(false)) })
-watch(() => props.viewMode, () => nextTick(() => render(true)))
-watch(() => props.showFields, () => nextTick(() => render(false)))
+watch(() => props.evidence.trace_id, () => {
+  selectedId.value = null
+  expandedIds.value = new Set()
+  nextTick(() => render(false))
+})
 watch(() => props.relationFilter, applyFilter)
 watch(() => props.fullscreen, async () => { await nextTick(); cy?.resize(); render(false) })
 
 onMounted(() => initialize())
 onBeforeUnmount(() => { cy?.destroy(); cy = undefined })
-defineExpose({ zoomIn, zoomOut, fit, relayout, toggleViewMode })
+defineExpose({ zoomIn, zoomOut, fit, relayout })
 </script>
 
 <template>
@@ -215,8 +227,8 @@ defineExpose({ zoomIn, zoomOut, fit, relayout, toggleViewMode })
     <div ref="tooltipEl" class="cy-tooltip" role="tooltip" />
     <div class="graph-summary">
       {{ visibleNodeCount }} 个节点 · {{ props.evidence.evidence.edges.length }} 条关系
-      <template v-if="viewMode === 'focused' && totalNodeCount > visibleNodeCount">
-        · 另有 {{ totalNodeCount - visibleNodeCount }} 个节点未展示
+      <template v-if="totalNodeCount > visibleNodeCount">
+        · 另有 {{ totalNodeCount - visibleNodeCount }} 个节点，点击节点展开
       </template>
     </div>
   </div>

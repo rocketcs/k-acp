@@ -76,25 +76,43 @@ function validEdge(value: unknown): value is GraphifyEvidenceEdge {
 }
 
 export function parseGraphifyEvidence(toolName: string, content: string): GraphifyEvidenceEnvelope | null {
-  if (!FINAL_QUERY_TOOLS.has(toolName)) return null
+  // 工具名可信（run_template_query/query）或缺失（含空字符串）时才尝试解析。
+  // 其它明确工具名一律拒绝，避免把无关工具结果误当 evidence。
+  // 缺失工具名时按内容兜底：只有当内容本身是完整的 executed evidence
+  // envelope 才接受，不受不可靠工具名上报影响。
+  if (toolName && !FINAL_QUERY_TOOLS.has(toolName)) return null
+  return parseEnvelopeByContent(content)
+}
+
+/** 不依赖工具名，仅凭内容是否为完整 executed evidence envelope 判定。 */
+function parseEnvelopeByContent(content: string): GraphifyEvidenceEnvelope | null {
+  if (!content || !content.trim()) return null
   try {
     const value: unknown = JSON.parse(content)
-    if (!isRecord(value) || value.status !== 'executed' || value.dataset_id !== 'medical_catalog'
-      || typeof value.trace_id !== 'string' || !value.trace_id || typeof value.question !== 'string'
-      || !isRecord(value.result) || !isStrings(value.result.columns) || !Array.isArray(value.result.rows)
-      || !value.result.rows.every(isRecord) || typeof value.result.truncated !== 'boolean'
-      || !isRecord(value.semantic_context) || typeof value.semantic_context.graph_version !== 'string'
-      || !isStrings(value.semantic_context.recommended_models) || !isStrings(value.semantic_context.recommended_columns)
-      || !Array.isArray(value.semantic_context.rules) || !isRecord(value.semantic_context.provenance)
-      || !isRecord(value.evidence) || !isStrings(value.evidence.source_record_ids)
-      || !Array.isArray(value.evidence.nodes) || !value.evidence.nodes.every(validNode)
-      || !Array.isArray(value.evidence.edges) || !value.evidence.edges.every(validEdge)) return null
-    const rules = value.semantic_context.rules
-    if (!rules.every((rule) => isRecord(rule) && typeof rule.code === 'string' && typeof rule.message === 'string' && ['warning', 'hard'].includes(String(rule.severity)))) return null
-    if (!Object.values(value.semantic_context.provenance).every((item) => typeof item === 'string')) return null
+    if (!isRecordingEnvelope(value)) return null
     return value as GraphifyEvidenceEnvelope
   } catch { return null }
 }
+
+/** 结构从严校验，等价于旧版 parseGraphifyEvidence 的全部约束。 */
+function isRecordingEnvelope(value: unknown): value is GraphifyEvidenceEnvelope {
+  if (!isRecord(value) || value.status !== 'executed' || value.dataset_id !== 'medical_catalog'
+    || typeof value.trace_id !== 'string' || !value.trace_id || typeof value.question !== 'string'
+    || !isRecord(value.result) || !isStrings(value.result.columns) || !Array.isArray(value.result.rows)
+    || !value.result.rows.every(isRecord) || typeof value.result.truncated !== 'boolean'
+    || !isRecord(value.semantic_context) || typeof value.semantic_context.graph_version !== 'string'
+    || !isStrings(value.semantic_context.recommended_models) || !isStrings(value.semantic_context.recommended_columns)
+    || !Array.isArray(value.semantic_context.rules) || !isRecord(value.semantic_context.provenance)
+    || !isRecord(value.evidence) || !isStrings(value.evidence.source_record_ids)
+    || !Array.isArray(value.evidence.nodes) || !value.evidence.nodes.every(validNode)
+    || !Array.isArray(value.evidence.edges) || !value.evidence.edges.every(validEdge)) return false
+  const rules = value.semantic_context.rules
+  if (!rules.every((rule) => isRecord(rule) && typeof rule.code === 'string' && typeof rule.message === 'string' && ['warning', 'hard'].includes(String(rule.severity)))) return false
+  if (!Object.values(value.semantic_context.provenance).every((item) => typeof item === 'string')) return false
+  return true
+}
+
+
 
 export function parseGraphifyToolOutcome(toolName: string, content: string): GraphifyToolOutcome | null {
   if (!OUTCOME_TOOLS.has(toolName)) return null

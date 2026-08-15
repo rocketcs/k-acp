@@ -28,9 +28,13 @@ export function useGraphifyDataQueryChat(agentId: Ref<string>) {
       const saved: unknown = JSON.parse(content)
       if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return null
       const record = saved as Record<string, unknown>
-      if (typeof record.name !== 'string' || typeof record.result !== 'string') return null
-      const evidence = parseGraphifyEvidence(record.name, record.result)
-      const outcome = parseGraphifyToolOutcome(record.name, record.result)
+      if (typeof record.result !== 'string') return null
+      // 兼容两类落库格式：{name,result} 与缺失 name 的 {args,result}。
+      // 工具名缺失时用空串，parseGraphifyEvidence/parseGraphifyToolOutcome
+      // 会按内容兜底仅接受完整的 executed evidence envelope。
+      const toolName = typeof record.name === 'string' ? record.name : ''
+      const evidence = parseGraphifyEvidence(toolName, record.result)
+      const outcome = parseGraphifyToolOutcome(toolName, record.result)
       return evidence || outcome ? { evidence: evidence ?? undefined, outcome: outcome ?? undefined } : null
     } catch {
       return null
