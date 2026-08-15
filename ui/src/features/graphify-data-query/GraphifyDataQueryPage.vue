@@ -34,13 +34,16 @@ const selectedNodeSummary = computed(() => {
   const node = selectedNode.value
   if (!evidence || !node) return null
   const nodeById = new Map(evidence.evidence.nodes.map((item) => [item.id, item]))
-  // Relation summaries show business relations only — never the query action
-  // edges or query-process nodes (record/source).
+  // Relation summaries show the relations actually visible in the focused
+  // graph: business facts and provenance. Never query-action edges, query
+  // process nodes (record/source), or mapping concepts kept out of the
+  // focused view.
+  const summaryKinds = new Set(['product', 'organization', 'registration', 'base', 'catalog_record', 'source_file', 'import_batch'])
   const edges = evidence.evidence.edges.filter((edge) =>
     (edge.source === node.id || edge.target === node.id)
     && edge.kind !== 'query'
-    && nodeById.get(edge.source)?.kind !== 'record' && nodeById.get(edge.source)?.kind !== 'source'
-    && nodeById.get(edge.target)?.kind !== 'record' && nodeById.get(edge.target)?.kind !== 'source')
+    && summaryKinds.has(nodeById.get(edge.source)?.kind ?? '')
+    && summaryKinds.has(nodeById.get(edge.target)?.kind ?? ''))
   const relations = [...new Set(edges.map((edge) => {
     const related = nodeById.get(edge.source === node.id ? edge.target : edge.source)
     if (!related) return ''
