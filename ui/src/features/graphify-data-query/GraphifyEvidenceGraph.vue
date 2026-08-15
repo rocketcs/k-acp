@@ -141,10 +141,6 @@ function initialize() {
         style: { 'border-width': 3, 'border-color': '#c98b37', 'background-color': '#fff4e4', color: '#8a5410' },
       },
       {
-        selector: 'node[?coreNode]:selected',
-        style: { 'border-width': 3, 'border-color': '#c98b37', 'background-color': '#fff4e4', color: '#8a5410', 'underlay-color': '#5a9fd0', 'underlay-opacity': 0.24, 'underlay-padding': 6 },
-      },
-      {
         selector: 'node[category = "entity"]',
         style: { 'border-style': 'dashed', 'border-color': '#b9cbd6', 'background-color': '#f7fafc', color: '#5a7184', 'font-size': 11 },
       },
@@ -157,6 +153,7 @@ function initialize() {
         style: { shape: 'diamond', 'border-color': '#5d8fb5', 'background-color': '#f0f6fb', color: '#2b5d80' },
       },
       { selector: 'node:selected', style: { 'border-width': 3, 'border-color': '#2f80c5', 'background-color': '#e6f2fb', 'underlay-color': '#5a9fd0', 'underlay-opacity': 0.24, 'underlay-padding': 6 } },
+      { selector: 'node[?coreNode]:selected', style: { 'border-width': 3, 'border-color': '#c98b37', 'background-color': '#fff4e4', color: '#8a5410', 'underlay-color': '#5a9fd0', 'underlay-opacity': 0.24, 'underlay-padding': 6 } },
       { selector: 'node.hover', style: { 'border-width': 3, 'border-color': '#e8a23a' } },
       { selector: 'node.dimmed', style: { opacity: 0.15 } },
       { selector: 'edge.dimmed', style: { opacity: 0.15 } },
