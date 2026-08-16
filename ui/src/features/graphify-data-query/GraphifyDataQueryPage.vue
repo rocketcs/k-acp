@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 import {
-  AimOutlined, CompressOutlined, DatabaseOutlined, DeploymentUnitOutlined, ExperimentOutlined, FieldStringOutlined, FilterOutlined,
+  AimOutlined, CompressOutlined, DatabaseOutlined, DeleteOutlined, DeploymentUnitOutlined, ExperimentOutlined, FieldStringOutlined, FilterOutlined,
   FullscreenExitOutlined, FullscreenOutlined, MedicineBoxOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SendOutlined,
   ShareAltOutlined, ZoomInOutlined, ZoomOutOutlined,
 } from '@ant-design/icons-vue'
@@ -10,16 +10,18 @@ import GraphifyEvidenceGraph from './GraphifyEvidenceGraph.vue'
 import { displayGraphifyLabel } from './evidenceAdapter'
 import { graphNodeLabel, graphRelationSentences, graphRelationSummary } from './evidencePresentation'
 import { useGraphifyDataQueryChat } from './useGraphifyDataQueryChat'
+import { shouldSubmitComposerShortcut, toggleEvidencePanel } from './composerControls'
+import type { ChatSessionVO } from '@/types'
 
 const props = defineProps<{ agentId: string }>()
 const agentId = computed(() => props.agentId)
 const {
   sessions, sessionsLoading, currentSessionId, displayMessages, isRunning, streamingContent, activeEvidence, activeOutcome,
-  selectedAssistantMessageId, chooseSession, startNewSession, sendQuestion,
+  selectedAssistantMessageId, chooseSession, deleteGraphifySession, startNewSession, sendQuestion,
 } = useGraphifyDataQueryChat(agentId)
 
 const question = ref('')
-const graphOpen = ref(true)
+const graphOpen = ref(false)
 const fullscreen = ref(false)
 const panelWidth = ref(470)
 const activeTab = ref<'graph' | 'mdl'>('graph')
@@ -66,11 +68,23 @@ async function submit() {
   const sent = await sendQuestion(question.value)
   if (sent) question.value = ''
 }
+function onComposerKeydown(event: KeyboardEvent) {
+  if (!shouldSubmitComposerShortcut(event)) return
+  event.preventDefault()
+  void submit()
+}
+function toggleGraph() {
+  graphOpen.value = toggleEvidencePanel(graphOpen.value)
+}
 async function focusGraph() {
   graphOpen.value = true
   activeTab.value = 'graph'
   await nextTick()
   graphRef.value?.fit()
+}
+async function removeSession(session: ChatSessionVO) {
+  if (!window.confirm(`确定删除“${session.title || '新对话'}”吗？此操作无法撤销。`)) return
+  await deleteGraphifySession(session)
 }
 function onResizeStart(event: PointerEvent) {
   const initial = panelWidth.value
@@ -89,7 +103,10 @@ function onResizeStart(event: PointerEvent) {
       <button class="new-session" type="button" :disabled="isRunning" @click="startNewSession"><PlusOutlined /> 新建对话</button>
       <span class="rail-label">历史会话</span>
       <div class="session-list" tabindex="0" aria-label="历史会话列表">
-        <button v-for="session in sessions" :key="session.id" class="session-item" :class="{ active: String(session.id) === currentSessionId }" :disabled="isRunning" @click="chooseSession(session)">{{ session.title || '新对话' }}</button>
+        <div v-for="session in sessions" :key="session.id" class="session-item-row" :class="{ active: String(session.id) === currentSessionId }">
+          <button class="session-item" :disabled="isRunning" @click="chooseSession(session)">{{ session.title || '新对话' }}</button>
+          <button class="session-delete" type="button" :disabled="isRunning" :aria-label="`删除会话：${session.title || '新对话'}`" title="删除会话" @click.stop="removeSession(session)"><DeleteOutlined /></button>
+        </div>
         <p v-if="sessionsLoading" class="rail-empty">正在加载会话…</p>
         <p v-else-if="!sessions.length" class="rail-empty">尚无历史会话</p>
       </div>
@@ -97,7 +114,7 @@ function onResizeStart(event: PointerEvent) {
     </aside>
 
     <section class="conversation-pane">
-      <header class="conversation-head"><div class="page-title"><MedicineBoxOutlined /><div><h1>医疗目录智能检索</h1><p>WREN MDL + NEO4J / GOVERNED EVIDENCE</p></div></div><div class="head-status"><b>{{ isRunning ? '正在查询' : activeEvidence ? `${activeEvidence.result.rows.length} 条结果` : '等待查询' }}</b><span>{{ activeEvidence ? `追踪 ${activeEvidence.trace_id}` : '实时证据链' }}</span></div><button class="icon-btn" title="打开语义依据" @click="graphOpen = true"><ShareAltOutlined /></button></header>
+      <header class="conversation-head"><div class="page-title"><MedicineBoxOutlined /><div><h1>医疗目录智能检索</h1><p>WREN MDL + NEO4J / GOVERNED EVIDENCE</p></div></div><div class="head-status"><b>{{ isRunning ? '正在查询' : activeEvidence ? `${activeEvidence.result.rows.length} 条结果` : '等待查询' }}</b><span>{{ activeEvidence ? `追踪 ${activeEvidence.trace_id}` : '实时证据链' }}</span></div><button class="icon-btn" :title="graphOpen ? '收起语义依据' : '展开语义依据'" :aria-expanded="graphOpen" aria-controls="graphify-evidence-panel" @click="toggleGraph"><ShareAltOutlined /></button></header>
       <div class="conversation-body">
         <section v-if="!displayMessages.length" class="empty-conversation"><MedicineBoxOutlined /><h2>从业务问题开始</h2><p>查询结果、语义依据和来源记录将在同一轮对话中展示。</p><div class="medical-domains" aria-label="可查询业务范围"><span><ExperimentOutlined /> 药品</span><span><DeploymentUnitOutlined /> 耗材</span><span><DatabaseOutlined /> 医疗目录</span></div></section>
         <article v-for="message in displayMessages" :key="message.id" :class="message.role === 'user' ? 'user-message' : 'answer'" @click="message.role === 'assistant' && (selectedAssistantMessageId = String(message.id))">
@@ -129,10 +146,10 @@ function onResizeStart(event: PointerEvent) {
         <section v-if="resultState === 'running' && !streamingContent" class="inline-state">正在调用受治理数据服务并生成证据链…</section>
         <section v-if="resultState === 'idle' && displayMessages.some((message) => message.role === 'assistant') && !activeEvidence && !activeOutcome" class="inline-state">该回答未返回可验证的 MCP 查询证据。</section>
       </div>
-      <form class="composer" @submit.prevent="submit"><textarea v-model="question" :disabled="isRunning" aria-label="继续追问" placeholder="继续追问，或输入一个新的业务问题" /><button type="submit" :disabled="!question.trim() || isRunning" title="发送当前问题" aria-label="发送当前问题"><SendOutlined /></button></form>
+      <form class="composer" @submit.prevent="submit"><textarea v-model="question" :disabled="isRunning" aria-label="继续追问" placeholder="继续追问，或输入一个新的业务问题" @keydown="onComposerKeydown" /><button type="submit" :disabled="!question.trim() || isRunning" title="发送当前问题" aria-label="发送当前问题"><SendOutlined /></button></form>
     </section>
 
-    <aside v-show="graphOpen" class="evidence-panel" :style="{ width: fullscreen ? '100vw' : `${panelWidth}px` }" aria-label="语义依据">
+    <aside v-show="graphOpen" id="graphify-evidence-panel" class="evidence-panel" :style="{ width: fullscreen ? '100vw' : `${panelWidth}px` }" aria-label="语义依据">
       <div v-if="!fullscreen" class="resize-handle" role="separator" aria-orientation="vertical" @pointerdown="onResizeStart" />
       <header class="panel-head"><h2>语义依据</h2><div><button class="icon-btn" :title="fullscreen ? '退出图谱大屏' : '图谱大屏查看'" @click="fullscreen = !fullscreen"><FullscreenExitOutlined v-if="fullscreen" /><FullscreenOutlined v-else /></button><button class="icon-btn" title="关闭" @click="graphOpen = false"><CompressOutlined /></button></div></header>
       <div class="panel-tabs" role="tablist"><button :class="{ active: activeTab === 'graph' }" @click="activeTab = 'graph'">当前问题</button><button :class="{ active: activeTab === 'mdl' }" @click="activeTab = 'mdl'">MDL 结构</button></div>
@@ -170,6 +187,14 @@ function onResizeStart(event: PointerEvent) {
  .node-summary-relations span { padding:4px 6px; border:1px solid #d6e3df; border-radius:3px; background:#f7faf9; color:#58716b; font-size:10px; line-height:1.35; }
 .node-summary > p { margin:0; color:#718187; font-size:11px; }
 .relation-summary { margin:0; color:#627b8e; font-size:11px; line-height:1.55; }
+
+.session-item-row { display:flex; min-width:0; min-height:42px; border-radius:3px; }
+.session-item-row .session-item { min-width:0; min-height:42px; flex:1; }
+.session-item-row:hover,.session-item-row.active { background:rgb(116 176 219 / 20%); box-shadow:inset 2px 0 #83c1eb; }
+.session-item-row:hover .session-item,.session-item-row.active .session-item { padding-left:9px; color:#fff; }
+.session-delete { display:grid; width:30px; flex:0 0 30px; place-items:center; border:0; border-radius:3px; background:transparent; color:#a9c0d2; cursor:pointer; opacity:0; }
+.session-item-row:hover .session-delete,.session-item-row:focus-within .session-delete { opacity:1; }
+.session-delete:hover { background:rgb(255 255 255 / 14%); color:#fff; }
 
 .page-title { display:flex; align-items:center; gap:10px; }.page-title > svg { flex:0 0 auto; padding:7px; border:1px solid #c4deef; border-radius:4px; background:#edf6fc; color:#2f80c5; font-size:22px; }.page-title h1 { margin:0; }.medical-domains { display:flex; flex-wrap:wrap; justify-content:center; gap:7px; margin-top:5px; }.medical-domains span { display:inline-flex; align-items:center; gap:5px; padding:5px 8px; border:1px solid #d3e3ef; border-radius:3px; background:#f6fbfe; color:#4e718a; font-size:11px; }.medical-domains svg { color:#3c91d3; }.legend span { display:inline-flex; align-items:center; gap:4px; }.legend span > svg { width:12px; height:12px; }.legend i { display:none; }
 

@@ -8,13 +8,14 @@ import type { RuntimeChatMessage } from '@/utils/chat/runtimeMessages'
 import type { ChatMessageVO, ChatSessionVO } from '@/types'
 import { parseGraphifyEvidence, parseGraphifyToolOutcome } from './evidenceAdapter'
 import type { GraphifyEvidenceEnvelope, GraphifyToolOutcome } from './types'
+import { shouldResetDeletedSession } from './composerControls'
 import { mergeTurnEvidence, type TurnEvidence } from './turnEvidence'
 
 const CONTEXT_MESSAGE_LIMIT = 6
 
 export function useGraphifyDataQueryChat(agentId: Ref<string>) {
   const { agentDetail } = useAgentDetail(agentId)
-  const { sessions, loading: sessionsLoading, createSession, resetAndReload } = useSessions(agentId)
+  const { sessions, loading: sessionsLoading, createSession, deleteSession, resetAndReload } = useSessions(agentId)
   const { currentSessionId, currentSessionTitle, messagesList, selectSession, resetSession, loadCurrentMessages } = useCurrentSession(agentId)
   const evidenceByMessageId = ref<Record<string, TurnEvidence>>({})
   // The dedicated Graphify experience needs the server to retain MCP results so
@@ -112,6 +113,18 @@ export function useGraphifyDataQueryChat(agentId: Ref<string>) {
     if (latestAssistant) selectedAssistantMessageId.value = String(latestAssistant.id)
   }
 
+  async function deleteGraphifySession(session: ChatSessionVO): Promise<boolean> {
+    if (isRunning.value) return false
+    try {
+      const isCurrentSession = shouldResetDeletedSession(currentSessionId.value, session.id)
+      await deleteSession(session.id)
+      if (isCurrentSession) await startNewSession()
+      return true
+    } catch {
+      return false
+    }
+  }
+
   async function loadInitialSession() {
     await resetAndReload()
     if (!currentSessionId.value && sessions.value[0]) {
@@ -176,6 +189,6 @@ export function useGraphifyDataQueryChat(agentId: Ref<string>) {
   return {
     sessions, sessionsLoading, currentSessionId, currentSessionTitle, displayMessages, isRunning, streamingContent,
     activeEvidence, activeOutcome, selectedAssistantMessageId, chooseSession, startNewSession,
-    sendQuestion, resetAndReload, loadCurrentMessages,
+    deleteGraphifySession, sendQuestion, resetAndReload, loadCurrentMessages,
   }
 }
