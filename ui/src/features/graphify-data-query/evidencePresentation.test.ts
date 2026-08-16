@@ -132,6 +132,43 @@ test('keeps a human-readable source file name in provenance text', () => {
   assert.match(graphRelationSummary(localEnvelope) ?? '', /耗材谈判记录/)
 })
 
+test('emits only fully localized catalog and source-file labels verbatim', () => {
+  const sourceKinds = [
+    { kind: 'catalog_record' as const, heading: '原始目录记录' },
+    { kind: 'source_file' as const, heading: '来源工作簿' },
+  ]
+  const unsafeLabels = [
+    '耗材谈判记录 crc32:deadbeef',
+    '耗材谈判记录 sha256:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=',
+    '耗材谈判记录 users',
+    '耗材谈判记录 node-123456',
+  ]
+
+  for (const sourceKind of sourceKinds) {
+    for (const [index, label] of unsafeLabels.entries()) {
+      const targetId = `localized-unsafe-${sourceKind.kind}-${index}`
+      const target = { id: targetId, label, kind: sourceKind.kind } as const
+      const edge = { id: `localized-unsafe-edge-${sourceKind.kind}-${index}`, source: 'product', target: targetId, label: '来源', kind: 'provenance' } as const
+      const localNodes = new Map(nodeById).set(targetId, target)
+      const localEnvelope = { ...envelope, evidence: { ...envelope.evidence, nodes: [...nodes, target], edges: [edge] } }
+
+      assert.equal(graphRelationSentence(edge, localNodes), `该信息由${sourceKind.heading}佐证。`)
+      assert.doesNotMatch(graphRelationSummary(localEnvelope) ?? '', new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    }
+  }
+
+  for (const sourceKind of sourceKinds) {
+    for (const [index, label] of ['耗材谈判记录', '耗材谈判记录 · 第 6 表 · 第 2 行'].entries()) {
+      const targetId = `localized-readable-${sourceKind.kind}-${index}`
+      const target = { id: targetId, label, kind: sourceKind.kind } as const
+      const edge = { id: `localized-readable-edge-${sourceKind.kind}-${index}`, source: 'product', target: targetId, label: '来源', kind: 'provenance' } as const
+      const localNodes = new Map(nodeById).set(targetId, target)
+
+      assert.equal(graphRelationSentence(edge, localNodes), `该信息由${label}佐证。`)
+    }
+  }
+})
+
 test('falls back to generic headings when source labels contain embedded internal tokens', () => {
   const unsafeLabels = [
     '耗材谈判记录 record:C1',

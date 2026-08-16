@@ -24,7 +24,7 @@ const internalLabel = (label: string): boolean =>
   || /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i.test(label)
 
 const humanReadableSourceName = (label: string): boolean =>
-  !internalLabel(label) && /[^\x00-\x7f]/.test(label)
+  /^(?=.*\p{Script=Han})[\p{Script=Han}\d\s《》·、，。()（）\-：；！？“”‘’【】〔〕〈〉…—]+$/u.test(label)
 
 const sentenceLabel = (node: GraphifyEvidenceNode | undefined): string | null => {
   if (!node) return null
