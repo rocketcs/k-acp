@@ -11,7 +11,11 @@ const NODE_HEADINGS: Record<string, string> = {
 
 const readable = (node: GraphifyEvidenceNode | undefined): node is GraphifyEvidenceNode => {
   const label = node?.label.trim() ?? ''
-  return Boolean(label) && !/^(record:|source:|import:|(?:raw|public)\.[a-z0-9_]+$|[a-f0-9]{32,})/i.test(label)
+  return Boolean(label)
+    && node?.kind !== 'import_batch'
+    && !/^(record:|source:|import:|batch(?:[_:-]|$)|(?:raw|public)\.[a-z0-9_]+$|[a-f0-9]{32,})/i.test(label)
+    && !/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:_records?|_table|_data|_dataset)$/i.test(label)
+    && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(label)
 }
 
 export function graphEdgeLabel(

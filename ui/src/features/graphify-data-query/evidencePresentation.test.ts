@@ -73,6 +73,28 @@ test('hides whitespace-prefixed internal ids and physical names from sentences a
   }
 })
 
+test('rejects import batches, unqualified physical tables, and batch identifiers', () => {
+  const rejectedLabels = [
+    { label: '导入批次-20260816', kind: 'import_batch' as const },
+    { label: 'medical_excel_consumable_negotiation_records', kind: 'catalog_record' as const },
+    { label: 'catalog_records', kind: 'catalog_record' as const },
+    { label: 'batch_20260816', kind: 'catalog_record' as const },
+    { label: '550e8400-e29b-41d4-a716-446655440000', kind: 'catalog_record' as const },
+    { label: '00000000-0000-0000-0000-000000000000', kind: 'catalog_record' as const },
+  ]
+
+  for (const [index, item] of rejectedLabels.entries()) {
+    const targetId = `rejected-${index}`
+    const target = { id: targetId, label: item.label, kind: item.kind } as const
+    const edge = { id: `rejected-edge-${index}`, source: 'product', target: targetId, label: '来源', kind: 'provenance' } as const
+    const localNodes = new Map(nodeById).set(targetId, target)
+    const localEnvelope = { ...envelope, evidence: { ...envelope.evidence, nodes: [...nodes, target], edges: [edge] } }
+
+    assert.equal(graphRelationSentence(edge, localNodes), null)
+    assert.doesNotMatch(graphRelationSummary(localEnvelope) ?? '', new RegExp(item.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  }
+})
+
 test('does not create a sentence when a relation endpoint is not readable', () => {
   const hidden = { id: 'hidden', source: 'product', target: 'missing', label: '对应', kind: 'business' } as const
   assert.equal(graphRelationSentence(hidden, nodeById), null)
