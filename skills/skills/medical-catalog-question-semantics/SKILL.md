@@ -52,6 +52,20 @@ description: 医疗目录问数智能体的「问题语义解析」技能。用�
 5. **预检与执行要求**：任何手写 SQL 必须先用 `query_preflight`（或旧版 `wren_query_preflight`）校验；只有返回 `allowed` / `warning` 才允许 `query`。耗材查询必须带 `catalog_domain = 'CONSUMABLE'`；查询 `max_price_text` 必须同时带 `price_semantics`。
 6. **无法落点**：当用户措辞无法确定映射到某个已发布字段，或一个词对应多个列且影响口径时，输出一个简洁澄清问题，不得臆造列名强行查询。
 
+## 证据字段要求
+
+关系查询必须返回能支撑结论的 `evidence_columns`。`evidence_columns` 必须是 `published_columns` 的子集，并且只允许使用上方已发布字段白名单中的值。
+
+| 问题语义 | `evidence_columns` |
+| --- | --- |
+| 注册备案号/批准文号 | `catalog_name`, `registration_no`, `source_record_id` |
+| 药品/耗材企业 | `catalog_name`, `manufacturer` or `consumable_enterprise`, `source_record_id` |
+| 耗材分类 | `catalog_name`, `category_level_1`, `category_level_2`, `category_level_3`, `source_record_id` |
+| 支付类别/限额/价格 | `catalog_name`, asked field, `source_record_id`; prices also require `price_semantics` |
+| 有效期/政策 | `catalog_name`, `valid_from`, `valid_to` or `policy_no`, `source_record_id` |
+
+若 `source_record_id` 不可访问，必须报告其不可用，绝不编造该字段或其值。
+
 ## 输出契约
 
 解析结果必须是以下结构（JSON），供智能体据此选择工具或 SQL：
@@ -60,15 +74,16 @@ description: 医疗目录问数智能体的「问题语义解析」技能。用�
 {
   "status": "resolved" | "needs_clarification",
   "catalog_domain": "CONSUMABLE",
-  "intent": "list_by_payment_category",
-  "recommended_template": "medical_catalog.list_records_by_payment_category",
-  "params": {"catalog_domain": "CONSUMABLE", "payment_category": "乙类"},
-  "published_columns": ["payment_category", "catalog_code", "catalog_name", "source_record_id"],
-  "constraints": ["catalog_domain = 'CONSUMABLE'"]
+  "intent": "get_by_registration_no",
+  "recommended_template": "medical_catalog.get_by_registration_no",
+  "params": {"registration_no": "示例注册备案号"},
+  "published_columns": ["catalog_name", "registration_no", "source_record_id"],
+  "evidence_columns": ["catalog_name", "registration_no", "source_record_id"],
+  "constraints": []
 }
 ```
 
-- `status = resolved` 且已给出 `published_columns`（必须都来自白名单）时，智能体按此执行；`status = needs_clarification` 时，输出澄清问题，不执行。
+- `status = resolved` 且已给出 `published_columns`（必须都来自白名单）时，智能体按此执行；`evidence_columns` 必须是 `published_columns` 的子集。`status = needs_clarification` 时，输出澄清问题，不执行。
 
 ## 反面与正面样例
 
