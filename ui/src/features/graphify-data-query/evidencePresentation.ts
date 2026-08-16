@@ -15,7 +15,12 @@ const NODE_HEADINGS: Record<string, string> = {
 const NEVER_INTERPOLATE_SOURCE_KINDS = new Set<GraphifyEvidenceNode['kind']>(['import_batch', 'record', 'source'])
 
 const internalLabel = (label: string): boolean =>
-  /^(?:record:|source:|import:|batch(?:[_:-]|$)|(?:raw|public)\.[a-z0-9_]+$|[a-f0-9]{32,}|(?:sha-?(?:1|224|256|384|512)|md5)\s*[:=]\s*[a-f0-9]{6,}$)/i.test(label)
+  /\b(?:record|source|import)\s*[:=]\s*[^\s,;，。]+/i.test(label)
+  || /\b[a-z][a-z0-9]*\.[a-z][a-z0-9_]*\b/i.test(label)
+  || /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/i.test(label)
+  || /\b[a-z][a-z0-9_-]*\s*[:=]\s*[a-f0-9]{32,}\b/i.test(label)
+  || /\b[a-f0-9]{32,}\b/i.test(label)
+  || /\b(?:batch(?:[_:-]|$)|raw\.)/i.test(label)
   || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(label)
 
 const humanReadableSourceName = (label: string): boolean =>

@@ -132,6 +132,30 @@ test('keeps a human-readable source file name in provenance text', () => {
   assert.match(graphRelationSummary(localEnvelope) ?? '', /耗材谈判记录/)
 })
 
+test('falls back to generic headings when source labels contain embedded internal tokens', () => {
+  const unsafeLabels = [
+    '耗材谈判记录 record:C1',
+    '耗材谈判记录 public.medical_reconciliation_ledger',
+    '耗材谈判记录 catalog_records',
+    '耗材谈判记录 BLAKE3:0123456789abcdef0123456789abcdef',
+  ]
+
+  for (const [index, label] of unsafeLabels.entries()) {
+    const targetId = `embedded-unsafe-${index}`
+    const target = { id: targetId, label, kind: 'catalog_record' } as const
+    const edge = { id: `embedded-unsafe-edge-${index}`, source: 'product', target: targetId, label: '来源', kind: 'provenance' } as const
+    const localNodes = new Map(nodeById).set(targetId, target)
+    const localEnvelope = { ...envelope, evidence: { ...envelope.evidence, nodes: [...nodes, target], edges: [edge] } }
+
+    const sentence = graphRelationSentence(edge, localNodes)
+    assert.equal(sentence, '该信息由原始目录记录佐证。')
+    assert.doesNotMatch(sentence ?? '', /record:C1|public\.medical_reconciliation_ledger|catalog_records|BLAKE3:0123456789abcdef0123456789abcdef/)
+    const summary = graphRelationSummary(localEnvelope)
+    assert.equal(summary, '该信息由原始目录记录佐证。')
+    assert.doesNotMatch(summary ?? '', /record:C1|public\.medical_reconciliation_ledger|catalog_records|BLAKE3:0123456789abcdef0123456789abcdef/)
+  }
+})
+
 test('does not create a sentence when a relation endpoint is not readable', () => {
   const hidden = { id: 'hidden', source: 'product', target: 'missing', label: '对应', kind: 'business' } as const
   assert.equal(graphRelationSentence(hidden, nodeById), null)
