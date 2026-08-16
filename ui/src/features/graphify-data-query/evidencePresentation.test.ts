@@ -67,7 +67,7 @@ test('hides whitespace-prefixed internal ids and physical names from sentences a
     const localNodes = new Map(nodeById).set(targetId, target)
     const localEnvelope = { ...envelope, evidence: { ...envelope.evidence, nodes: [...nodes, target], edges: [edge] } }
 
-    assert.equal(graphRelationSentence(edge, localNodes), null)
+    assert.equal(graphRelationSentence(edge, localNodes), '覆膜气管支架与原始目录记录相关。')
     const summary = graphRelationSummary(localEnvelope)
     assert.doesNotMatch(summary ?? '', /record:C1|raw\.catalog_record|public\.medical_excel_consumable_negotiation_records|0123456789abcdef0123456789abcdef/)
   }
@@ -90,9 +90,46 @@ test('rejects import batches, unqualified physical tables, and batch identifiers
     const localNodes = new Map(nodeById).set(targetId, target)
     const localEnvelope = { ...envelope, evidence: { ...envelope.evidence, nodes: [...nodes, target], edges: [edge] } }
 
-    assert.equal(graphRelationSentence(edge, localNodes), null)
+    assert.equal(graphRelationSentence(edge, localNodes), `该信息由${item.kind === 'import_batch' ? '导入批次' : '原始目录记录'}佐证。`)
     assert.doesNotMatch(graphRelationSummary(localEnvelope) ?? '', new RegExp(item.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
   }
+})
+
+test('uses only safe source names in provenance sentences and summaries', () => {
+  const unsafeSources = [
+    { label: '内部导入批次-20260816', kind: 'import_batch' as const, heading: '导入批次' },
+    { label: '查询记录 #42', kind: 'record' as const, heading: '查询记录' },
+    { label: '内部来源', kind: 'source' as const, heading: '来源记录' },
+    { label: 'medical_reconciliation_ledger', kind: 'catalog_record' as const, heading: '原始目录记录' },
+    { label: 'sha256:abcdef0123456789abcdef0123456789', kind: 'catalog_record' as const, heading: '原始目录记录' },
+    { label: 'SHA-256=abcdef0123456789abcdef0123456789', kind: 'source_file' as const, heading: '来源工作簿' },
+    { label: 'md5:abcdef0123456789abcdef01234567', kind: 'source_file' as const, heading: '来源工作簿' },
+  ]
+
+  for (const [index, item] of unsafeSources.entries()) {
+    const targetId = `unsafe-source-${index}`
+    const target = { id: targetId, label: item.label, kind: item.kind } as const
+    const edge = { id: `unsafe-source-edge-${index}`, source: 'product', target: targetId, label: '来源', kind: 'provenance' } as const
+    const localNodes = new Map(nodeById).set(targetId, target)
+    const localEnvelope = { ...envelope, evidence: { ...envelope.evidence, nodes: [...nodes, target], edges: [edge] } }
+
+    const sentence = graphRelationSentence(edge, localNodes)
+    assert.equal(sentence, `该信息由${item.heading}佐证。`)
+    assert.doesNotMatch(sentence ?? '', new RegExp(item.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))
+    const summary = graphRelationSummary(localEnvelope)
+    assert.match(summary ?? '', new RegExp(item.heading))
+    assert.doesNotMatch(summary ?? '', new RegExp(item.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))
+  }
+})
+
+test('keeps a human-readable source file name in provenance text', () => {
+  const source = { id: 'human-source-file', label: '耗材谈判记录', kind: 'source_file' } as const
+  const edge = { id: 'human-source-edge', source: 'product', target: source.id, label: '来源', kind: 'provenance' } as const
+  const localNodes = new Map(nodeById).set(source.id, source)
+  const localEnvelope = { ...envelope, evidence: { ...envelope.evidence, nodes: [...nodes, source], edges: [edge] } }
+
+  assert.equal(graphRelationSentence(edge, localNodes), '该信息由耗材谈判记录佐证。')
+  assert.match(graphRelationSummary(localEnvelope) ?? '', /耗材谈判记录/)
 })
 
 test('does not create a sentence when a relation endpoint is not readable', () => {
