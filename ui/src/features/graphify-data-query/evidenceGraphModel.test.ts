@@ -86,3 +86,25 @@ test('uses readable semantic labels for business and provenance edges', () => {
   assert.ok(labels.includes('原始记录佐证'))
   assert.equal(labels.includes('业务关联'), false)
 })
+
+test('never stores raw internal node labels in rendered labels or tooltips', () => {
+  const unsafeEnvelope: GraphifyEvidenceEnvelope = {
+    ...envelope,
+    evidence: {
+      ...envelope.evidence,
+      nodes: envelope.evidence.nodes.map((node) => node.id === 'catalog_record'
+        ? { ...node, label: '耗材谈判记录·导入批次20260816' }
+        : node.id === 'registration'
+          ? { ...node, label: 'raw.registration_record' }
+          : node),
+    },
+  }
+  const elements = evidenceGraphModel(unsafeEnvelope, { viewMode: 'focused', showFields: false })
+  const nodeText = elements
+    .filter((item) => !item.data?.source)
+    .flatMap((item) => [String(item.data?.label), String(item.data?.fullLabel)])
+    .join('\n')
+
+  assert.doesNotMatch(nodeText, /耗材谈判记录·导入批次20260816|raw\.registration_record/)
+  assert.match(nodeText, /原始目录记录|注册备案号/)
+})

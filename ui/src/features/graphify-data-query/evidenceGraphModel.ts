@@ -1,7 +1,7 @@
 import type { ElementDefinition } from 'cytoscape'
 import { dagrePositions } from './dagreLayout.ts'
 import { nodeVisual } from './evidenceStyles.ts'
-import { graphEdgeLabel } from './evidencePresentation.ts'
+import { graphEdgeLabel, graphNodeLabel } from './evidencePresentation.ts'
 import type { GraphifyEvidenceEnvelope, GraphifyEvidenceNode } from './types'
 
 export type GraphModelOptions = {
@@ -85,14 +85,15 @@ export function evidenceGraphModel(envelope: GraphifyEvidenceEnvelope, opts: Gra
 
   const nodeElements: ElementDefinition[] = nodes.map((node) => {
     const visual = nodeVisual(node.kind)
+    const presentedLabel = graphNodeLabel(node)
     // Core entity shows its business name directly; related entities show
     // their relation type above the concrete value.
-    const label = node.kind === 'product' ? node.label : `${visual.heading}\n${node.label}`
+    const label = node.kind === 'product' ? presentedLabel : `${visual.heading}\n${presentedLabel}`
     return {
       data: {
         id: node.id,
         label,
-        fullLabel: node.label,
+        fullLabel: presentedLabel,
         kind: node.kind,
         category: node.kind,
         heading: visual.heading,

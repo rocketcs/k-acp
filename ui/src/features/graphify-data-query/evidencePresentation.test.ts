@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { GraphifyEvidenceEdge, GraphifyEvidenceEnvelope, GraphifyEvidenceNode } from './types.ts'
-import { graphEdgeLabel, graphRelationSentence, graphRelationSummary } from './evidencePresentation.ts'
+import {
+  graphEdgeLabel,
+  graphNodeLabel,
+  graphRelationSentence,
+  graphRelationSentences,
+  graphRelationSummary,
+} from './evidencePresentation.ts'
 
 const nodes: GraphifyEvidenceNode[] = [
   { id: 'product', label: '覆膜气管支架', kind: 'product' },
@@ -45,6 +51,37 @@ test('returns a safe fallback for an unknown readable relation', () => {
   const unknown = { id: 'unknown', source: 'product', target: 'organization', label: 'CUSTOM_LINK', kind: 'business' } as const
   assert.equal(graphEdgeLabel(unknown, nodeById), '相关')
   assert.equal(graphRelationSentence(unknown, nodeById), '覆膜气管支架与淮安市西格玛医用实业有限公司相关。')
+})
+
+test('does not infer factual relation semantics from endpoint kinds', () => {
+  const targets = [
+    { id: 'registration', kind: 'registration' as const },
+    { id: 'organization', kind: 'organization' as const },
+    { id: 'base', kind: 'base' as const },
+    { id: 'concept', kind: 'concept' as const },
+  ]
+
+  for (const target of targets) {
+    const targetNode = { ...target, label: `可读${target.kind}` }
+    const localNodes = new Map(nodeById).set(target.id, targetNode)
+    const edge = { id: `unknown-${target.kind}`, source: 'product', target: target.id, label: 'HAS_OBSERVED_LABEL', kind: 'business' as const }
+
+    assert.equal(graphEdgeLabel(edge, localNodes), '相关')
+    assert.equal(graphRelationSentence(edge, localNodes), `覆膜气管支架与可读${target.kind}相关。`)
+  }
+})
+
+test('uses factual forms only for recognized business relations', () => {
+  const relationCases = [
+    { target: { id: 'base', label: '基础耗材 0133', kind: 'base' as const }, label: '归类', expected: '覆膜气管支架归属基础耗材 0133。' },
+    { target: { id: 'concept', label: '中心静脉导管', kind: 'concept' as const }, label: '目录映射', expected: '覆膜气管支架映射至中心静脉导管。' },
+  ]
+
+  for (const item of relationCases) {
+    const localNodes = new Map(nodeById).set(item.target.id, item.target)
+    const edge = { id: `recognized-${item.target.kind}`, source: 'product', target: item.target.id, label: item.label, kind: 'business' as const }
+    assert.equal(graphRelationSentence(edge, localNodes), item.expected)
+  }
 })
 
 test('hides raw labels for unknown semantic relations', () => {
@@ -117,7 +154,8 @@ test('uses only safe source names in provenance sentences and summaries', () => 
     assert.equal(sentence, `该信息由${item.heading}佐证。`)
     assert.doesNotMatch(sentence ?? '', new RegExp(item.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))
     const summary = graphRelationSummary(localEnvelope)
-    assert.match(summary ?? '', new RegExp(item.heading))
+    if (item.kind === 'record' || item.kind === 'source') assert.equal(summary, null)
+    else assert.match(summary ?? '', new RegExp(item.heading))
     assert.doesNotMatch(summary ?? '', new RegExp(item.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))
   }
 })
@@ -130,6 +168,53 @@ test('keeps a human-readable source file name in provenance text', () => {
 
   assert.equal(graphRelationSentence(edge, localNodes), '该信息由耗材谈判记录佐证。')
   assert.match(graphRelationSummary(localEnvelope) ?? '', /耗材谈判记录/)
+})
+
+test('redacts semantic batch suffixes from otherwise localized source labels', () => {
+  const source = { id: 'batch-source-file', label: '耗材谈判记录·导入批次20260816', kind: 'source_file' as const }
+  const edge = { id: 'batch-source-edge', source: 'product', target: source.id, label: '来源', kind: 'provenance' as const }
+  const localNodes = new Map(nodeById).set(source.id, source)
+
+  assert.equal(graphNodeLabel(source), '来源工作簿')
+  assert.equal(graphRelationSentence(edge, localNodes), '该信息由来源工作簿佐证。')
+})
+
+test('presents safe graph labels while preserving genuine readable labels', () => {
+  assert.equal(graphNodeLabel({ id: 'safe-source', label: '耗材谈判记录', kind: 'source_file' }), '耗材谈判记录')
+  assert.equal(graphNodeLabel({ id: 'unsafe-organization', label: 'raw.medical_organization', kind: 'organization' }), '生产企业')
+  assert.equal(graphNodeLabel({ id: 'unsafe-model', label: 'medical_catalog', kind: 'model' }), '业务模型')
+  assert.equal(graphNodeLabel({ id: 'unsafe-product', label: '耗材谈判记录·导入批次20260816', kind: 'product' }), '耗材目录项')
+})
+
+test('summaries include only display-contract relations with a business subject', () => {
+  const summaryEnvelope: GraphifyEvidenceEnvelope = {
+    ...envelope,
+    evidence: {
+      ...envelope.evidence,
+      nodes: [
+        ...nodes,
+        { id: 'query-record', label: '查询记录', kind: 'record' },
+        { id: 'concept', label: '中心静脉导管', kind: 'concept' },
+      ],
+      edges: [
+        { id: 'query-edge', source: 'query-record', target: 'product', label: '查询返回', kind: 'business' },
+        { id: 'semantic-edge', source: 'product', target: 'concept', label: '目录映射', kind: 'semantic' },
+        { id: 'lineage-edge', source: 'record', target: 'source-file', label: '来源', kind: 'provenance' },
+        { id: 'concept-edge', source: 'product', target: 'concept', label: '目录映射', kind: 'business' },
+        edges[0]!,
+      ],
+    },
+  }
+
+  assert.equal(
+    graphRelationSummary(summaryEnvelope, 1),
+    '覆膜气管支架映射至中心静脉导管。另有 1 条关联。',
+  )
+  assert.deepEqual(
+    graphRelationSentences(summaryEnvelope, 'concept'),
+    ['覆膜气管支架映射至中心静脉导管。'],
+  )
+  assert.doesNotMatch(graphRelationSummary(summaryEnvelope) ?? '', /查询记录|来源工作簿与|语义/)
 })
 
 test('emits only fully localized catalog and source-file labels verbatim', () => {

@@ -7,8 +7,8 @@ import {
 } from '@ant-design/icons-vue'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer.vue'
 import GraphifyEvidenceGraph from './GraphifyEvidenceGraph.vue'
-import { displayGraphifyLabel, displayGraphifyNodeLabel } from './evidenceAdapter'
-import { graphRelationSentence, graphRelationSummary } from './evidencePresentation'
+import { displayGraphifyLabel } from './evidenceAdapter'
+import { graphNodeLabel, graphRelationSentences, graphRelationSummary } from './evidencePresentation'
 import { useGraphifyDataQueryChat } from './useGraphifyDataQueryChat'
 
 const props = defineProps<{ agentId: string }>()
@@ -34,24 +34,11 @@ const selectedNodeSummary = computed(() => {
   const evidence = activeEvidence.value
   const node = selectedNode.value
   if (!evidence || !node) return null
-  const nodeById = new Map(evidence.evidence.nodes.map((item) => [item.id, item]))
-  // Relation summaries show the relations actually visible in the focused
-  // graph: business facts and provenance. Never query-action edges, query
-  // process nodes (record/source), or mapping concepts kept out of the
-  // focused view.
-  const summaryKinds = new Set(['product', 'organization', 'registration', 'base', 'catalog_record', 'source_file', 'import_batch'])
-  const edges = evidence.evidence.edges.filter((edge) =>
-    (edge.source === node.id || edge.target === node.id)
-    && edge.kind !== 'query'
-    && summaryKinds.has(nodeById.get(edge.source)?.kind ?? '')
-    && summaryKinds.has(nodeById.get(edge.target)?.kind ?? ''))
-  const relations = [...new Set(edges
-    .map((edge) => graphRelationSentence(edge, nodeById))
-    .filter((relation): relation is string => relation !== null))]
+  const relations = graphRelationSentences(evidence, node.id)
   return {
     type: ({ model: '业务模型', record: '查询记录', entity: '业务实体', source: '来源记录', product: '耗材', registration: '注册备案', organization: '耗材企业', base: '基础耗材', concept: '映射概念', catalog_record: '原始目录记录', source_file: '来源工作簿', import_batch: '导入批次' } as Record<string, string>)[node.kind] ?? '业务实体',
-    label: displayGraphifyNodeLabel(node),
-    edgeCount: edges.length,
+    label: graphNodeLabel(node),
+    edgeCount: relations.length,
     relations: relations.slice(0, 4),
     extraCount: Math.max(0, relations.length - 4),
   }
