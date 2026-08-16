@@ -47,6 +47,32 @@ test('returns a safe fallback for an unknown readable relation', () => {
   assert.equal(graphRelationSentence(unknown, nodeById), '覆膜气管支架与淮安市西格玛医用实业有限公司相关。')
 })
 
+test('hides raw labels for unknown semantic relations', () => {
+  const unknown = { id: 'semantic-unknown', source: 'product', target: 'registration', label: 'HAS_OBSERVED_LABEL', kind: 'semantic' } as const
+  assert.doesNotMatch(graphEdgeLabel(unknown, nodeById), /HAS_OBSERVED_LABEL/)
+})
+
+test('hides whitespace-prefixed internal ids and physical names from sentences and summaries', () => {
+  const internalLabels = [
+    ' record:C1',
+    ' raw.catalog_record',
+    ' public.medical_excel_consumable_negotiation_records',
+    ' 0123456789abcdef0123456789abcdef',
+  ]
+
+  for (const [index, label] of internalLabels.entries()) {
+    const targetId = `internal-${index}`
+    const target = { id: targetId, label, kind: 'catalog_record' } as const
+    const edge = { id: `internal-edge-${index}`, source: 'product', target: targetId, label: '来源', kind: 'business' } as const
+    const localNodes = new Map(nodeById).set(targetId, target)
+    const localEnvelope = { ...envelope, evidence: { ...envelope.evidence, nodes: [...nodes, target], edges: [edge] } }
+
+    assert.equal(graphRelationSentence(edge, localNodes), null)
+    const summary = graphRelationSummary(localEnvelope)
+    assert.doesNotMatch(summary ?? '', /record:C1|raw\.catalog_record|public\.medical_excel_consumable_negotiation_records|0123456789abcdef0123456789abcdef/)
+  }
+})
+
 test('does not create a sentence when a relation endpoint is not readable', () => {
   const hidden = { id: 'hidden', source: 'product', target: 'missing', label: '对应', kind: 'business' } as const
   assert.equal(graphRelationSentence(hidden, nodeById), null)

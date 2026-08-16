@@ -9,8 +9,10 @@ const NODE_HEADINGS: Record<string, string> = {
   source_file: '来源工作簿',
 }
 
-const readable = (node: GraphifyEvidenceNode | undefined): node is GraphifyEvidenceNode =>
-  Boolean(node?.label.trim()) && !/^(record:|source:|import:|[a-f0-9]{32,})/i.test(node!.label)
+const readable = (node: GraphifyEvidenceNode | undefined): node is GraphifyEvidenceNode => {
+  const label = node?.label.trim() ?? ''
+  return Boolean(label) && !/^(record:|source:|import:|(?:raw|public)\.[a-z0-9_]+$|[a-f0-9]{32,})/i.test(label)
+}
 
 export function graphEdgeLabel(
   edge: GraphifyEvidenceEdge,
@@ -26,7 +28,7 @@ export function graphEdgeLabel(
   if (edge.label === '生产' || (target?.kind === 'organization' && !/^[A-Z_]+$/.test(edge.label))) return '生产企业'
   if (edge.label === '归类' || target?.kind === 'base') return '归属分类'
   if (edge.label.includes('映射') || target?.kind === 'concept') return '映射至'
-  return edge.kind === 'business' ? '相关' : edge.label
+  return '相关'
 }
 
 export function graphRelationSentence(
