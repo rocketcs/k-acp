@@ -19,7 +19,9 @@ const internalLabel = (label: string): boolean =>
   || /\b[a-z][a-z0-9]*\.[a-z][a-z0-9_]*\b/i.test(label)
   || /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/i.test(label)
   || /\b[a-z][a-z0-9_-]*\s*[:=]\s*[a-f0-9]{32,}\b/i.test(label)
+  || /\b(?:sha(?:-?\d+)?|md\d+|crc\d*|blake\d*)\s*[:=]\s*[a-z0-9+/]{16,}={0,2}/i.test(label)
   || /\b[a-f0-9]{32,}\b/i.test(label)
+  || /\b(?:node|edge)[-_:=][a-z0-9]+(?:[-_][a-z0-9]+)*\b/i.test(label)
   || /\b(?:batch(?:[_:-]|$)|raw\.)/i.test(label)
   || /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i.test(label)
 

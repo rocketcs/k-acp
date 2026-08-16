@@ -219,6 +219,26 @@ test('hides uppercase physical raw-code source labels', () => {
   assert.doesNotMatch(summary ?? '', /HAS_OBSERVED_LABEL/)
 })
 
+test('redacts algorithm hashes and internal node ids on ordinary node endpoints', () => {
+  const internalLabels = [
+    'sha256:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=',
+    'node-123456',
+  ]
+
+  for (const [index, label] of internalLabels.entries()) {
+    const targetId = `ordinary-internal-${index}`
+    const target = { id: targetId, label, kind: 'organization' as const }
+    const edge = { id: `ordinary-internal-edge-${index}`, source: 'product', target: targetId, label: '生产', kind: 'business' as const }
+    const localNodes = new Map(nodeById).set(targetId, target)
+    const localEnvelope = { ...envelope, evidence: { ...envelope.evidence, nodes: [...nodes, target], edges: [edge] } }
+
+    const sentence = graphRelationSentence(edge, localNodes)
+    const summary = graphRelationSummary(localEnvelope)
+    assert.doesNotMatch(sentence ?? '', new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    assert.doesNotMatch(summary ?? '', new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  }
+})
+
 test('does not create a sentence when a relation endpoint is not readable', () => {
   const hidden = { id: 'hidden', source: 'product', target: 'missing', label: '对应', kind: 'business' } as const
   assert.equal(graphRelationSentence(hidden, nodeById), null)
