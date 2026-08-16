@@ -21,7 +21,7 @@ const internalLabel = (label: string): boolean =>
   || /\b[a-z][a-z0-9_-]*\s*[:=]\s*[a-f0-9]{32,}\b/i.test(label)
   || /\b[a-f0-9]{32,}\b/i.test(label)
   || /\b(?:batch(?:[_:-]|$)|raw\.)/i.test(label)
-  || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(label)
+  || /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i.test(label)
 
 const humanReadableSourceName = (label: string): boolean =>
   !internalLabel(label) && /[^\x00-\x7f]/.test(label)

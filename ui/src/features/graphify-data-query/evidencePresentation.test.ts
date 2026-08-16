@@ -156,6 +156,32 @@ test('falls back to generic headings when source labels contain embedded interna
   }
 })
 
+test('falls back when a source label contains an embedded UUID', () => {
+  const targetId = 'embedded-uuid'
+  const target = { id: targetId, label: '耗材谈判记录 550e8400-e29b-41d4-a716-446655440000', kind: 'catalog_record' } as const
+  const edge = { id: 'embedded-uuid-edge', source: 'product', target: targetId, label: '来源', kind: 'provenance' } as const
+  const localNodes = new Map(nodeById).set(targetId, target)
+  const localEnvelope = { ...envelope, evidence: { ...envelope.evidence, nodes: [...nodes, target], edges: [edge] } }
+
+  assert.equal(graphRelationSentence(edge, localNodes), '该信息由原始目录记录佐证。')
+  const summary = graphRelationSummary(localEnvelope)
+  assert.equal(summary, '该信息由原始目录记录佐证。')
+  assert.doesNotMatch(summary ?? '', /550e8400-e29b-41d4-a716-446655440000/)
+})
+
+test('hides uppercase physical raw-code source labels', () => {
+  const targetId = 'uppercase-raw-code'
+  const target = { id: targetId, label: 'HAS_OBSERVED_LABEL', kind: 'catalog_record' } as const
+  const edge = { id: 'uppercase-raw-code-edge', source: 'product', target: targetId, label: '来源', kind: 'provenance' } as const
+  const localNodes = new Map(nodeById).set(targetId, target)
+  const localEnvelope = { ...envelope, evidence: { ...envelope.evidence, nodes: [...nodes, target], edges: [edge] } }
+
+  assert.equal(graphRelationSentence(edge, localNodes), '该信息由原始目录记录佐证。')
+  const summary = graphRelationSummary(localEnvelope)
+  assert.equal(summary, '该信息由原始目录记录佐证。')
+  assert.doesNotMatch(summary ?? '', /HAS_OBSERVED_LABEL/)
+})
+
 test('does not create a sentence when a relation endpoint is not readable', () => {
   const hidden = { id: 'hidden', source: 'product', target: 'missing', label: '对应', kind: 'business' } as const
   assert.equal(graphRelationSentence(hidden, nodeById), null)
