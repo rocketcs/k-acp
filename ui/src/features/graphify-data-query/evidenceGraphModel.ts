@@ -1,6 +1,7 @@
 import type { ElementDefinition } from 'cytoscape'
 import { dagrePositions } from './dagreLayout.ts'
 import { nodeVisual } from './evidenceStyles.ts'
+import { graphEdgeLabel } from './evidencePresentation.ts'
 import type { GraphifyEvidenceEnvelope, GraphifyEvidenceNode } from './types'
 
 export type GraphModelOptions = {
@@ -63,6 +64,7 @@ export function evidenceGraphModel(envelope: GraphifyEvidenceEnvelope, opts: Gra
   const nodes = opts.visibleIds
     ? allNodes.filter((node) => opts.visibleIds!.has(node.id))
     : allNodes
+  const nodeById = new Map(nodes.map((node) => [node.id, node]))
   const nodeIds = new Set(nodes.map((node) => node.id))
   const modelId = nodes.find((node) => node.kind === 'model')?.id
   // A query edge from the model root to a business entity *defines* that
@@ -105,7 +107,7 @@ export function evidenceGraphModel(envelope: GraphifyEvidenceEnvelope, opts: Gra
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      label: edge.label,
+      label: graphEdgeLabel(edge, nodeById),
       kind: edge.kind,
     },
   }))

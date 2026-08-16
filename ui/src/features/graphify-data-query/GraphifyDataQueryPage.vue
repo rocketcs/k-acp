@@ -8,6 +8,7 @@ import {
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer.vue'
 import GraphifyEvidenceGraph from './GraphifyEvidenceGraph.vue'
 import { displayGraphifyLabel, displayGraphifyNodeLabel } from './evidenceAdapter'
+import { graphRelationSentence, graphRelationSummary } from './evidencePresentation'
 import { useGraphifyDataQueryChat } from './useGraphifyDataQueryChat'
 
 const props = defineProps<{ agentId: string }>()
@@ -27,6 +28,7 @@ const mdlSearch = ref('')
 const selectedId = ref<string | null>(null)
 const graphRef = ref<InstanceType<typeof GraphifyEvidenceGraph> | null>(null)
 const showFields = ref(false)
+const relationSummary = computed(() => activeEvidence.value ? graphRelationSummary(activeEvidence.value) : null)
 const selectedNode = computed(() => activeEvidence.value?.evidence.nodes.find((node) => node.id === selectedId.value) ?? activeEvidence.value?.evidence.nodes[0])
 const selectedNodeSummary = computed(() => {
   const evidence = activeEvidence.value
@@ -43,13 +45,9 @@ const selectedNodeSummary = computed(() => {
     && edge.kind !== 'query'
     && summaryKinds.has(nodeById.get(edge.source)?.kind ?? '')
     && summaryKinds.has(nodeById.get(edge.target)?.kind ?? ''))
-  const relations = [...new Set(edges.map((edge) => {
-    const related = nodeById.get(edge.source === node.id ? edge.target : edge.source)
-    if (!related) return ''
-    const direction = edge.source === node.id ? '关联到' : '来自'
-    const relation = displayGraphifyLabel(edge.label, displayGraphifyLabel(edge.kind, '业务关联'))
-    return `${direction}${displayGraphifyNodeLabel(related)}（${relation}）`
-  }).filter(Boolean))]
+  const relations = [...new Set(edges
+    .map((edge) => graphRelationSentence(edge, nodeById))
+    .filter((relation): relation is string => relation !== null))]
   return {
     type: ({ model: '业务模型', record: '查询记录', entity: '业务实体', source: '来源记录', product: '耗材', registration: '注册备案', organization: '耗材企业', base: '基础耗材', concept: '映射概念', catalog_record: '原始目录记录', source_file: '来源工作簿', import_batch: '导入批次' } as Record<string, string>)[node.kind] ?? '业务实体',
     label: displayGraphifyNodeLabel(node),
@@ -154,7 +152,7 @@ function onResizeStart(event: PointerEvent) {
       <section class="evidence-scroll">
         <template v-if="activeTab === 'graph'">
           <template v-if="activeEvidence">
-            <header v-if="!fullscreen" class="question-summary"><small>当前对话轮次 · {{ activeEvidence.trace_id }}</small><strong>{{ activeEvidence.question }}</strong><span>{{ activeEvidence.result.rows.length }} 条结果 · {{ activeEvidence.evidence.source_record_ids.length }} 条来源记录</span></header>
+            <header v-if="!fullscreen" class="question-summary"><small>当前对话轮次 · {{ activeEvidence.trace_id }}</small><strong>{{ activeEvidence.question }}</strong><span>{{ activeEvidence.result.rows.length }} 条结果 · {{ activeEvidence.evidence.source_record_ids.length }} 条来源记录</span><p v-if="relationSummary" class="relation-summary">关系摘要：{{ relationSummary }}</p></header>
             <div class="legend"><span><DatabaseOutlined class="blue" /> Wren MDL</span><span><MedicineBoxOutlined class="teal" /> 业务实体</span><span><ShareAltOutlined class="green" /> 来源追溯</span><span><DeploymentUnitOutlined class="plum" /> 业务关系</span></div>
             <div class="graph-workspace"><GraphifyEvidenceGraph ref="graphRef" :evidence="activeEvidence" :relation-filter="relationFilter" :fullscreen="fullscreen" :show-fields="showFields" @select="selectedId = $event" /><div class="graph-tools" aria-label="图谱工具栏"><button class="icon-btn" title="放大" @click="graphRef?.zoomIn()"><ZoomInOutlined /></button><button class="icon-btn" title="缩小" @click="graphRef?.zoomOut()"><ZoomOutOutlined /></button><button class="icon-btn" title="适应画布" @click="graphRef?.fit()"><AimOutlined /></button><button class="icon-btn" title="重新布局" @click="graphRef?.relayout()"><ReloadOutlined /></button><button class="icon-btn" :class="{ active: showFields }" title="显示/隐藏语义字段" @click="showFields = !showFields"><FieldStringOutlined /></button><button class="icon-btn" :title="fullscreen ? '退出图谱大屏' : '图谱大屏查看'" @click="fullscreen = !fullscreen"><FullscreenExitOutlined v-if="fullscreen" /><FullscreenOutlined v-else /></button></div><div class="graph-actions"><label><FilterOutlined /><select v-model="relationFilter" aria-label="筛选图谱关系"><option value="all">全部关系</option><option value="business">业务关系</option><option value="provenance">来源追溯</option><option value="semantic">语义关系</option></select><span class="graph-hint">点击节点展开下一级</span></label></div></div>
             <section v-if="!fullscreen && selectedNodeSummary" class="node-summary"><header><span class="node-summary-type">{{ selectedNodeSummary.type }}</span><b>已选节点</b><span class="node-summary-count">{{ selectedNodeSummary.edgeCount }} 个关联</span></header><h3>{{ selectedNodeSummary.label }}</h3><div v-if="selectedNodeSummary.relations.length" class="node-summary-relations"><span v-for="relation in selectedNodeSummary.relations" :key="relation">{{ relation }}</span><span v-if="selectedNodeSummary.extraCount">另有 {{ selectedNodeSummary.extraCount }} 条关联</span></div><p v-else>当前节点暂无可展示的关联。</p></section>
@@ -184,6 +182,7 @@ function onResizeStart(event: PointerEvent) {
  .node-summary-relations { display:flex; flex-wrap:wrap; gap:5px; }
  .node-summary-relations span { padding:4px 6px; border:1px solid #d6e3df; border-radius:3px; background:#f7faf9; color:#58716b; font-size:10px; line-height:1.35; }
 .node-summary > p { margin:0; color:#718187; font-size:11px; }
+.relation-summary { margin:0; color:#627b8e; font-size:11px; line-height:1.55; }
 
 .page-title { display:flex; align-items:center; gap:10px; }.page-title > svg { flex:0 0 auto; padding:7px; border:1px solid #c4deef; border-radius:4px; background:#edf6fc; color:#2f80c5; font-size:22px; }.page-title h1 { margin:0; }.medical-domains { display:flex; flex-wrap:wrap; justify-content:center; gap:7px; margin-top:5px; }.medical-domains span { display:inline-flex; align-items:center; gap:5px; padding:5px 8px; border:1px solid #d3e3ef; border-radius:3px; background:#f6fbfe; color:#4e718a; font-size:11px; }.medical-domains svg { color:#3c91d3; }.legend span { display:inline-flex; align-items:center; gap:4px; }.legend span > svg { width:12px; height:12px; }.legend i { display:none; }
 
