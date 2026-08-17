@@ -10,6 +10,7 @@ import GraphifyEvidenceGraph from './GraphifyEvidenceGraph.vue'
 import GraphifyExecutionPath from './GraphifyExecutionPath.vue'
 import { displayGraphifyLabel } from './evidenceAdapter'
 import { graphNodeLabel, graphRelationSentences, graphRelationSummary } from './evidencePresentation'
+import { nodeTypeLabel } from './evidenceStyles'
 import { shouldRenderAssistantPlaceholder, shouldRenderAssistantText } from './resultPresentation'
 import { useGraphifyDataQueryChat } from './useGraphifyDataQueryChat'
 import { shouldSubmitComposerShortcut, toggleEvidencePanel } from './composerControls'
@@ -43,7 +44,7 @@ const selectedNodeSummary = computed(() => {
   if (!evidence || !node) return null
   const relations = graphRelationSentences(evidence, node.id)
   return {
-    type: ({ model: '业务模型', record: '查询记录', entity: '业务实体', source: '来源记录', product: '耗材', registration: '注册备案', organization: '耗材企业', base: '基础耗材', concept: '映射概念', catalog_record: '原始目录记录', source_file: '来源工作簿', import_batch: '导入批次' } as Record<string, string>)[node.kind] ?? '业务实体',
+    type: nodeTypeLabel(node),
     label: graphNodeLabel(node),
     edgeCount: relations.length,
     relations: relations.slice(0, 4),

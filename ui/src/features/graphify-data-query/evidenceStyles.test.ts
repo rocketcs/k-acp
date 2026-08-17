@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { isBusinessEntity, isSourceKind, nodeVisual } from './evidenceStyles.ts'
+import { isBusinessEntity, isSourceKind, nodeTypeLabel, nodeVisual } from './evidenceStyles.ts'
 
 const visualFor = (kind: string, domain?: string) => nodeVisual({ kind, domain })
 
@@ -19,6 +19,16 @@ test('product heading reflects the catalog domain', () => {
   assert.equal(visualFor('product', 'SERVICE').heading, '医疗服务项目')
   assert.equal(visualFor('product', 'DIAGNOSIS').heading, '诊疗项目')
   assert.equal(visualFor('product').heading, '耗材目录项')
+})
+
+test('node type label reflects the catalog domain for products', () => {
+  assert.equal(nodeTypeLabel({ kind: 'product', domain: 'DRUG' }), '药品')
+  assert.equal(nodeTypeLabel({ kind: 'product', domain: 'SERVICE' }), '医疗服务项目')
+  assert.equal(nodeTypeLabel({ kind: 'product', domain: 'CONSUMABLE' }), '耗材')
+  assert.equal(nodeTypeLabel({ kind: 'product' }), '目录项')
+  assert.equal(nodeTypeLabel({ kind: 'organization' }), '生产企业')
+  assert.equal(nodeTypeLabel({ kind: 'model' }), '业务模型')
+  assert.equal(nodeTypeLabel({ kind: 'catalog_record' }), '原始目录记录')
 })
 
 test('unknown kinds fall back to the default entity visual', () => {
