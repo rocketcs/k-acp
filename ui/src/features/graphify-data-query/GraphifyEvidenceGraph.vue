@@ -29,6 +29,16 @@ const visibleNodeCount = computed(() => expandSelection(
   props.evidence.evidence.edges,
   expandedIds.value,
 ).size)
+const visibleEdgeCount = computed(() => {
+  const visible = expandSelection(
+    props.evidence.evidence.nodes,
+    props.evidence.evidence.edges,
+    expandedIds.value,
+  )
+  return props.evidence.evidence.edges.filter((edge) =>
+    visible.has(edge.source) && visible.has(edge.target) && edge.kind !== 'query'
+  ).length
+})
 const totalNodeCount = computed(() => props.evidence.evidence.nodes
   .filter((node) => node.kind !== 'record' && node.kind !== 'source')
   .length)
@@ -115,6 +125,15 @@ function zoomIn() { cy?.zoom({ level: Math.min(2.4, cy.zoom() + 0.16), renderedP
 function zoomOut() { cy?.zoom({ level: Math.max(0.3, cy.zoom() - 0.16), renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }) }
 function fit() { cy?.fit(cy.elements(), props.fullscreen ? 32 : 16) }
 function relayout() { render(true) }
+
+/** 汇总条点击：一次展示整张证据图（全部非查询过程节点并入展开集）。 */
+function expandAll() {
+  const roots = props.evidence.evidence.nodes
+    .filter((node) => node.kind !== 'record' && node.kind !== 'source')
+    .map((node) => node.id)
+  expandedIds.value = new Set([...expandedIds.value, ...roots])
+  nextTick(() => render(true))
+}
 
 function initialize() {
   if (!canvas.value) return
@@ -225,10 +244,10 @@ defineExpose({ zoomIn, zoomOut, fit, relayout })
   <div class="evidence-graph" :class="{ 'is-fullscreen': fullscreen }" aria-label="业务逻辑关系图谱">
     <div ref="canvas" class="cy-canvas" />
     <div ref="tooltipEl" class="cy-tooltip" role="tooltip" />
-    <div class="graph-summary">
-      {{ visibleNodeCount }} 个节点 · {{ props.evidence.evidence.edges.length }} 条关系
+    <div class="graph-summary" :class="{ expandable: totalNodeCount > visibleNodeCount }" role="button" tabindex="0" aria-label="图谱节点统计" @click="expandAll" @keydown.enter="expandAll">
+      {{ visibleNodeCount }} 个节点 · {{ visibleEdgeCount }} 条关系
       <template v-if="totalNodeCount > visibleNodeCount">
-        · 另有 {{ totalNodeCount - visibleNodeCount }} 个节点，点击节点展开
+        · 另有 {{ totalNodeCount - visibleNodeCount }} 个节点，点击展开
       </template>
     </div>
   </div>
@@ -239,5 +258,5 @@ defineExpose({ zoomIn, zoomOut, fit, relayout })
 .evidence-graph.is-fullscreen { height: 100%; min-height: 0; }
 .cy-canvas { position: absolute; inset: 0; z-index: 1; }
 .cy-tooltip { position: absolute; z-index: 8; display: none; max-width: 220px; padding: 5px 9px; border: 1px solid #b8d0dd; border-radius: 4px; background: rgb(255 255 255 / 96%); box-shadow: 0 4px 14px rgb(31 58 58 / 14%); color: #21445f; font-size: 11px; line-height: 1.45; pointer-events: none; }
-.graph-summary { position: absolute; z-index: 3; right: 10px; bottom: 10px; padding: 4px 7px; border: 1px solid #cbdfea; border-radius: 3px; background: rgb(255 255 255 / 94%); color: #286fa8; font-size: 11px; font-weight: 650; pointer-events: none; }
+.graph-summary { position: absolute; z-index: 3; right: 10px; bottom: 10px; padding: 4px 7px; border: 1px solid #cbdfea; border-radius: 3px; background: rgb(255 255 255 / 94%); color: #286fa8; font-size: 11px; font-weight: 650; }.graph-summary.expandable { cursor: pointer; }.graph-summary.expandable:hover { border-color: #7fb8dc; background: #eef7fc; }
 </style>

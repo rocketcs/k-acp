@@ -9,6 +9,7 @@ import MarkdownRenderer from '@/components/markdown/MarkdownRenderer.vue'
 import GraphifyEvidenceGraph from './GraphifyEvidenceGraph.vue'
 import { displayGraphifyLabel } from './evidenceAdapter'
 import { graphNodeLabel, graphRelationSentences, graphRelationSummary } from './evidencePresentation'
+import { shouldRenderAssistantPlaceholder, shouldRenderAssistantText } from './resultPresentation'
 import { useGraphifyDataQueryChat } from './useGraphifyDataQueryChat'
 import { shouldSubmitComposerShortcut, toggleEvidencePanel } from './composerControls'
 import type { ChatSessionVO } from '@/types'
@@ -46,7 +47,10 @@ const selectedNodeSummary = computed(() => {
   }
 })
 const selectedTurn = computed(() => selectedAssistantMessageId.value)
-const resultColumns = computed(() => activeEvidence.value?.result.columns.map((key) => ({ key, label: displayGraphifyLabel(key) })) ?? [])
+const resultColumns = computed(() => activeEvidence.value?.result.columns.map((key) => ({
+  key,
+  label: activeEvidence.value?.result.column_labels?.[key] ?? displayGraphifyLabel(key),
+})) ?? [])
 const resultState = computed<'idle' | 'running' | 'executed' | 'blocked' | 'unavailable'>(() => {
   if (isRunning.value) return 'running'
   if (activeEvidence.value) return 'executed'
@@ -122,15 +126,14 @@ function onResizeStart(event: PointerEvent) {
           <template v-else>
             <header><h2>智能问数结果</h2><span :class="{ selected: selectedTurn === String(message.id) }">{{ selectedTurn === String(message.id) ? '当前证据' : '选择查看证据' }}</span></header>
             <MarkdownRenderer
-              v-if="message.content"
+              v-if="shouldRenderAssistantText({ hasContent: Boolean(message.content), isSelectedTurn: selectedTurn === String(message.id), hasEvidence: Boolean(activeEvidence) })"
               class="answer-text markdown-answer"
               :content="message.content"
               :is-streaming="isRunning && selectedTurn === String(message.id)"
               :is-diy-chat="true"
             />
-            <p v-else class="answer-text">正在整理查询结果…</p>
+            <p v-else-if="shouldRenderAssistantPlaceholder({ hasContent: Boolean(message.content), hasEvidence: Boolean(activeEvidence) })" class="answer-text">正在整理查询结果…</p>
             <template v-if="selectedTurn === String(message.id) && activeEvidence">
-              <div v-if="activeEvidence.semantic_context.rules.length" class="warning"><div v-for="rule in activeEvidence.semantic_context.rules" :key="rule.code">{{ rule.message }}</div></div>
               <div v-if="activeEvidence.result.rows.length" class="result-table">
                 <table>
                   <thead><tr><th v-for="column in resultColumns" :key="column.key">{{ column.label }}</th></tr></thead>
@@ -156,7 +159,7 @@ function onResizeStart(event: PointerEvent) {
       <section class="evidence-scroll">
         <template v-if="activeTab === 'graph'">
           <template v-if="activeEvidence">
-            <header v-if="!fullscreen" class="question-summary"><small>当前对话轮次 · {{ activeEvidence.trace_id }}</small><strong>{{ activeEvidence.question }}</strong><span>{{ activeEvidence.result.rows.length }} 条结果 · {{ activeEvidence.evidence.source_record_ids.length }} 条来源记录</span><p v-if="relationSummary" class="relation-summary">关系摘要：{{ relationSummary }}</p></header>
+            <header v-if="!fullscreen" class="question-summary"><small>当前对话轮次 · {{ activeEvidence.trace_id }}</small><strong>{{ activeEvidence.question }}</strong><span>{{ activeEvidence.result.rows.length }} 条结果 · {{ activeEvidence.evidence.source_record_count ?? activeEvidence.evidence.source_record_ids.length }} 条来源记录</span><p v-if="relationSummary" class="relation-summary">关系摘要：{{ relationSummary }}</p></header>
             <div class="legend"><span><DatabaseOutlined class="blue" /> Wren MDL</span><span><MedicineBoxOutlined class="teal" /> 业务实体</span><span><ShareAltOutlined class="green" /> 来源追溯</span><span><DeploymentUnitOutlined class="plum" /> 业务关系</span></div>
             <div class="graph-workspace"><GraphifyEvidenceGraph ref="graphRef" :evidence="activeEvidence" :relation-filter="relationFilter" :fullscreen="fullscreen" :show-fields="showFields" @select="selectedId = $event" /><div class="graph-tools" aria-label="图谱工具栏"><button class="icon-btn" title="放大" @click="graphRef?.zoomIn()"><ZoomInOutlined /></button><button class="icon-btn" title="缩小" @click="graphRef?.zoomOut()"><ZoomOutOutlined /></button><button class="icon-btn" title="适应画布" @click="graphRef?.fit()"><AimOutlined /></button><button class="icon-btn" title="重新布局" @click="graphRef?.relayout()"><ReloadOutlined /></button><button class="icon-btn" :class="{ active: showFields }" title="显示/隐藏语义字段" @click="showFields = !showFields"><FieldStringOutlined /></button><button class="icon-btn" :title="fullscreen ? '退出图谱大屏' : '图谱大屏查看'" @click="fullscreen = !fullscreen"><FullscreenExitOutlined v-if="fullscreen" /><FullscreenOutlined v-else /></button></div><div class="graph-actions"><label><FilterOutlined /><select v-model="relationFilter" aria-label="筛选图谱关系"><option value="all">全部关系</option><option value="business">业务关系</option><option value="provenance">来源追溯</option><option value="semantic">语义关系</option></select><span class="graph-hint">点击节点展开下一级</span></label></div></div>
             <section v-if="!fullscreen && selectedNodeSummary" class="node-summary"><header><span class="node-summary-type">{{ selectedNodeSummary.type }}</span><b>已选节点</b><span class="node-summary-count">{{ selectedNodeSummary.edgeCount }} 个关联</span></header><h3>{{ selectedNodeSummary.label }}</h3><div v-if="selectedNodeSummary.relations.length" class="node-summary-relations"><span v-for="relation in selectedNodeSummary.relations" :key="relation">{{ relation }}</span><span v-if="selectedNodeSummary.extraCount">另有 {{ selectedNodeSummary.extraCount }} 条关联</span></div><p v-else>当前节点暂无可展示的关联。</p></section>

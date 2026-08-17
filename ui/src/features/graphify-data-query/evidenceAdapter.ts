@@ -19,6 +19,17 @@ const DISPLAY_LABELS: Record<string, string> = {
   valid_to: '失效日期',
   max_price_text: '最高价格',
   price_semantics: '价格语义',
+  payment_category: '医保支付类别',
+  management_category: '管理类别',
+  max_limit_text: '最高限额',
+  retiree_max_limit_text: '离休最高限额',
+  category_level_1: '一级分类',
+  category_level_2: '二级分类',
+  category_level_3: '三级分类',
+  medical_generic_name: '医保通用名',
+  mapping_result: '目录映射结果',
+  copay_ratio: '自付比例',
+  first_pay_ratio: '首付比例',
   source_record_id: '原始来源记录',
   product: '耗材目录项',
   registration: '注册备案号',
@@ -53,8 +64,9 @@ const DISPLAY_LABELS: Record<string, string> = {
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const isStrings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string')
 
-export function displayGraphifyLabel(value: string, fallback = '业务字段'): string {
-  return DISPLAY_LABELS[value] ?? fallback
+export function displayGraphifyLabel(value: string, fallback?: string): string {
+  // 未映射的键回显原值（诚实），绝不显示"业务字段"这类误导性占位表头。
+  return DISPLAY_LABELS[value] ?? fallback ?? value
 }
 
 export function displayGraphifyNodeLabel(node: GraphifyEvidenceNode): string {
@@ -76,11 +88,9 @@ function validEdge(value: unknown): value is GraphifyEvidenceEdge {
 }
 
 export function parseGraphifyEvidence(toolName: string, content: string): GraphifyEvidenceEnvelope | null {
-  // 工具名可信（run_template_query/query）或缺失（含空字符串）时才尝试解析。
-  // 其它明确工具名一律拒绝，避免把无关工具结果误当 evidence。
-  // 缺失工具名时按内容兜底：只有当内容本身是完整的 executed evidence
-  // envelope 才接受，不受不可靠工具名上报影响。
-  if (toolName && !FINAL_QUERY_TOOLS.has(toolName)) return null
+  // Runtime tool names can be absent or mismatched after a reconnect. The
+  // envelope itself is the authority: parse only a complete executed result,
+  // never a partial/legacy payload, regardless of the reported tool name.
   return parseEnvelopeByContent(content)
 }
 

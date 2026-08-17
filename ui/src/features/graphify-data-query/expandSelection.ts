@@ -6,6 +6,11 @@ export type ExpandSelectionOptions = {
    */
   rootKinds?: readonly string[]
   /**
+   * 初始展开的主节点数量上限。宽查询会命中大量产品节点，初始只展开
+   * 前 N 个，其余通过点击节点 / 「显示语义字段」全视图查看，避免图谱一屏铺满。
+   */
+  maxInitialRoots?: number
+  /**
    * 默认是否纳入 query 动作边。渐进展开聚焦业务/来源/语义关系，
    * 真正的查询过程节点（record/source）始终不纳入。
    */
@@ -24,17 +29,18 @@ export function expandSelection(
   expandedIds: ReadonlySet<string>,
   opts: ExpandSelectionOptions = {},
 ): Set<string> {
-  const { includeQueryEdges = false, rootKinds = ['product', 'model'] } = opts
+  const { includeQueryEdges = false, rootKinds = ['product', 'model'], maxInitialRoots = 3 } = opts
   const nodeById = new Map(nodes.map((node) => [node.id, node]))
 
   const defaultRoots = () => {
     // 优先核心业务实体 / 业务模型；否则取 query 边指向的查询结果节点；再退到模型。
     const byKind = rootKinds.flatMap((kind) => nodes.filter((node) => node.kind === kind).map((node) => node.id))
-    if (byKind.length) return new Set(byKind)
+    const capped = byKind.slice(0, Math.max(1, maxInitialRoots))
+    if (capped.length) return new Set(capped)
     const queryTargets = edges
       .filter((edge) => edge.kind === 'query' && nodeById.has(edge.target) && nodeById.get(edge.target)!.kind !== 'record' && nodeById.get(edge.target)!.kind !== 'source')
       .map((edge) => edge.target)
-    if (queryTargets.length) return new Set(queryTargets)
+    if (queryTargets.length) return new Set(queryTargets.slice(0, Math.max(1, maxInitialRoots)))
     const model = nodes.find((node) => node.kind === 'model')
     return new Set(model ? [model.id] : [])
   }

@@ -17,7 +17,7 @@ export type GraphifyEvidenceEnvelope = {
   trace_id: string
   dataset_id: 'medical_catalog'
   question: string
-  result: { columns: string[]; rows: Array<Record<string, unknown>>; truncated: boolean }
+  result: { columns: string[]; column_labels?: Record<string, string>; rows: Array<Record<string, unknown>>; truncated: boolean }
   semantic_context: {
     graph_version: string
     recommended_models: string[]
@@ -25,7 +25,7 @@ export type GraphifyEvidenceEnvelope = {
     rules: Array<{ code: string; message: string; severity: 'warning' | 'hard' }>
     provenance: Record<string, string>
   }
-  evidence: { source_record_ids: string[]; nodes: GraphifyEvidenceNode[]; edges: GraphifyEvidenceEdge[] }
+  evidence: { source_record_ids: string[]; source_record_count?: number; nodes: GraphifyEvidenceNode[]; edges: GraphifyEvidenceEdge[] }
 }
 
 export type GraphifyToolOutcome = {
