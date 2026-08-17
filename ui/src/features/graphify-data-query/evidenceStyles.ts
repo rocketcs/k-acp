@@ -13,7 +13,7 @@ const SOURCE_KINDS = new Set(['catalog_record', 'source_file', 'import_batch', '
 
 const KIND_VISUALS: Record<string, NodeVisual> = {
   model: { shape: 'ellipse', fill: '#e8f1fb', border: '#2f6fb0', color: '#1e4f7d', heading: '业务模型' },
-  product: { shape: 'round-rectangle', fill: '#fff4e4', border: '#c98b37', color: '#8a5410', heading: '耗材' },
+  product: { shape: 'round-rectangle', fill: '#fff4e4', border: '#c98b37', color: '#8a5410', heading: '耗材目录项' },
   organization: { shape: 'round-rectangle', fill: '#eef7fb', border: '#2f8fb0', color: '#146a85', heading: '耗材企业' },
   registration: { shape: 'round-rectangle', fill: '#eef7fb', border: '#2f8fb0', color: '#146a85', heading: '注册备案' },
   base: { shape: 'round-rectangle', fill: '#eef7fb', border: '#2f8fb0', color: '#146a85', heading: '基础耗材' },
@@ -28,8 +28,20 @@ const KIND_VISUALS: Record<string, NodeVisual> = {
 
 const DEFAULT_VISUAL: NodeVisual = { shape: 'round-rectangle', fill: '#eef7fb', border: '#2f8fb0', color: '#146a85', heading: '业务实体' }
 
-export function nodeVisual(kind: string): NodeVisual {
-  return Object.prototype.hasOwnProperty.call(KIND_VISUALS, kind) ? KIND_VISUALS[kind]! : DEFAULT_VISUAL
+// 目录域 → 产品节点标题（结果驱动图谱：药品/耗材/服务/诊疗共用 product 节点类型）。
+const DOMAIN_PRODUCT_HEADINGS: Record<string, string> = {
+  DRUG: '药品目录项',
+  CONSUMABLE: '耗材目录项',
+  SERVICE: '医疗服务项目',
+  DIAGNOSIS: '诊疗项目',
+}
+
+export function nodeVisual(node: Pick<GraphifyEvidenceNode, 'kind' | 'domain'>): NodeVisual {
+  if (node.kind === 'product' && node.domain && DOMAIN_PRODUCT_HEADINGS[node.domain]) {
+    const base = Object.prototype.hasOwnProperty.call(KIND_VISUALS, 'product') ? KIND_VISUALS['product'] : DEFAULT_VISUAL
+    return { ...base, heading: DOMAIN_PRODUCT_HEADINGS[node.domain] }
+  }
+  return Object.prototype.hasOwnProperty.call(KIND_VISUALS, node.kind) ? KIND_VISUALS[node.kind]! : DEFAULT_VISUAL
 }
 
 export function isBusinessEntity(kind: string): boolean {
@@ -41,6 +53,6 @@ export function isSourceKind(kind: string): boolean {
 }
 
 // Re-exported so callers can narrow without importing GraphifyEvidenceNode type names.
-export function nodeHeading(node: Pick<GraphifyEvidenceNode, 'kind'>): string {
-  return nodeVisual(node.kind).heading
+export function nodeHeading(node: Pick<GraphifyEvidenceNode, 'kind' | 'domain'>): string {
+  return nodeVisual(node).heading
 }

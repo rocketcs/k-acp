@@ -2,6 +2,8 @@ export type GraphifyEvidenceNode = {
   id: string
   label: string
   kind: 'model' | 'record' | 'entity' | 'source' | 'product' | 'registration' | 'organization' | 'base' | 'concept' | 'catalog_record' | 'source_file' | 'import_batch'
+  /** 可选目录域（DRUG/CONSUMABLE/SERVICE/DIAGNOSIS），结果驱动图谱用于区分产品标题。 */
+  domain?: string
 }
 
 export type GraphifyEvidenceEdge = {

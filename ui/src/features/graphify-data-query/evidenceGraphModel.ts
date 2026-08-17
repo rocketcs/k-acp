@@ -84,7 +84,7 @@ export function evidenceGraphModel(envelope: GraphifyEvidenceEnvelope, opts: Gra
     : dagrePositions(nodes, edges, { rankdir: 'LR' })
 
   const nodeElements: ElementDefinition[] = nodes.map((node) => {
-    const visual = nodeVisual(node.kind)
+    const visual = nodeVisual(node)
     const presentedLabel = graphNodeLabel(node)
     // Core entity shows its business name directly; related entities show
     // their relation type above the concrete value.
