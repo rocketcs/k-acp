@@ -50,12 +50,14 @@ const selectedNodeSummary = computed(() => {
   const node = selectedNode.value
   if (!evidence || !node) return null
   const relations = graphRelationSentences(evidence, node.id)
+  const detail = node.kind === 'product' ? evidence.product_details?.[node.label] : undefined
   return {
     type: nodeTypeLabel(node, domainSemantics.value),
     label: graphNodeLabel(node),
     edgeCount: relations.length,
     relations: relations.slice(0, 4),
     extraCount: Math.max(0, relations.length - 4),
+    productDetail: detail,
   }
 })
 const selectedTurn = computed(() => selectedAssistantMessageId.value)
@@ -204,7 +206,7 @@ function onResizeStart(event: PointerEvent) {
             <button v-if="!fullscreen" class="graph-toggle" :aria-expanded="showGraph" @click="showGraph = !showGraph"><ShareAltOutlined /> {{ showGraph ? '收起结果子图' : '查看结果子图' }}（{{ activeEvidence.evidence.nodes.length }} 节点 · {{ activeEvidence.evidence.edges.length }} 关系）</button>
             <div v-show="showGraph" class="legend"><span><DatabaseOutlined class="blue" /> Wren MDL</span><span><MedicineBoxOutlined class="teal" /> 业务实体</span><span><ShareAltOutlined class="green" /> 来源追溯</span><span><DeploymentUnitOutlined class="plum" /> 业务关系</span></div>
             <div v-show="showGraph" class="graph-workspace"><GraphifyEvidenceGraph ref="graphRef" :evidence="activeEvidence" :relation-filter="relationFilter" :fullscreen="fullscreen" :show-fields="showFields" @select="selectedId = $event" /><div class="graph-tools" aria-label="图谱工具栏"><button class="icon-btn" title="放大" @click="graphRef?.zoomIn()"><ZoomInOutlined /></button><button class="icon-btn" title="缩小" @click="graphRef?.zoomOut()"><ZoomOutOutlined /></button><button class="icon-btn" title="适应画布" @click="graphRef?.fit()"><AimOutlined /></button><button class="icon-btn" title="重新布局" @click="graphRef?.relayout()"><ReloadOutlined /></button><button class="icon-btn" :class="{ active: showFields }" title="显示/隐藏语义字段" @click="showFields = !showFields"><FieldStringOutlined /></button><button class="icon-btn" :title="fullscreen ? '退出图谱大屏' : '图谱大屏查看'" @click="fullscreen = !fullscreen"><FullscreenExitOutlined v-if="fullscreen" /><FullscreenOutlined v-else /></button></div><div class="graph-actions"><label><FilterOutlined /><select v-model="relationFilter" aria-label="筛选图谱关系"><option value="all">全部关系</option><option value="business">业务关系</option><option value="provenance">来源追溯</option><option value="semantic">语义关系</option></select><span class="graph-hint">点击节点展开下一级</span></label></div></div>
-            <section v-if="showGraph && !fullscreen && selectedNodeSummary" class="node-summary"><header><span class="node-summary-type">{{ selectedNodeSummary.type }}</span><b>已选节点</b><span class="node-summary-count">{{ selectedNodeSummary.edgeCount }} 个关联</span></header><h3>{{ selectedNodeSummary.label }}</h3><div v-if="selectedNodeSummary.relations.length" class="node-summary-relations"><span v-for="relation in selectedNodeSummary.relations" :key="relation">{{ relation }}</span><span v-if="selectedNodeSummary.extraCount">另有 {{ selectedNodeSummary.extraCount }} 条关联</span></div><p v-else>当前节点暂无可展示的关联。</p></section>
+            <section v-if="showGraph && !fullscreen && selectedNodeSummary" class="node-summary"><header><span class="node-summary-type">{{ selectedNodeSummary.type }}</span><b>已选节点</b><span class="node-summary-count">{{ selectedNodeSummary.edgeCount }} 个关联</span></header><h3>{{ selectedNodeSummary.label }}</h3><template v-if="selectedNodeSummary.productDetail"><div class="node-summary-detail"><p class="node-summary-meta"><span>{{ selectedNodeSummary.productDetail.count }} 条目录记录</span><span v-if="selectedNodeSummary.productDetail.specifications.length">规格：{{ selectedNodeSummary.productDetail.specifications.join(' / ') }}</span><span v-if="selectedNodeSummary.productDetail.enterprises.length">生产企业：{{ selectedNodeSummary.productDetail.enterprises.join(' / ') }}</span><span v-if="selectedNodeSummary.productDetail.categories.length">支付类别：{{ selectedNodeSummary.productDetail.categories.join(' / ') }}</span></p><details v-if="selectedNodeSummary.productDetail.codes.length" class="node-summary-codes"><summary>目录编码（{{ selectedNodeSummary.productDetail.codes.length }}）</summary><ol><li v-for="code in selectedNodeSummary.productDetail.codes" :key="code"><code>{{ code }}</code></li></ol></details></div></template><div v-if="selectedNodeSummary.relations.length" class="node-summary-relations"><span v-for="relation in selectedNodeSummary.relations" :key="relation">{{ relation }}</span><span v-if="selectedNodeSummary.extraCount">另有 {{ selectedNodeSummary.extraCount }} 条关联</span></div><p v-else-if="!selectedNodeSummary.productDetail">当前节点暂无可展示的关联。</p></section>
           </template>
           <section v-else class="panel-empty"><DatabaseOutlined /><p>{{ activeOutcome ? '当前问题没有可展示的图谱证据。' : '选择一个带 MCP 查询证据的回答后，图谱将在这里显示。' }}</p></section>
         </template>
@@ -230,6 +232,12 @@ function onResizeStart(event: PointerEvent) {
  .node-summary-type { padding:3px 6px; border:1px solid #b8d8d0; border-radius:3px; background:#e8f4f0; color:#17695c; font-size:10px; font-weight:700; }
  .node-summary-count { margin-left:auto; color:#17695c; font-size:10px; }
  .node-summary h3 { margin:7px 0 8px; color:#183e3b; font-size:14px; overflow-wrap:anywhere; }
+ .node-summary-detail { margin:0 0 8px; padding:8px 9px; border:1px solid #d5e3ed; border-radius:4px; background:#f7fbfe; }
+ .node-summary-meta { display:flex; flex-wrap:wrap; gap:4px 10px; margin:0 0 6px; color:#567186; font-size:10.5px; line-height:1.5; }
+ .node-summary-meta span { display:inline-flex; gap:3px; }
+ .node-summary-codes summary { color:#286fa8; font-size:10.5px; font-weight:650; cursor:pointer; }
+ .node-summary-codes ol { max-height:150px; margin:6px 0 0; padding-left:20px; overflow-y:auto; color:#425f72; font-size:10.5px; line-height:1.6; }
+ .node-summary-codes code { color:#1d5f95; user-select:all; }
  .node-summary-relations { display:flex; flex-wrap:wrap; gap:5px; }
  .node-summary-relations span { padding:4px 6px; border:1px solid #d6e3df; border-radius:3px; background:#f7faf9; color:#58716b; font-size:10px; line-height:1.35; }
 .node-summary > p { margin:0; color:#718187; font-size:11px; }

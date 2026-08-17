@@ -14,6 +14,15 @@ export type GraphifyEvidenceEdge = {
   kind: 'query' | 'semantic' | 'provenance' | 'business'
 }
 
+export type GraphifyProductDetail = {
+  codes: string[]
+  specifications: string[]
+  enterprises: string[]
+  categories: string[]
+  registrations: string[]
+  count: number
+}
+
 export type GraphifyEvidenceEnvelope = {
   status: 'executed'
   trace_id: string
@@ -41,6 +50,8 @@ export type GraphifyEvidenceEnvelope = {
     rules: Array<{ code: string; message: string; severity: 'warning' | 'hard' }>
     provenance: Record<string, string>
   }
+  /** 按产品名聚合的目录明细（编码/规格/生产企业），摘要面板展示用。 */
+  product_details?: Record<string, GraphifyProductDetail>
   evidence: { source_record_ids: string[]; source_record_count?: number; nodes: GraphifyEvidenceNode[]; edges: GraphifyEvidenceEdge[] }
 }
 
