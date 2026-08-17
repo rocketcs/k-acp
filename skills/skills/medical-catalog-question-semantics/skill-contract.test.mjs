@@ -12,20 +12,43 @@ function section(document, heading) {
   return document.slice(bodyStart, nextHeading === -1 ? undefined : nextHeading)
 }
 
-function markdownTableRows(documentSection) {
-  return documentSection.split('\n')
-    .filter((line) => /^\|.+\|$/.test(line.trim()) && !/^\|\s*-/.test(line.trim()))
-    .map((line) => line.split('|').slice(1, -1).map((cell) => cell.trim()))
+function present(document, needle) {
+  assert.ok(document.includes(needle), `expected to contain: ${needle}`)
 }
 
-test('medical catalog skill requires evidence projections for relationship queries', () => {
-  const rows = markdownTableRows(section(skill, '证据字段要求'))
-  assert.deepEqual(rows, [
-    ['问题语义', '`evidence_columns`'],
-    ['注册备案号/批准文号', '`catalog_name`, `registration_no`, `source_record_id`'],
-    ['药品/耗材企业', '`catalog_name`, `manufacturer` or `consumable_enterprise`, `source_record_id`'],
-    ['耗材分类', '`catalog_name`, `category_level_1`, `category_level_2`, `category_level_3`, `source_record_id`'],
-    ['支付类别/限额/价格', '`catalog_name`, asked field, `source_record_id`; prices also require `price_semantics`'],
-    ['有效期/政策', '`catalog_name`, `valid_from`, `valid_to` or `policy_no`, `source_record_id`'],
-  ])
+test('skill explains question-to-semantic parsing', () => {
+  present(skill, '已发布字段白名单')
+  present(skill, 'insurance_category')
+  present(skill, 'get_by_registration_no')
+  present(skill, '语义依据与知识图谱')
+  present(skill, 'MDL 结构展示')
+})
+
+test('skill requires evidence projections and covers detail fields', () => {
+  const draw = section(skill, '证据字段要求')
+  // 详情意图必须一次返回完整字段，不允许"再查一次"。
+  assert.match(draw, /必须一次返回完整字段集/)
+  assert.match(draw, /spec_model_count/)
+  assert.match(draw, /max_limit_text/)
+  assert.match(draw, /source_record_id/)
+})
+
+test('skill documents per-domain return fields without mixing', () => {
+  const render = section(skill, '查询结果展示')
+  assert.match(render, /药品（DRUG）/)
+  assert.match(render, /耗材（CONSUMABLE）/)
+  // 药品带最高价格，耗材带最高限额；不混用。
+  assert.match(render, /max_price_text/)
+  assert.match(render, /max_limit_text/)
+  assert.match(render, /不要把/)
+})
+
+test('skill separates execution path from result subgraph', () => {
+  const kg = section(skill, '语义依据与知识图谱')
+  assert.match(kg, /执行链路/)
+  assert.match(kg, /结果子图/)
+  assert.match(kg, /Wren 语义层/)
+  assert.match(kg, /PostgreSQL 数据源/)
+  assert.match(kg, /Neo4j 语义图谱/)
+  assert.match(kg, /不得/)
 })

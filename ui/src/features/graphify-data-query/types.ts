@@ -18,6 +18,16 @@ export type GraphifyEvidenceEnvelope = {
   dataset_id: 'medical_catalog'
   question: string
   result: { columns: string[]; column_labels?: Record<string, string>; rows: Array<Record<string, unknown>>; truncated: boolean }
+  execution_path?: {
+    question: string
+    intent: string
+    template_id: string | null
+    stages: Array<{ step: string; system: string; title: string; detail: string; icon: string }>
+    models: string[]
+    columns: string[]
+    source_record_count: number
+    truncated: boolean
+  }
   semantic_context: {
     graph_version: string
     recommended_models: string[]

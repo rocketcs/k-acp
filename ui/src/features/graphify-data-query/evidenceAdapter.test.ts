@@ -39,6 +39,13 @@ test('uses Chinese labels for user-visible fields and graph evidence', () => {
   assert.equal(displayGraphifyLabel('model-node'), '业务模型')
   assert.equal(displayGraphifyLabel('payment_category'), '医保支付类别')
   assert.equal(displayGraphifyLabel('max_limit_text'), '最高限额')
+  // 详情字段集的中文映射（与 get_by_registration_no / get_record_detail 返回对齐）
+  assert.equal(displayGraphifyLabel('material'), '材质')
+  assert.equal(displayGraphifyLabel('feature'), '特征')
+  assert.equal(displayGraphifyLabel('policy_no'), '政策号')
+  assert.equal(displayGraphifyLabel('spec_model_count'), '规格型号数')
+  assert.equal(displayGraphifyLabel('registrant_name'), '注册备案人')
+  assert.equal(displayGraphifyLabel('medical_generic_name'), '医保通用名')
   // 未映射键回显原值，绝不显示"业务字段"这类误导性占位表头
   assert.equal(displayGraphifyLabel('unknown_field'), 'unknown_field')
   assert.equal(displayGraphifyNodeLabel({ id: 'model:medical_catalog', label: 'medical_catalog', kind: 'model' }), '医疗目录')
