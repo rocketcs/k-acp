@@ -1,6 +1,6 @@
 import type { ElementDefinition } from 'cytoscape'
 import { dagrePositions } from './dagreLayout.ts'
-import { nodeVisual } from './evidenceStyles.ts'
+import { nodeVisual, type DomainSemantics } from './evidenceStyles.ts'
 import { graphEdgeLabel, graphNodeLabel } from './evidencePresentation.ts'
 import type { GraphifyEvidenceEnvelope, GraphifyEvidenceNode } from './types'
 
@@ -8,6 +8,8 @@ export type GraphModelOptions = {
   viewMode: 'focused' | 'full'
   showFields: boolean
   visibleIds?: ReadonlySet<string>
+  /** 行业语义（域标签/标题），由 envelope.semantic_context 注入，缺省时用中性词。 */
+  semantics?: DomainSemantics
 }
 
 const QUERY_PROCESS_KINDS = new Set(['record', 'source'])
@@ -84,7 +86,7 @@ export function evidenceGraphModel(envelope: GraphifyEvidenceEnvelope, opts: Gra
     : dagrePositions(nodes, edges, { rankdir: 'LR' })
 
   const nodeElements: ElementDefinition[] = nodes.map((node) => {
-    const visual = nodeVisual(node)
+    const visual = nodeVisual(node, opts.semantics)
     const presentedLabel = graphNodeLabel(node)
     // Core entity shows its business name directly; related entities show
     // their relation type above the concrete value.

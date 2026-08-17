@@ -56,6 +56,10 @@ function buildElements() {
     viewMode: showAll ? 'full' : 'focused',
     showFields: props.showFields,
     visibleIds,
+    semantics: {
+      labels: props.evidence.semantic_context.domain_labels,
+      headings: props.evidence.semantic_context.domain_headings,
+    },
   })
 }
 

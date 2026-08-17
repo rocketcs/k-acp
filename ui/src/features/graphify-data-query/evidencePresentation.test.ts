@@ -183,7 +183,7 @@ test('presents safe graph labels while preserving genuine readable labels', () =
   assert.equal(graphNodeLabel({ id: 'safe-source', label: '耗材谈判记录', kind: 'source_file' }), '耗材谈判记录')
   assert.equal(graphNodeLabel({ id: 'unsafe-organization', label: 'raw.medical_organization', kind: 'organization' }), '生产企业')
   assert.equal(graphNodeLabel({ id: 'unsafe-model', label: 'medical_catalog', kind: 'model' }), '业务模型')
-  assert.equal(graphNodeLabel({ id: 'unsafe-product', label: '耗材谈判记录·导入批次20260816', kind: 'product' }), '耗材目录项')
+  assert.equal(graphNodeLabel({ id: 'unsafe-product', label: '耗材谈判记录·导入批次20260816', kind: 'product' }), '目录项')
 })
 
 test('summaries include only display-contract relations with a business subject', () => {

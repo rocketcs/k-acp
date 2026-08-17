@@ -3,10 +3,10 @@ import type { GraphifyEvidenceEdge, GraphifyEvidenceEnvelope, GraphifyEvidenceNo
 const NODE_HEADINGS: Record<string, string> = {
   model: '业务模型',
   entity: '业务实体',
-  product: '耗材目录项',
+  product: '目录项',
   registration: '注册备案号',
   organization: '生产企业',
-  base: '基础耗材',
+  base: '基础分类',
   concept: '映射概念',
   record: '查询记录',
   source: '来源记录',

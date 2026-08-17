@@ -11,6 +11,7 @@ import GraphifyExecutionPath from './GraphifyExecutionPath.vue'
 import { displayGraphifyLabel } from './evidenceAdapter'
 import { graphNodeLabel, graphRelationSentences, graphRelationSummary } from './evidencePresentation'
 import { nodeTypeLabel } from './evidenceStyles'
+import type { DomainSemantics } from './evidenceStyles'
 import { shouldRenderAssistantPlaceholder, shouldRenderAssistantText } from './resultPresentation'
 import { useGraphifyDataQueryChat } from './useGraphifyDataQueryChat'
 import { shouldSubmitComposerShortcut, toggleEvidencePanel } from './composerControls'
@@ -37,6 +38,12 @@ const graphRef = ref<InstanceType<typeof GraphifyEvidenceGraph> | null>(null)
 const showFields = ref(false)
 const showGraph = ref(false)
 const relationSummary = computed(() => activeEvidence.value ? graphRelationSummary(activeEvidence.value) : null)
+const domainSemantics = computed<DomainSemantics>(() => activeEvidence.value
+  ? {
+      labels: activeEvidence.value.semantic_context.domain_labels,
+      headings: activeEvidence.value.semantic_context.domain_headings,
+    }
+  : {})
 const selectedNode = computed(() => activeEvidence.value?.evidence.nodes.find((node) => node.id === selectedId.value) ?? activeEvidence.value?.evidence.nodes[0])
 const selectedNodeSummary = computed(() => {
   const evidence = activeEvidence.value
@@ -44,7 +51,7 @@ const selectedNodeSummary = computed(() => {
   if (!evidence || !node) return null
   const relations = graphRelationSentences(evidence, node.id)
   return {
-    type: nodeTypeLabel(node),
+    type: nodeTypeLabel(node, domainSemantics.value),
     label: graphNodeLabel(node),
     edgeCount: relations.length,
     relations: relations.slice(0, 4),
@@ -68,9 +75,9 @@ const resultColumns = computed(() => {
       label: evidence.result.column_labels?.[key] ?? displayGraphifyLabel(key),
       formatValue: (value: unknown): string => {
         const text = value === null || value === undefined ? '' : String(value)
-        // 目录领域、医保支付类别等枚举值面向用户用中文呈现。
-        if (key === 'catalog_domain') {
-          return ({ DRUG: '药品', CONSUMABLE: '耗材', SERVICE: '医疗服务项目', DIAGNOSIS: '诊疗项目' } as Record<string, string>)[text] ?? text
+        // 目录域等枚举值面向用户用后端下发的域标签中文呈现（行业配置驱动，前端不硬编码）。
+        if (key === 'catalog_domain' || key === 'domain') {
+          return domainSemantics.value.labels?.[text] ?? text
         }
         return text
       },

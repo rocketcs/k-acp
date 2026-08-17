@@ -2,7 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { isBusinessEntity, isSourceKind, nodeTypeLabel, nodeVisual } from './evidenceStyles.ts'
 
-const visualFor = (kind: string, domain?: string) => nodeVisual({ kind, domain })
+const MOCK_SEMANTICS = {
+  labels: { DRUG: '药品', CONSUMABLE: '耗材', SERVICE: '医疗服务项目', DIAGNOSIS: '诊疗项目' },
+  headings: { DRUG: '药品目录项', CONSUMABLE: '耗材目录项', SERVICE: '医疗服务项目', DIAGNOSIS: '诊疗项目' },
+}
+
+const visualFor = (kind: string, domain?: string, semantics = MOCK_SEMANTICS) => nodeVisual({ kind, domain }, semantics)
 
 test('maps every business/source kind to a visual', () => {
   for (const kind of ['product', 'organization', 'registration', 'base', 'concept']) {
@@ -13,18 +18,22 @@ test('maps every business/source kind to a visual', () => {
   }
 })
 
-test('product heading reflects the catalog domain', () => {
+test('product heading reflects the catalog domain from injected semantics', () => {
   assert.equal(visualFor('product', 'DRUG').heading, '药品目录项')
   assert.equal(visualFor('product', 'CONSUMABLE').heading, '耗材目录项')
   assert.equal(visualFor('product', 'SERVICE').heading, '医疗服务项目')
   assert.equal(visualFor('product', 'DIAGNOSIS').heading, '诊疗项目')
-  assert.equal(visualFor('product').heading, '耗材目录项')
+})
+
+test('product heading falls back to a neutral word without injected semantics', () => {
+  assert.equal(visualFor('product').heading, '目录项')
+  assert.equal(visualFor('product', 'DRUG', {}).heading, '目录项')
 })
 
 test('node type label reflects the catalog domain for products', () => {
-  assert.equal(nodeTypeLabel({ kind: 'product', domain: 'DRUG' }), '药品')
-  assert.equal(nodeTypeLabel({ kind: 'product', domain: 'SERVICE' }), '医疗服务项目')
-  assert.equal(nodeTypeLabel({ kind: 'product', domain: 'CONSUMABLE' }), '耗材')
+  assert.equal(nodeTypeLabel({ kind: 'product', domain: 'DRUG' }, MOCK_SEMANTICS), '药品')
+  assert.equal(nodeTypeLabel({ kind: 'product', domain: 'SERVICE' }, MOCK_SEMANTICS), '医疗服务项目')
+  assert.equal(nodeTypeLabel({ kind: 'product', domain: 'CONSUMABLE' }, MOCK_SEMANTICS), '耗材')
   assert.equal(nodeTypeLabel({ kind: 'product' }), '目录项')
   assert.equal(nodeTypeLabel({ kind: 'organization' }), '生产企业')
   assert.equal(nodeTypeLabel({ kind: 'model' }), '业务模型')

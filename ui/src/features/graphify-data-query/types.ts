@@ -34,6 +34,10 @@ export type GraphifyEvidenceEnvelope = {
     graph_version: string
     recommended_models: string[]
     recommended_columns: string[]
+    /** 行业语义配置下发的域标签（如 DRUG→药品）。前端渲染节点类型时只查表，不做行业拼接。 */
+    domain_labels?: Record<string, string>
+    /** 行业语义配置下发的产品节点标题（如 DRUG→药品目录项），前端原样展示。 */
+    domain_headings?: Record<string, string>
     rules: Array<{ code: string; message: string; severity: 'warning' | 'hard' }>
     provenance: Record<string, string>
   }
