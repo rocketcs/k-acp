@@ -63,3 +63,4 @@ env/*/.env
 agent_context.json
 __pycache__/
 tmp/
+.gstack/

@@ -47,22 +47,21 @@ COPY biz/biz-cache/pom.xml ./biz/biz-cache/
 COPY biz/biz-mq/pom.xml ./biz/biz-mq/
 COPY biz/biz-datasource/pom.xml ./biz/biz-datasource/
 COPY biz/biz-workflow/pom.xml ./biz/biz-workflow/
-COPY biz/biz-cache/pom.xml ./biz/biz-cache/
-COPY biz/biz-datasource/pom.xml ./biz/biz-datasource/
 COPY biz/biz-gateway/pom.xml ./biz/biz-gateway/
-COPY biz/biz-mq/pom.xml ./biz/biz-mq/
 COPY biz/biz-channel/pom.xml ./biz/biz-channel/
 COPY biz/biz-dashboard/pom.xml ./biz/biz-dashboard/
 
 # 复制 Maven 私有仓库配置
 COPY docker/maven/settings.xml /root/.m2/settings.xml
 
-# 预下载依赖
-RUN mvn dependency:go-offline -pl runner-runtime -am -DskipTests -q
+# 预下载依赖。缓存仓库内容而非整个 .m2，避免遮蔽上面的 settings.xml。
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mvn -B -ntp dependency:go-offline -pl runner-runtime -am -DskipTests
 
 # 复制源码并构建
 COPY . .
-RUN mvn package -pl runner-runtime -am -DskipTests -q
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mvn -B -ntp package -pl runner-runtime -am -DskipTests
 
 # 国内 Node.js 运行时，避免运行镜像访问 NodeSource
 FROM ${NODE_IMAGE} AS node-runtime

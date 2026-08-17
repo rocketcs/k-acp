@@ -109,15 +109,17 @@ select_docker() {
 }
 
 compose() {
+  # 注意：compose 文件中的镜像名已直接使用 ${DOCKER_REGISTRY} 前缀的国内镜像，
+  # 不再通过 DOCKER_REGISTRY 环境变量注入（该变量已废弃）。
   if [[ "$USE_SUDO" == true ]]; then
-    sudo env DOCKER_REGISTRY="$DOMESTIC_REGISTRY" docker compose \
+    sudo docker compose \
       --project-name "$PROJECT_NAME" \
       --env-file "$ENV_FILE" \
       -f "$COMPOSE_BASE" \
       -f "$COMPOSE_LOCAL" \
       "$@"
   else
-    DOCKER_REGISTRY="$DOMESTIC_REGISTRY" docker compose \
+    docker compose \
       --project-name "$PROJECT_NAME" \
       --env-file "$ENV_FILE" \
       -f "$COMPOSE_BASE" \

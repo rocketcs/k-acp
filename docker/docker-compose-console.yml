@@ -18,6 +18,12 @@ services:
     # root 运行（业务可信服务，容器隔离承担安全边界），无 cap/security 限制
     mem_limit: ${CONSOLE_MEM_LIMIT:-4g}
     cpus: ${CONSOLE_CPU_LIMIT:-4}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3060/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
     environment:
       SPRING_PROFILES_ACTIVE: docker
       MYSQL_HOST: ${MYSQL_HOST}
@@ -55,6 +61,12 @@ services:
     restart: unless-stopped
     mem_limit: ${WEBSOCKET_MEM_LIMIT:-1g}
     cpus: ${WEBSOCKET_CPU_LIMIT:-2}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3064/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
     environment:
       SPRING_PROFILES_ACTIVE: docker
       REDIS_HOST: ${REDIS_HOST}
@@ -81,6 +93,12 @@ services:
         VITE_APP_CONTEXT_PATH: ${VITE_APP_CONTEXT_PATH}
     container_name: apboa-frontend
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/web/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     # 生产模式下 Nginx 需要知道 runtime 的地址（跨服务器）
     # 使用 envsubst 在启动时替换 nginx.conf 中的变量
     environment:
@@ -99,7 +117,10 @@ services:
     ports:
       - "${FRONTEND_PORT:-80}:80"
     depends_on:
-      - apboa-console
+      apboa-console:
+        condition: service_healthy
+      apboa-websocket:
+        condition: service_healthy
     networks:
       - apboa_console
 

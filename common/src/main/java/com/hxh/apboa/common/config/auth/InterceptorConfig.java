@@ -36,7 +36,7 @@ public class InterceptorConfig implements WebMvcConfigurer {
         /* 拦截所有的请求，通过请求映射到的方法上的注解进行判断是否需要权限验证 */
         registry.addInterceptor(new AuthInterceptor(redisUtils))
                 .addPathPatterns("/**")
-                .excludePathPatterns("/web/index.html");
+                .excludePathPatterns("/web/index.html", "/actuator/**");
     }
 
     @Override

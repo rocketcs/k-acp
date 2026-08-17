@@ -52,12 +52,14 @@ COPY biz/biz-dashboard/pom.xml ./biz/biz-dashboard/
 # 复制 Maven 私有仓库配置
 COPY docker/maven/settings.xml /root/.m2/settings.xml
 
-# 预下载依赖
-RUN mvn dependency:go-offline -pl runner-websocket -am -DskipTests -q
+# 预下载依赖。缓存仓库内容而非整个 .m2，避免遮蔽上面的 settings.xml。
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mvn -B -ntp dependency:go-offline -pl runner-websocket -am -DskipTests -q
 
 # 复制源码并构建
 COPY . .
-RUN mvn package -pl runner-websocket -am -DskipTests -q
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mvn -B -ntp package -pl runner-websocket -am -DskipTests -q
 
 # ============================================================
 # 阶段二：运行镜像
@@ -65,6 +67,11 @@ RUN mvn package -pl runner-websocket -am -DskipTests -q
 FROM ${JRE_IMAGE}
 
 WORKDIR /app
+
+# 安装 curl（Docker healthcheck 使用）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 复制构建产物
 COPY --from=build /build/runner-websocket/target/runner-websocket-*.jar app.jar

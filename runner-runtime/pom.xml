@@ -17,6 +17,11 @@
     </properties>
 
     <dependencies>
+        <!-- Actuator 健康检查：Docker healthcheck 依赖 /actuator/health -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.hxh.apboa.next</groupId>
             <artifactId>scheduler</artifactId>

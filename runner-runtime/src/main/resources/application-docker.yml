@@ -116,3 +116,19 @@ heartbeat:
   console-url: http://${CONSOLE_HOST:apboa-console}:3060
   service-type: RUNTIME
   port: ${server.port}
+
+# Actuator 健康检查端点（Docker healthcheck 使用）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    # engine 模块引入 elasticsearch-rest-client，但部署栈不包含 ES，
+    # 禁用其健康指标，避免健康检查误报 DOWN（连接被拒）。
+    elasticsearch:
+      enabled: false
