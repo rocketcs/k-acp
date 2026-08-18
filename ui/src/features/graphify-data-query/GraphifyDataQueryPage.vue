@@ -504,6 +504,9 @@ function onModalKeydown(event: KeyboardEvent) {
 
 .session-list {
   display: grid;
+  /* 默认 align-content: stretch 会把剩余高度均摊到各行，导致会话条目间距被拉得过大。
+     改为 start 让历史会话条目在顶部紧凑排列；内容超出时由 overflow-y 滚动。 */
+  align-content: start;
   min-height: 0;
   flex: 1;
   gap: 3px;
