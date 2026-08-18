@@ -6,6 +6,9 @@ import {
   ShareAltOutlined, ZoomInOutlined, ZoomOutOutlined,
 } from '@ant-design/icons-vue'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer.vue'
+import DiyWelcome from '@/components/chat/DiyWelcome.vue'
+import { getPublished } from '@/api/agentDiy'
+import type { DiyOutputFormat, DiyPageConfig } from '@/types'
 import GraphifyEvidenceGraph from './GraphifyEvidenceGraph.vue'
 import GraphifyExecutionPath from './GraphifyExecutionPath.vue'
 import { displayGraphifyLabel } from './evidenceAdapter'
@@ -28,6 +31,8 @@ const {
 
 const question = ref('')
 const graphOpen = ref(false)
+/** DIY 快捷问答配置（页面管理里可在线维护），用于空状态快捷问题卡。 */
+const diyConfig = ref<DiyPageConfig | null>(null)
 /** 图谱大屏弹窗开关（点击全屏按钮弹出模态框）。 */
 const fullscreen = ref(false)
 const panelWidth = ref(470)
@@ -125,10 +130,29 @@ function closeFullscreen() {
   fullscreen.value = false
 }
 // Esc 关闭图谱大屏弹窗。
-onMounted(() => window.addEventListener('keydown', onModalKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', onModalKeydown)
+  void loadDiyConfig()
+})
 onUnmounted(() => window.removeEventListener('keydown', onModalKeydown))
 function onModalKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && fullscreen.value) fullscreen.value = false
+}
+async function loadDiyConfig() {
+  try {
+    const res = await getPublished(props.agentId)
+    diyConfig.value = res?.data?.data ?? null
+  } catch {
+    diyConfig.value = null
+  }
+}
+/** DIY 快捷问答确认 → 直接把生成的问题发给 MCP 语义查询（忽略图表输出格式指令）。 */
+function onQuickSend(payload: { text: string; outputFormat: DiyOutputFormat }) {
+  void submitWith(payload.text)
+}
+async function submitWith(text: string) {
+  const sent = await sendQuestion(text)
+  if (sent) question.value = ''
 }
 </script>
 
@@ -175,7 +199,7 @@ function onModalKeydown(event: KeyboardEvent) {
         </button>
       </header>
       <div class="conversation-body">
-        <section v-if="!displayMessages.length" class="empty-conversation">
+        <section v-if="!displayMessages.length && !diyConfig" class="empty-conversation">
           <MedicineBoxOutlined />
           <h2>从业务问题开始</h2>
           <p>查询结果、语义依据和来源记录将在同一轮对话中展示。</p>
@@ -186,6 +210,9 @@ function onModalKeydown(event: KeyboardEvent) {
             </span><span>
               <DatabaseOutlined /> 医疗目录
             </span></div>
+        </section>
+        <section v-else-if="!displayMessages.length && diyConfig" class="diy-welcome-wrap">
+          <DiyWelcome :config="diyConfig" :is-running="isRunning" @confirm="onQuickSend" />
         </section>
         <article v-for="message in displayMessages" :key="message.id"
           :class="message.role === 'user' ? 'user-message' : 'answer'"
@@ -577,6 +604,12 @@ function onModalKeydown(event: KeyboardEvent) {
   max-width: 780px;
   margin-right: auto;
   margin-left: auto;
+}
+
+/* DIY 快捷问答卡：放宽宽度以便卡片横排。 */
+.conversation-body>.diy-welcome-wrap {
+  max-width: 1060px;
+  padding-top: 24px;
 }
 
 .empty-conversation,
@@ -1170,14 +1203,14 @@ function onModalKeydown(event: KeyboardEvent) {
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 12px;
   background: rgb(20 30 38 / 55%);
 }
 .graph-modal-panel {
   display: flex;
   flex-direction: column;
-  width: min(1200px, 94vw);
-  height: min(820px, 90vh);
+  width: min(1600px, 97vw);
+  height: min(1100px, 96vh);
   overflow: hidden;
   border: 1px solid #b9cdd9;
   border-radius: 8px;
@@ -1205,7 +1238,7 @@ function onModalKeydown(event: KeyboardEvent) {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 14px;
+  padding: 8px;
   overflow: hidden;
 }
 .graph-modal-canvas {
