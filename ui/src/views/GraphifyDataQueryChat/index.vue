@@ -18,14 +18,14 @@ async function loadAgent() {
     const agents = (response.data?.data?.records ?? []).filter((item) => item.agentCode === GRAPHIFY_DATA_QUERY_AGENT_CODE)
     if (agents.length > 1) throw new Error('Duplicate default-graphify-data-query agents')
     if (!agents[0]) {
-      loadError.value = '智能问数助手尚未配置或未启用'
+      loadError.value = '医药问数助手尚未配置或未启用'
       return
     }
     agentId.value = String(agents[0].id)
   } catch (error) {
     loadError.value = error instanceof Error && error.message.includes('Duplicate')
-      ? '检测到重复的智能问数助手，请联系管理员处理'
-      : '智能问数助手加载失败，请稍后重试'
+      ? '检测到重复的医药问数助手，请联系管理员处理'
+      : '医药问数助手加载失败，请稍后重试'
   } finally {
     loading.value = false
   }
@@ -37,7 +37,7 @@ onMounted(() => { void loadAgent() })
 <template>
   <GraphifyDataQueryPage v-if="agentId" :agent-id="agentId" />
   <main v-else class="graphify-route-state" aria-live="polite">
-    <ASpin v-if="loading" tip="正在加载智能问数助手…" />
+    <ASpin v-if="loading" tip="正在加载医药问数助手…" />
     <section v-else>
       <p>{{ loadError }}</p>
       <AButton type="primary" @click="loadAgent">重新加载</AButton>

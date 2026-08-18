@@ -136,7 +136,7 @@ function parseEnvelopeByContent(content: string): GraphifyEvidenceEnvelope | nul
 /** 结构从严校验，等价于旧版 parseGraphifyEvidence 的全部约束。 */
 function isRecordingEnvelope(value: unknown): value is GraphifyEvidenceEnvelope {
   if (!isRecord(value) || value.status !== 'executed' || value.dataset_id !== 'medical_catalog'
-    || typeof value.trace_id !== 'string' || !value.trace_id || typeof value.question !== 'string'
+    || typeof value.trace_id !== 'string' || typeof value.question !== 'string'
     || !isRecord(value.result) || !isStrings(value.result.columns) || !Array.isArray(value.result.rows)
     || !value.result.rows.every(isRecord) || typeof value.result.truncated !== 'boolean'
     || !isRecord(value.semantic_context) || typeof value.semantic_context.graph_version !== 'string'

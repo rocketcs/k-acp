@@ -13,6 +13,14 @@ test('accepts an executed medical-catalog evidence envelope', () => {
   assert.equal(parseGraphifyEvidence('run_template_query', JSON.stringify(evidence))?.trace_id, 'trace-1')
 })
 
+test('accepts an executed envelope when trace_id/question are empty (direct query tool)', () => {
+  const bare = { ...evidence, trace_id: '', question: '' }
+  const parsed = parseGraphifyEvidence('query', JSON.stringify(bare))
+  assert.equal(parsed?.trace_id, '')
+  assert.equal(parsed?.question, '')
+  assert.equal(parsed?.result.rows.length, 1)
+})
+
 test('rejects legacy bare results', () => {
   assert.equal(parseGraphifyEvidence('run_template_query', '{"catalog_code":"x"}'), null)
 })

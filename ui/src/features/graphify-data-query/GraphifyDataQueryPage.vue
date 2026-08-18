@@ -6,9 +6,6 @@ import {
   ShareAltOutlined, ZoomInOutlined, ZoomOutOutlined,
 } from '@ant-design/icons-vue'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer.vue'
-import DiyWelcome from '@/components/chat/DiyWelcome.vue'
-import { getPublished } from '@/api/agentDiy'
-import type { DiyOutputFormat, DiyPageConfig } from '@/types'
 import GraphifyEvidenceGraph from './GraphifyEvidenceGraph.vue'
 import GraphifyExecutionPath from './GraphifyExecutionPath.vue'
 import { displayGraphifyLabel } from './evidenceAdapter'
@@ -31,8 +28,6 @@ const {
 
 const question = ref('')
 const graphOpen = ref(false)
-/** DIY 快捷问答配置（页面管理里可在线维护），用于空状态快捷问题卡。 */
-const diyConfig = ref<DiyPageConfig | null>(null)
 /** 图谱大屏弹窗开关（点击全屏按钮弹出模态框）。 */
 const fullscreen = ref(false)
 const panelWidth = ref(470)
@@ -106,6 +101,58 @@ function onComposerKeydown(event: KeyboardEvent) {
   event.preventDefault()
   void submit()
 }
+
+/**
+ * 空状态快捷问题池：覆盖药品/耗材/服务/诊疗各域的问题，供随机抽取展示。
+ * 用户可点选直接发起查询，省去手打。每次进入空状态随机打乱并取前 15 条。
+ */
+const QUICK_QUESTIONS: string[] = [
+  '查询医保支付类别为甲类的药品目录',
+  '查询药名含“阿莫西林”的药品及生产企业',
+  '列出医保支付类别为乙类的药品及最高价格',
+  '查询医保通用名为“布洛芬”的药品记录',
+  '查询名称含“胰岛素”的药品及其生产企业',
+  '查询有效期内的高血压用药目录',
+  '按生产企业查询感冒类药品目录',
+  '查询医保支付类别为丙类的药品及最高价格',
+  '查询名称含“一次性”的耗材目录及自付比例',
+  '列出医保支付类别为乙类的耗材及最高限额',
+  '查询某耗材企业的注册备案号与材质信息',
+  '查询名称含“导管”的耗材及其管理类别',
+  '查询名称含“口罩”的耗材及自付比例',
+  '查询名称含“支架”的高值耗材及最高限额',
+  '查询名称含“康复”的医疗服务项目及支付类别',
+  '列出医疗服务项目的最省级一档最高限额',
+  '查询名称含“透析”的医疗服务及最高限额',
+  '查询名称含“检查”的诊疗项目及其价格',
+  '统计药品目录中一共收录了多少条记录',
+  '按注册备案号查询某耗材的完整目录详情',
+  '查询自付比例为 20% 的医疗服务项目',
+  '查询名称含“采样”的耗材目录及医用支付类别',
+  '查询最近新生效（2026-03-10 起）的目录记录',
+  '列出支付类别为丙类的医疗服务项目',
+]
+/** 当前空状态展示的随机快捷问题（每次进入随机取 15 条、乱序）。 */
+const quickQuestions = ref<string[]>([])
+
+function shuffle<T>(list: readonly T[]): T[] {
+  const arr = [...list]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j]!, arr[i]!]
+  }
+  return arr
+}
+
+function initializeQuickQuestions() {
+  quickQuestions.value = shuffle(QUICK_QUESTIONS).slice(0, 15)
+}
+
+async function askQuick(questionText: string) {
+  if (isRunning.value) return
+  const sent = await sendQuestion(questionText)
+  if (sent) question.value = ''
+}
 function toggleGraph() {
   graphOpen.value = toggleEvidencePanel(graphOpen.value)
 }
@@ -132,27 +179,11 @@ function closeFullscreen() {
 // Esc 关闭图谱大屏弹窗。
 onMounted(() => {
   window.addEventListener('keydown', onModalKeydown)
-  void loadDiyConfig()
+  initializeQuickQuestions()
 })
 onUnmounted(() => window.removeEventListener('keydown', onModalKeydown))
 function onModalKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && fullscreen.value) fullscreen.value = false
-}
-async function loadDiyConfig() {
-  try {
-    const res = await getPublished(props.agentId)
-    diyConfig.value = res?.data?.data ?? null
-  } catch {
-    diyConfig.value = null
-  }
-}
-/** DIY 快捷问答确认 → 直接把生成的问题发给 MCP 语义查询（忽略图表输出格式指令）。 */
-function onQuickSend(payload: { text: string; outputFormat: DiyOutputFormat }) {
-  void submitWith(payload.text)
-}
-async function submitWith(text: string) {
-  const sent = await sendQuestion(text)
-  if (sent) question.value = ''
 }
 </script>
 
@@ -160,7 +191,7 @@ async function submitWith(text: string) {
   <main class="graphify-page" data-agent-id="agentId">
     <aside class="session-rail" aria-label="查询会话">
       <div class="brand-mark">
-        <MedicineBoxOutlined /><strong>医疗目录</strong>
+        <MedicineBoxOutlined /><strong>医药问数助手</strong>
       </div>
       <button class="new-session" type="button" :disabled="isRunning" @click="startNewSession">
         <PlusOutlined /> 新建对话
@@ -179,7 +210,7 @@ async function submitWith(text: string) {
         <p v-if="sessionsLoading" class="rail-empty">正在加载会话…</p>
         <p v-else-if="!sessions.length" class="rail-empty">尚无历史会话</p>
       </div>
-      <p class="rail-foot">Wren MDL + Neo4j<br>受治理数据查询</p>
+      <p class="rail-foot">医药问数 · 受治理查询<br>数据来源实时可溯</p>
     </aside>
 
     <section class="conversation-pane">
@@ -187,8 +218,8 @@ async function submitWith(text: string) {
         <div class="page-title">
           <MedicineBoxOutlined />
           <div>
-            <h1>医疗目录智能检索</h1>
-            <p>WREN MDL + NEO4J / GOVERNED EVIDENCE</p>
+            <h1>医药问数助手</h1>
+            <p>受治理医药问数 · 来源实时可溯</p>
           </div>
         </div>
         <div class="head-status"><b>{{ isRunning ? '正在查询' : activeEvidence ? `${activeEvidence.result.rows.length} 条结果`
@@ -199,20 +230,14 @@ async function submitWith(text: string) {
         </button>
       </header>
       <div class="conversation-body">
-        <section v-if="!displayMessages.length && !diyConfig" class="empty-conversation">
+        <section v-if="!displayMessages.length" class="empty-conversation">
           <MedicineBoxOutlined />
           <h2>从业务问题开始</h2>
-          <p>查询结果、语义依据和来源记录将在同一轮对话中展示。</p>
-          <div class="medical-domains" aria-label="可查询业务范围"><span>
-              <ExperimentOutlined /> 药品
-            </span><span>
-              <DeploymentUnitOutlined /> 耗材
-            </span><span>
-              <DatabaseOutlined /> 医疗目录
-            </span></div>
-        </section>
-        <section v-else-if="!displayMessages.length && diyConfig" class="diy-welcome-wrap">
-          <DiyWelcome :config="diyConfig" :is-running="isRunning" @confirm="onQuickSend" />
+          <p>选择一个快捷问题，或直接输入你想查询的医药问数内容。</p>
+          <div v-if="quickQuestions.length" class="quick-questions" aria-label="快捷问题">
+            <button v-for="(q, i) in quickQuestions" :key="`${i}-${q}`" type="button" class="quick-chip"
+              :disabled="isRunning" @click="askQuick(q)">{{ q }}</button>
+          </div>
         </section>
         <article v-for="message in displayMessages" :key="message.id"
           :class="message.role === 'user' ? 'user-message' : 'answer'"
@@ -606,81 +631,6 @@ async function submitWith(text: string) {
   margin-left: auto;
 }
 
-/* DIY 快捷问答卡：放宽宽度以便卡片横排。 */
-.conversation-body>.diy-welcome-wrap {
-  max-width: 1060px;
-  padding-top: 20px;
-}
-
-/*
- * 医药目录专属卡片风格（scoped + :deep 局部覆盖，不影响其他页面/agent）：
- * 贴合本智能体页面的冷静蓝色主题（--green:#2f80c5 / 浅蓝背景）· 紧凑标签（胶囊）式。
- */
-.diy-welcome-wrap :deep(.diy-welcome-content) {
-  width: 100%;
-}
-.diy-welcome-wrap :deep(.diy-question-grid) {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-}
-.diy-welcome-wrap :deep(.diy-question-card) {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  min-height: 42px;
-  /* 药丸/胶囊外观 */
-  padding: 6px 16px 6px 8px;
-  border: 1px solid #c6ddf1;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #eff6fd, #e1eef9);
-  box-shadow: 0 2px 6px rgb(63 145 209 / 10%);
-  color: #1e4f78;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
-}
-.diy-welcome-wrap :deep(.diy-question-card:hover:not(:disabled)) {
-  transform: translateY(-2px);
-  border-color: #4b9bd4;
-  box-shadow: 0 8px 18px rgb(47 128 197 / 18%);
-  background: linear-gradient(135deg, #e7f3fc, #d5e9f7);
-}
-.diy-welcome-wrap :deep(.diy-question-icon) {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #dfedf8;
-  font-size: 15px;
-}
-.diy-welcome-wrap :deep(.diy-question-copy) {
-  gap: 0;
-}
-.diy-welcome-wrap :deep(.diy-question-copy strong) {
-  color: #1e4f78;
-  font-size: 13px;
-  font-weight: 650;
-  white-space: nowrap;
-}
-.diy-welcome-wrap :deep(.diy-question-copy small) {
-  display: none;
-}
-/* 点击进入参数表单后，表单容器沿用默认样式，仅套用医药蓝色主题。 */
-.diy-welcome-wrap :deep(.diy-question-form) {
-  border-color: #c6ddf1;
-  box-shadow: 0 12px 32px rgb(47 128 197 / 14%);
-}
-.diy-welcome-wrap :deep(.diy-form-footer .ant-btn-primary) {
-  border-color: #2f80c5;
-  background: #2f80c5;
-}
-.diy-welcome-wrap :deep(.diy-option.active) {
-  border-color: #3c91d3;
-  background: #e7f2fb;
-  color: #286fa8;
-}
-
 .empty-conversation,
 .panel-empty {
   display: grid;
@@ -689,6 +639,15 @@ async function submitWith(text: string) {
   min-height: 210px;
   color: #6a7d7b;
   text-align: center;
+}
+
+.empty-conversation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-height: 260px;
+  padding: 26px 0;
 }
 
 .empty-conversation svg,
@@ -705,6 +664,42 @@ async function submitWith(text: string) {
 .empty-conversation p {
   margin: 0;
   font-size: 13px;
+}
+
+/* 空状态快捷问题（随机 15 条、乱序、可换行）。 */
+.quick-questions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  max-width: 720px;
+  margin-top: 6px;
+}
+
+.quick-chip {
+  max-width: 100%;
+  padding: 7px 13px;
+  border: 1px solid #c9dcea;
+  border-radius: 999px;
+  background: #f2f8fd;
+  color: #34679a;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.quick-chip:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #5f9fd0;
+  background: #e6f1fb;
+  color: #20527f;
+}
+
+.quick-chip:disabled {
+  cursor: not-allowed;
+  opacity: .55;
 }
 
 .user-message {
@@ -1509,30 +1504,6 @@ async function submitWith(text: string) {
 
 .page-title h1 {
   margin: 0;
-}
-
-.medical-domains {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 7px;
-  margin-top: 5px;
-}
-
-.medical-domains span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 8px;
-  border: 1px solid #d3e3ef;
-  border-radius: 3px;
-  background: #f6fbfe;
-  color: #4e718a;
-  font-size: 11px;
-}
-
-.medical-domains svg {
-  color: #3c91d3;
 }
 
 .legend span {

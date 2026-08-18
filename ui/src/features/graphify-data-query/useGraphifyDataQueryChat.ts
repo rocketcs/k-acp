@@ -13,6 +13,57 @@ import { mergeTurnEvidence, type TurnEvidence } from './turnEvidence'
 
 const CONTEXT_MESSAGE_LIMIT = 6
 
+/**
+ * 会话选中态持久化：刷新后应回到用户上次所在的会话；若用户处于“新建对话”空状态，
+ * 则刷新后仍保持空状态，而不是自动跳回最新会话。
+ * 存储值：选中会话 id；空串 '' 表示“新建对话”空状态；未写过则为 null。
+ */
+const lastSessionStorageKey = (agentId: string) => `graphify:last-session:${agentId}`
+
+function persistLastSession(agentId: Ref<string>, sessionId: string | null) {
+  try {
+    if (!agentId.value) return
+    localStorage.setItem(lastSessionStorageKey(agentId.value), sessionId ?? '')
+  } catch { /* 忽略 localStorage 不可用 */ }
+}
+
+function readLastSession(agentId: string): string | null {
+  try {
+    return localStorage.getItem(lastSessionStorageKey(agentId))
+  } catch { return null }
+}
+
+/**
+ * 本地执行的证据信封兜底：受治理数据服务的 executed 结果可能因后端/智能体
+ * 落库链路未把 `query` 的 tool 消息写回 chat_message，刷新重放时只能还原出
+ * blocked/warning 预检诊断，导致 `activeEvidence` 为空、表格消失。这里在查询
+ * 成功取得 executed 信封时额外缓存到 localStorage（以助手消息 id 为键），刷新
+ * 时优先合并进来，保证表格在本浏览器会话内稳定还原。
+ */
+const evidenceStoragePrefix = 'graphify:evidence:'
+const evidenceStorageKey = (messageId: string) => `${evidenceStoragePrefix}${messageId}`
+
+function persistTurnEvidence(messageId: string, turn: TurnEvidence) {
+  try {
+    if (!messageId || !turn?.evidence) return
+    localStorage.setItem(evidenceStorageKey(messageId), JSON.stringify(turn))
+  } catch { /* 忽略 localStorage 不可用 */ }
+}
+
+function readTurnEvidence(messageId: string): TurnEvidence | null {
+  try {
+    const raw = localStorage.getItem(evidenceStorageKey(messageId))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as TurnEvidence
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !parsed.evidence) return null
+    return parsed
+  } catch { return null }
+}
+
+function clearTurnEvidence(messageId: string) {
+  try { localStorage.removeItem(evidenceStorageKey(messageId)) } catch { /* 忽略 localStorage 不可用 */ }
+}
+
 export function useGraphifyDataQueryChat(agentId: Ref<string>) {
   const { agentDetail } = useAgentDetail(agentId)
   const { sessions, loading: sessionsLoading, createSession, deleteSession, resetAndReload } = useSessions(agentId)
@@ -49,8 +100,15 @@ export function useGraphifyDataQueryChat(agentId: Ref<string>) {
       if (message.role === 'tool') {
         const toolResult = parsePersistedToolResult(message.content)
         if (toolResult) pending = mergeTurnEvidence(pending ?? undefined, toolResult)
-      } else if (message.role === 'assistant' && pending) {
-        restored[String(message.id)] = pending
+      } else if (message.role === 'assistant') {
+        const messageId = String(message.id)
+        // 本地已缓存的 executed 证据信封优先（覆盖后端未落库、仅剩 blocked/warning 预检诊断的情况）。
+        const local = readTurnEvidence(messageId)
+        if (local) {
+          restored[messageId] = pending ? mergeTurnEvidence(local, pending) : local
+        } else if (pending) {
+          restored[messageId] = pending
+        }
         pending = null
       }
     }
@@ -117,6 +175,10 @@ export function useGraphifyDataQueryChat(agentId: Ref<string>) {
     if (isRunning.value) return false
     try {
       const isCurrentSession = shouldResetDeletedSession(currentSessionId.value, session.id)
+      // 同步清理该会话助手消息对应的本地证据缓存。
+      for (const message of messagesList.value) {
+        if (message.role === 'assistant') clearTurnEvidence(String(message.id))
+      }
       await deleteSession(session.id)
       if (isCurrentSession) await startNewSession()
       return true
@@ -127,9 +189,21 @@ export function useGraphifyDataQueryChat(agentId: Ref<string>) {
 
   async function loadInitialSession() {
     await resetAndReload()
-    if (!currentSessionId.value && sessions.value[0]) {
-      await chooseSession(sessions.value[0])
+    if (currentSessionId.value) return
+
+    // 刷新恢复：优先回到用户上次选中的会话。
+    const last = readLastSession(agentId.value)
+    if (last) {
+      const target = sessions.value.find((s) => String(s.id) === last)
+      if (target) {
+        await chooseSession(target)
+        return
+      }
     }
+    // 用户上次处于“新建对话”空状态（持久化为空串）→ 保持空状态，不自动选中最新会话。
+    if (last === '') return
+    // 从未持久化或上次会话已失效 → 退回最新会话（兼容首次进入）。
+    if (sessions.value[0]) await chooseSession(sessions.value[0])
   }
 
   async function sendQuestion(question: string): Promise<boolean> {
@@ -157,14 +231,19 @@ export function useGraphifyDataQueryChat(agentId: Ref<string>) {
         : text
       runtimeMessages[runtimeMessages.length - 1] = { id: userMessage.id, role: 'user', content: runtimeQuestion }
       await sendMessage(runtimeQuestion, runtimeMessages)
-      if (pendingTurnId.value && evidenceByMessageId.value[pendingTurnId.value]) {
+      if (pendingTurnId.value) {
         const assistant = [...messagesList.value].reverse().find((item) => item.role === 'assistant')
         if (assistant) {
+          // 流的 watch(messagesList)→restorePersistedEvidence 会把 evidenceByMessageId 整体重建，
+          // 可能把实时累积的 pending: 键证据移到 assistantId 下；因此这里两个键都查，保证持久化一定触发。
           const turn = evidenceByMessageId.value[pendingTurnId.value]
+            ?? evidenceByMessageId.value[String(assistant.id)]
           if (turn) {
             evidenceByMessageId.value = { ...evidenceByMessageId.value, [String(assistant.id)]: turn }
             delete evidenceByMessageId.value[pendingTurnId.value]
             selectedAssistantMessageId.value = String(assistant.id)
+            // 查询成功取得 executed 信封后缓存到本地，刷新时据此还原表格（见 readTurnEvidence）。
+            persistTurnEvidence(String(assistant.id), turn)
           }
         }
       }
@@ -182,7 +261,11 @@ export function useGraphifyDataQueryChat(agentId: Ref<string>) {
     if (!selectedAssistantMessageId.value && latest) selectedAssistantMessageId.value = String(latest.id)
   }, { deep: true })
 
-  watch(currentSessionId, () => { evidenceByMessageId.value = {}; selectedAssistantMessageId.value = null })
+  watch(currentSessionId, (id) => {
+    evidenceByMessageId.value = {}
+    selectedAssistantMessageId.value = null
+    persistLastSession(agentId, id)
+  })
   onMounted(() => { void loadInitialSession() })
   onBeforeUnmount(disconnect)
 
