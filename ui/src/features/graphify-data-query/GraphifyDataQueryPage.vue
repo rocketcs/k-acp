@@ -614,7 +614,7 @@ async function submitWith(text: string) {
 
 /*
  * 医药目录专属卡片风格（scoped + :deep 局部覆盖，不影响其他页面/agent）：
- * 医药清新风 · 紧凑标签（胶囊）式。
+ * 贴合本智能体页面的冷静蓝色主题（--green:#2f80c5 / 浅蓝背景）· 紧凑标签（胶囊）式。
  */
 .diy-welcome-wrap :deep(.diy-welcome-content) {
   width: 100%;
@@ -634,31 +634,31 @@ async function submitWith(text: string) {
   min-height: 42px;
   /* 药丸/胶囊外观 */
   padding: 6px 16px 6px 8px;
-  border: 1px solid #cfe8e2;
+  border: 1px solid #c6ddf1;
   border-radius: 999px;
-  background: linear-gradient(135deg, #eefaf7, #e3f4ef);
-  box-shadow: 0 2px 6px rgb(13 106 92 / 8%);
-  color: #0d6a5c;
+  background: linear-gradient(135deg, #eff6fd, #e1eef9);
+  box-shadow: 0 2px 6px rgb(63 145 209 / 10%);
+  color: #1e4f78;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 .diy-welcome-wrap :deep(.diy-question-card:hover:not(:disabled)) {
   transform: translateY(-2px);
-  border-color: #2f9d8a;
-  box-shadow: 0 8px 18px rgb(13 106 92 / 16%);
-  background: linear-gradient(135deg, #e6f8f3, #d7f0e9);
+  border-color: #4b9bd4;
+  box-shadow: 0 8px 18px rgb(47 128 197 / 18%);
+  background: linear-gradient(135deg, #e7f3fc, #d5e9f7);
 }
 .diy-welcome-wrap :deep(.diy-question-icon) {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: #d9efe9;
+  background: #dfedf8;
   font-size: 15px;
 }
 .diy-welcome-wrap :deep(.diy-question-copy) {
   gap: 0;
 }
 .diy-welcome-wrap :deep(.diy-question-copy strong) {
-  color: #0d6a5c;
+  color: #1e4f78;
   font-size: 13px;
   font-weight: 650;
   white-space: nowrap;
@@ -666,19 +666,19 @@ async function submitWith(text: string) {
 .diy-welcome-wrap :deep(.diy-question-copy small) {
   display: none;
 }
-/* 点击进入参数表单后，表单容器沿用默认样式，仅套用医药主题边框。 */
+/* 点击进入参数表单后，表单容器沿用默认样式，仅套用医药蓝色主题。 */
 .diy-welcome-wrap :deep(.diy-question-form) {
-  border-color: #c5e4dc;
-  box-shadow: 0 12px 32px rgb(13 106 92 / 12%);
+  border-color: #c6ddf1;
+  box-shadow: 0 12px 32px rgb(47 128 197 / 14%);
 }
 .diy-welcome-wrap :deep(.diy-form-footer .ant-btn-primary) {
-  border-color: #128071;
-  background: #128071;
+  border-color: #2f80c5;
+  background: #2f80c5;
 }
 .diy-welcome-wrap :deep(.diy-option.active) {
-  border-color: #128071;
-  background: #e7f6f2;
-  color: #0d6a5c;
+  border-color: #3c91d3;
+  background: #e7f2fb;
+  color: #286fa8;
 }
 
 .empty-conversation,
