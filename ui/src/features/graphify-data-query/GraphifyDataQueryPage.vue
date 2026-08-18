@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import {
-  AimOutlined, CompressOutlined, DatabaseOutlined, DeleteOutlined, DeploymentUnitOutlined, ExperimentOutlined, FieldStringOutlined, FilterOutlined,
-  FullscreenExitOutlined, FullscreenOutlined, MedicineBoxOutlined, PlusOutlined, ReloadOutlined, SendOutlined,
+  AimOutlined, CloseOutlined, CompressOutlined, DatabaseOutlined, DeleteOutlined, DeploymentUnitOutlined, ExperimentOutlined, FieldStringOutlined, FilterOutlined,
+  FullscreenOutlined, MedicineBoxOutlined, PlusOutlined, ReloadOutlined, SendOutlined,
   ShareAltOutlined, ZoomInOutlined, ZoomOutOutlined,
 } from '@ant-design/icons-vue'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer.vue'
@@ -28,11 +28,13 @@ const {
 
 const question = ref('')
 const graphOpen = ref(false)
+/** 图谱大屏弹窗开关（点击全屏按钮弹出模态框）。 */
 const fullscreen = ref(false)
 const panelWidth = ref(470)
 const relationFilter = ref<'all' | 'business' | 'provenance' | 'semantic'>('all')
 const selectedId = ref<string | null>(null)
 const graphRef = ref<InstanceType<typeof GraphifyEvidenceGraph> | null>(null)
+const modalGraphRef = ref<InstanceType<typeof GraphifyEvidenceGraph> | null>(null)
 const showFields = ref(false)
 const showGraph = ref(false)
 const relationSummary = computed(() => activeEvidence.value ? graphRelationSummary(activeEvidence.value) : null)
@@ -119,10 +121,19 @@ function onResizeStart(event: PointerEvent) {
   window.addEventListener('pointermove', move)
   window.addEventListener('pointerup', stop, { once: true })
 }
+function closeFullscreen() {
+  fullscreen.value = false
+}
+// Esc 关闭图谱大屏弹窗。
+onMounted(() => window.addEventListener('keydown', onModalKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onModalKeydown))
+function onModalKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && fullscreen.value) fullscreen.value = false
+}
 </script>
 
 <template>
-  <main class="graphify-page" :class="{ 'is-fullscreen': fullscreen }" :data-agent-id="agentId">
+  <main class="graphify-page" data-agent-id="agentId">
     <aside class="session-rail" aria-label="查询会话">
       <div class="brand-mark">
         <MedicineBoxOutlined /><strong>医疗目录</strong>
@@ -240,28 +251,27 @@ function onResizeStart(event: PointerEvent) {
     </section>
 
     <aside v-show="graphOpen" id="graphify-evidence-panel" class="evidence-panel"
-      :style="{ width: fullscreen ? '100vw' : `${panelWidth}px` }" aria-label="语义依据">
-      <div v-if="!fullscreen" class="resize-handle" role="separator" aria-orientation="vertical"
+      :style="{ width: `${panelWidth}px` }" aria-label="语义依据">
+      <div class="resize-handle" role="separator" aria-orientation="vertical"
         @pointerdown="onResizeStart" />
       <header class="panel-head">
         <h2>语义依据</h2>
-        <div><button class="icon-btn" :title="fullscreen ? '退出图谱大屏' : '图谱大屏查看'" @click="fullscreen = !fullscreen">
-            <FullscreenExitOutlined v-if="fullscreen" />
-            <FullscreenOutlined v-else />
+        <div><button class="icon-btn" title="图谱大屏查看" @click="fullscreen = true">
+            <FullscreenOutlined />
           </button><button class="icon-btn" title="关闭" @click="graphOpen = false">
             <CompressOutlined />
           </button></div>
       </header>
       <section class="evidence-scroll">
           <template v-if="activeEvidence">
-            <header v-if="!fullscreen" class="question-summary"><small>当前对话轮次 · {{ activeEvidence.trace_id
+            <header class="question-summary"><small>当前对话轮次 · {{ activeEvidence.trace_id
                 }}</small><strong>{{ activeEvidence.question }}</strong><span>{{ activeEvidence.result.rows.length }}
                 条结果 · {{ activeEvidence.evidence.source_record_count ?? activeEvidence.evidence.source_record_ids.length
                 }} 条来源记录</span>
               <p v-if="relationSummary" class="relation-summary">关系摘要：{{ relationSummary }}</p>
             </header>
             <GraphifyExecutionPath :evidence="activeEvidence" />
-            <button v-if="!fullscreen" class="graph-toggle" :aria-expanded="showGraph" @click="showGraph = !showGraph">
+            <button class="graph-toggle" :aria-expanded="showGraph" @click="showGraph = !showGraph">
               <ShareAltOutlined /> {{ showGraph ? '收起结果子图' : '查看结果子图' }}（{{ activeEvidence.evidence.nodes.length }} 节点 ·
               {{ activeEvidence.evidence.edges.length }} 关系）
             </button>
@@ -276,7 +286,7 @@ function onResizeStart(event: PointerEvent) {
               </span></div>
             <div v-show="showGraph" class="graph-workspace">
               <GraphifyEvidenceGraph ref="graphRef" :evidence="activeEvidence" :relation-filter="relationFilter"
-                :fullscreen="fullscreen" :show-fields="showFields" @select="selectedId = $event" />
+                :fullscreen="false" :show-fields="showFields" @select="selectedId = $event" />
               <div class="graph-tools" aria-label="图谱工具栏"><button class="icon-btn" title="放大"
                   @click="graphRef?.zoomIn()">
                   <ZoomInOutlined />
@@ -289,10 +299,8 @@ function onResizeStart(event: PointerEvent) {
                 </button><button class="icon-btn" :class="{ active: showFields }" title="显示/隐藏语义字段"
                   @click="showFields = !showFields">
                   <FieldStringOutlined />
-                </button><button class="icon-btn" :title="fullscreen ? '退出图谱大屏' : '图谱大屏查看'"
-                  @click="fullscreen = !fullscreen">
-                  <FullscreenExitOutlined v-if="fullscreen" />
-                  <FullscreenOutlined v-else />
+                </button><button class="icon-btn" title="图谱大屏查看" @click="fullscreen = true">
+                  <FullscreenOutlined />
                 </button></div>
               <div class="graph-actions"><label>
                   <FilterOutlined /><select v-model="relationFilter" aria-label="筛选图谱关系">
@@ -303,7 +311,7 @@ function onResizeStart(event: PointerEvent) {
                   </select><span class="graph-hint">点击节点展开下一级</span>
                 </label></div>
             </div>
-            <section v-if="showGraph && !fullscreen && selectedNodeSummary" class="node-summary">
+            <section v-if="showGraph && selectedNodeSummary" class="node-summary">
               <header><span class="node-summary-type">{{ selectedNodeSummary.type }}</span><b>已选节点</b><span
                   class="node-summary-count">{{ selectedNodeSummary.edgeCount }} 个关联</span></header>
               <h3>{{ selectedNodeSummary.label }}</h3><template v-if="selectedNodeSummary.productDetail">
@@ -336,6 +344,48 @@ function onResizeStart(event: PointerEvent) {
           </section>
       </section>
     </aside>
+
+    <!-- 图谱大屏弹窗：点击“图谱大屏查看”弹出，遮罩/关闭/Esc 均可退出 -->
+    <Teleport to="body">
+      <div v-if="fullscreen && activeEvidence" class="graph-modal" role="dialog" aria-modal="true"
+        aria-label="图谱大屏" @click.self="closeFullscreen">
+        <div class="graph-modal-panel">
+          <header class="graph-modal-head">
+            <h2>图谱大屏</h2>
+            <button class="icon-btn" title="关闭大屏" aria-label="关闭大屏" @click="closeFullscreen">
+              <CloseOutlined />
+            </button>
+          </header>
+          <div class="graph-modal-body">
+            <div class="graph-modal-canvas">
+              <GraphifyEvidenceGraph ref="modalGraphRef" :evidence="activeEvidence" :relation-filter="relationFilter"
+                fullscreen :show-fields="showFields" @select="selectedId = $event" />
+              <div class="graph-tools" aria-label="图谱工具栏"><button class="icon-btn" title="放大"
+                  @click="modalGraphRef?.zoomIn()">
+                  <ZoomInOutlined />
+                </button><button class="icon-btn" title="缩小" @click="modalGraphRef?.zoomOut()">
+                  <ZoomOutOutlined />
+                </button><button class="icon-btn" title="适应画布" @click="modalGraphRef?.fit()">
+                  <AimOutlined />
+                </button><button class="icon-btn" title="重新布局" @click="modalGraphRef?.relayout()">
+                  <ReloadOutlined />
+                </button><button class="icon-btn" :class="{ active: showFields }" title="显示/隐藏语义字段"
+                  @click="showFields = !showFields">
+                  <FieldStringOutlined />
+                </button></div>
+              <div class="graph-actions"><label>
+                  <FilterOutlined /><select v-model="relationFilter" aria-label="筛选图谱关系">
+                    <option value="all">全部关系</option>
+                    <option value="business">业务关系</option>
+                    <option value="provenance">来源追溯</option>
+                    <option value="semantic">语义关系</option>
+                  </select><span class="graph-hint">点击节点展开下一级</span>
+                </label></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </main>
 </template>
 
@@ -1113,30 +1163,67 @@ function onResizeStart(event: PointerEvent) {
   user-select: all;
 }
 
-.is-fullscreen {
-  display: block;
+/* 图谱大屏弹窗：遮罩 + 居中面板 */
+.graph-modal {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(20 30 38 / 55%);
 }
-
-.is-fullscreen .session-rail,
-.is-fullscreen .conversation-pane {
-  display: none;
-}
-
-.is-fullscreen .evidence-panel {
-  width: 100% !important;
-  height: 100dvh;
-}
-
-.is-fullscreen .evidence-scroll {
+.graph-modal-panel {
   display: flex;
   flex-direction: column;
+  width: min(1200px, 94vw);
+  height: min(820px, 90vh);
+  overflow: hidden;
+  border: 1px solid #b9cdd9;
+  border-radius: 8px;
+  background: #fbfdff;
+  box-shadow: 0 18px 60px rgb(15 35 45 / 35%);
+}
+.graph-modal-head {
+  display: flex;
+  height: 52px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px 0 20px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+.graph-modal-head h2 {
+  margin: 0;
+  font-family: STSong, "Songti SC", serif;
+  font-size: 16px;
+}
+.graph-modal-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
   overflow: hidden;
 }
-
-.is-fullscreen .graph-workspace {
+.graph-modal-canvas {
+  position: relative;
   flex: 1;
-  height: auto;
   min-height: 0;
+  overflow: hidden;
+  border: 1px solid #c5dbea;
+  border-radius: 6px;
+  background: #f2f8fc;
+}
+.graph-modal .graph-tools {
+  top: 12px;
+  right: 12px;
+}
+.graph-modal .graph-actions {
+  left: 12px;
+  bottom: 12px;
 }
 
 @media (max-width:980px) {
