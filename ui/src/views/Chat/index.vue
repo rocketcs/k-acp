@@ -13,7 +13,6 @@ import ChatSidebar from '@/components/chat/ChatSidebar.vue'
 import ChatMain from '@/components/chat/ChatMain.vue'
 import RenameModal from '@/components/chat/RenameModal.vue'
 import WorkspacePanel from '@/components/workspace/WorkspacePanel.vue'
-import { GraphifyDataQueryPage } from '@/features/graphify-data-query'
 import type { DisplayMessage, ChatMessageVO, UploadedFileItem, ChatSessionVO, ChatMessagePresentation, ChatMessagePresentationInput } from '@/types'
 import type { ChatAttachmentPolicy } from '@/composables/chat/useChatAttachments'
 import * as chatSessionApi from '@/api/chatSession'
@@ -60,9 +59,12 @@ const props = withDefaults(defineProps<{
   attachmentAutoSubmitAdapter?: (input: ChatSubmissionInput & { uploadedFile: UploadedFileItem }) => ChatSubmission | null
   onAttachmentRemoved?: (file: UploadedFileItem) => void
   onSessionMessagesChanged?: (input: { sessionId: string | null; messages: readonly ChatMessageVO[] }) => void
+  /** 强制开启工具执行过程展示（用于需要保留 MCP 工具结果的受治理数据查询类 agent）。 */
+  forceToolProcessActive?: boolean
 }>(), {
   showAccount: true,
-  chatAgentId: null
+  chatAgentId: null,
+  forceToolProcessActive: false
 })
 
 const route = useRoute()
@@ -73,11 +75,9 @@ const userInfo = computed(() => accountStore.userInfo)
 const agentId = computed(() => (props.chatAgentId || route.params.agentId) as string || '')
 const isDiyRoute = computed(() => route.name === RouteNames.CHAT_DIY)
 const diyConfig = ref<DiyPageConfig | null>(null)
-const GRAPHIFY_DATA_QUERY_AGENT_CODE = 'default-graphify-data-query'
 
 // 智能体详情
 const { agentDetail, allowFileType } = useAgentDetail(agentId)
-const isGraphifyDataQueryAgent = computed(() => agentDetail.value?.agentCode === GRAPHIFY_DATA_QUERY_AGENT_CODE)
 
 // 记忆/规划是否可用（由 agentDetail 决定）
 const accountId = computed(() => accountStore.userInfo?.id)
@@ -99,6 +99,7 @@ const planActive = computed(() => {
   return chatStore.getPlanActive(id as string, accountId.value as string, enablePlanning.value)
 })
 const toolProcessActive = computed(() => {
+  if (props.forceToolProcessActive) return true
   const id = agentDetail.value?.id ?? agentId.value
   chatStore.preferences
   return chatStore.getToolProcessActive(id as string, accountId.value as string, showToolProcess.value)
@@ -759,8 +760,7 @@ defineExpose({ submitExternalSubmission, requestAttachmentPicker })
 </script>
 
 <template>
-  <GraphifyDataQueryPage v-if="isGraphifyDataQueryAgent" :agent-id="agentId" />
-  <div v-else class="chat-page">
+  <div class="chat-page">
     <ChatSidebar
       :collapsed="sidebarCollapsed"
       :agent-name="agentDetail?.name"

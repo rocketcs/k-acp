@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { ElementDefinition } from 'cytoscape'
 import type { GraphifyEvidenceEnvelope } from './types'
-import { evidenceGraphModel } from './evidenceGraphModel.ts'
+import { evidenceGraphCounts, evidenceGraphModel } from './evidenceGraphModel.ts'
 
 const envelope: GraphifyEvidenceEnvelope = {
   status: 'executed', trace_id: 't1', dataset_id: 'medical_catalog', question: 'q',
@@ -107,4 +107,69 @@ test('never stores raw internal node labels in rendered labels or tooltips', () 
 
   assert.doesNotMatch(nodeText, /耗材谈判记录·导入批次20260816|raw\.registration_record/)
   assert.match(nodeText, /原始目录记录|注册备案号/)
+})
+
+test('relationship-less (isolated) nodes are hidden from the rendered graph', () => {
+  const isoEnvelope: GraphifyEvidenceEnvelope = {
+    ...envelope,
+    evidence: {
+      ...envelope.evidence,
+      nodes: [
+        ...envelope.evidence.nodes,
+        // 一个没有任何边的业务节点：应被隐藏
+        { id: 'orphan', label: '孤立记录', kind: 'organization' },
+      ],
+    },
+  }
+  const nodes = evidenceGraphModel(isoEnvelope, { viewMode: 'focused', showFields: false })
+    .filter((e) => !e.data?.source)
+    .map((e) => String(e.data!.id))
+  assert.equal(nodes.includes('orphan'), false, 'node with no relationship must not be rendered')
+  // 有关联关系的节点不受影响
+  assert.ok(nodes.includes('product') && nodes.includes('registration') && nodes.includes('catalog_record'))
+})
+
+test('isolated nodes are excluded from summary counts', () => {
+  const isoEnvelope: GraphifyEvidenceEnvelope = {
+    ...envelope,
+    evidence: {
+      ...envelope.evidence,
+      nodes: [
+        ...envelope.evidence.nodes,
+        { id: 'orphan', label: '孤立记录', kind: 'organization' },
+      ],
+    },
+  }
+  const { nodeCount, edgeCount, totalCount } = evidenceGraphCounts(isoEnvelope, {
+    viewMode: 'focused',
+    showFields: false,
+  })
+  // focused 视图关联节点：product / registration / catalog_record；孤立或查询过程节点不计入
+  assert.equal(nodeCount, 3)
+  assert.equal(edgeCount, 2)
+  // totalCount 为全部非查询过程业务节点（含被隐藏的孤立节点），驱动「点击展开」提示
+  // 基础 envelope 中非 record/source 节点：model/product/registration/catalog_record/field + orphan = 6
+  assert.equal(totalCount, 6)
+})
+
+test('a node reachable only through a dropped query edge becomes isolated and hides', () => {
+  const qEnv: GraphifyEvidenceEnvelope = {
+    ...envelope,
+    evidence: {
+      ...envelope.evidence,
+      nodes: [
+        ...envelope.evidence.nodes,
+        { id: 'extra_product', label: '另一产品', kind: 'product' },
+      ],
+      edges: [
+        ...envelope.evidence.edges,
+        // 该产品只通过 model 的 query 边相连；query 边不渲染 → 变成孤立节点
+        { id: 'q2', source: 'model', target: 'extra_product', label: '查询返回', kind: 'query' },
+      ],
+    },
+  }
+  const nodes = evidenceGraphModel(qEnv, { viewMode: 'focused', showFields: false })
+    .filter((e) => !e.data?.source)
+    .map((e) => String(e.data!.id))
+  assert.equal(nodes.includes('extra_product'), false)
 })

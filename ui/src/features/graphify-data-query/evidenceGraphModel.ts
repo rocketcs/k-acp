@@ -2,7 +2,7 @@ import type { ElementDefinition } from 'cytoscape'
 import { dagrePositions } from './dagreLayout.ts'
 import { nodeVisual, type DomainSemantics } from './evidenceStyles.ts'
 import { graphEdgeLabel, graphNodeLabel } from './evidencePresentation.ts'
-import type { GraphifyEvidenceEnvelope, GraphifyEvidenceNode } from './types'
+import type { GraphifyEvidenceEnvelope, GraphifyEvidenceEdge, GraphifyEvidenceNode } from './types'
 
 export type GraphModelOptions = {
   viewMode: 'focused' | 'full'
@@ -61,26 +61,70 @@ function nodeVisible(node: GraphifyEvidenceNode, opts: GraphModelOptions): boole
   return true
 }
 
-export function evidenceGraphModel(envelope: GraphifyEvidenceEnvelope, opts: GraphModelOptions): ElementDefinition[] {
+export type EvidenceGraphSelection = {
+  nodes: GraphifyEvidenceNode[]
+  edges: GraphifyEvidenceEdge[]
+  /** 图谱内全部可供展示的业务节点数（不含查询过程节点），用于「点击展开」提示。 */
+  totalCount: number
+}
+
+/**
+ * 计算出当前选项下实际渲染的节点与边。
+ *
+ * 关键规则：孤立节点（与其它节点没有任何一条边——业务/来源/语义关系都不存在）
+ * 会被剔除，保证查询出来的图谱只展示有关联关系的节点，不展示孤立节点。
+ * 元素构建与汇总计数统一走这里，保证所见即所计。
+ */
+export function selectGraph(
+  envelope: GraphifyEvidenceEnvelope,
+  opts: GraphModelOptions,
+): EvidenceGraphSelection {
   const allNodes = envelope.evidence.nodes.filter((node) => nodeVisible(node, opts))
-  const nodes = opts.visibleIds
+  const initialNodes = opts.visibleIds
     ? allNodes.filter((node) => opts.visibleIds!.has(node.id))
     : allNodes
-  const nodeById = new Map(nodes.map((node) => [node.id, node]))
-  const nodeIds = new Set(nodes.map((node) => node.id))
-  const modelId = nodes.find((node) => node.kind === 'model')?.id
+  const initialNodeIds = new Set(initialNodes.map((node) => node.id))
+  const modelId = initialNodes.find((node) => node.kind === 'model')?.id
   // A query edge from the model root to a business entity *defines* that
   // entity in this model. Keep it as a business relation from the model so
   // the model is never rendered as an isolated node; other query edges
   // (query-time actions) are dropped.
-  const edges = envelope.evidence.edges.flatMap((edge) => {
-    const within = nodeIds.has(edge.source) && nodeIds.has(edge.target)
+  const selectedEdges = envelope.evidence.edges.flatMap((edge) => {
+    const within = initialNodeIds.has(edge.source) && initialNodeIds.has(edge.target)
     if (!within) return []
     if (edge.kind === 'query' && modelId && edge.source === modelId) {
       return [{ ...edge, kind: 'business' as const, label: '业务模型' }]
     }
     return edge.kind === 'query' ? [] : [edge]
   })
+
+  // 隐藏没有关联关系的孤立节点：只保留至少出现在一条边端点上的节点。
+  const connected = new Set<string>()
+  for (const edge of selectedEdges) {
+    connected.add(edge.source)
+    connected.add(edge.target)
+  }
+  const nodes = initialNodes.filter((node) => connected.has(node.id))
+  const nodeIds = new Set(nodes.map((node) => node.id))
+  const edges = selectedEdges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
+
+  const totalCount = envelope.evidence.nodes
+    .filter((node) => node.kind !== 'record' && node.kind !== 'source')
+    .length
+  return { nodes, edges, totalCount }
+}
+
+export function evidenceGraphCounts(
+  envelope: GraphifyEvidenceEnvelope,
+  opts: GraphModelOptions,
+): { nodeCount: number; edgeCount: number; totalCount: number } {
+  const { nodes, edges, totalCount } = selectGraph(envelope, opts)
+  return { nodeCount: nodes.length, edgeCount: edges.length, totalCount }
+}
+
+export function evidenceGraphModel(envelope: GraphifyEvidenceEnvelope, opts: GraphModelOptions): ElementDefinition[] {
+  const { nodes, edges } = selectGraph(envelope, opts)
+  const nodeById = new Map(nodes.map((node) => [node.id, node]))
   const position = opts.viewMode === 'full'
     ? fullViewPositions(nodes)
     : dagrePositions(nodes, edges, { rankdir: 'LR' })

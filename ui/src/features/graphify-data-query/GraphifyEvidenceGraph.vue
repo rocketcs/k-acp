@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import cytoscape, { type Core } from 'cytoscape'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { evidenceGraphModel } from './evidenceGraphModel'
+import { evidenceGraphCounts, evidenceGraphModel } from './evidenceGraphModel'
 import { expandSelection } from './expandSelection'
 import type { GraphifyEvidenceEnvelope } from './types'
 
@@ -24,38 +24,34 @@ let cy: Core | undefined
 const selectedId = ref<string | null>(null)
 const expandedIds = ref<ReadonlySet<string>>(new Set())
 
-const visibleNodeCount = computed(() => expandSelection(
-  props.evidence.evidence.nodes,
-  props.evidence.evidence.edges,
-  expandedIds.value,
-).size)
-const visibleEdgeCount = computed(() => {
-  const visible = expandSelection(
-    props.evidence.evidence.nodes,
-    props.evidence.evidence.edges,
-    expandedIds.value,
-  )
-  return props.evidence.evidence.edges.filter((edge) =>
-    visible.has(edge.source) && visible.has(edge.target) && edge.kind !== 'query'
-  ).length
-})
-const totalNodeCount = computed(() => props.evidence.evidence.nodes
-  .filter((node) => node.kind !== 'record' && node.kind !== 'source')
-  .length)
-
-function buildElements() {
-  const showAll = props.showFields
-  const visibleIds = showAll
+/** 当前图谱渲染选项：focused 走渐进展开，showFields 展示全视图。 */
+const graphOpts = computed<{
+  viewMode: 'focused' | 'full'
+  showFields: boolean
+  visibleIds?: ReadonlySet<string>
+}>(() => ({
+  viewMode: props.showFields ? 'full' : 'focused',
+  showFields: props.showFields,
+  visibleIds: props.showFields
     ? undefined
     : expandSelection(
         props.evidence.evidence.nodes,
         props.evidence.evidence.edges,
         expandedIds.value,
-      )
+      ),
+}))
+
+// 汇总计数与实际渲染保持一致：evidenceGraphCounts 会剔除无关联关系的孤立节点。
+const visibleNodeCount = computed(() =>
+  evidenceGraphCounts(props.evidence, graphOpts.value).nodeCount)
+const visibleEdgeCount = computed(() =>
+  evidenceGraphCounts(props.evidence, graphOpts.value).edgeCount)
+const totalNodeCount = computed(() =>
+  evidenceGraphCounts(props.evidence, graphOpts.value).totalCount)
+
+function buildElements() {
   return evidenceGraphModel(props.evidence, {
-    viewMode: showAll ? 'full' : 'focused',
-    showFields: props.showFields,
-    visibleIds,
+    ...graphOpts.value,
     semantics: {
       labels: props.evidence.semantic_context.domain_labels,
       headings: props.evidence.semantic_context.domain_headings,

@@ -1,4 +1,4 @@
-import type { TracingResultStatus, TracingStatusTone, TracingUserIdentity } from '@/types/sessionTracing'
+import type { TracingResultStatus, TracingStatusTone, TracingUserIdentity } from './types'
 
 export function formatTracingUserLabel(user: TracingUserIdentity): string {
   const identityParts = [user.nickname, user.username, user.email].filter(

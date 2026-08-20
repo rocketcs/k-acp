@@ -1,1 +1,1 @@
-export { default as GraphifyDataQueryPage } from './GraphifyDataQueryPage.vue'
+export { default as GraphifyDataQueryChat } from './GraphifyDataQueryChat.vue'

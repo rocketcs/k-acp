@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { formatTracingUserLabel, tracingStatusTone } from './sessionTracing.ts'
+import { formatTracingUserLabel, tracingStatusTone } from './utils.ts'
 
 test('用户标签优先显示昵称、账号和邮箱', () => {
   assert.equal(

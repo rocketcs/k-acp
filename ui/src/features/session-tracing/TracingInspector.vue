@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import type { TracingPageItem, TracingSummary } from '@/types/sessionTracing'
+import type { TracingPageItem, TracingSummary } from './types'
 
 defineProps<{
   summary: TracingSummary | null

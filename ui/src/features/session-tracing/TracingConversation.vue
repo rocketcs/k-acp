@@ -3,8 +3,8 @@ import { computed } from 'vue'
 import { CopyOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import type { TracingDetail, TracingRaw } from '@/types/sessionTracing'
-import { formatTracingUserLabel } from '@/utils/sessionTracing'
+import type { TracingDetail, TracingRaw } from './types'
+import { formatTracingUserLabel } from './utils'
 
 export type TracingDetailTab = 'conversation' | 'trace' | 'raw'
 
@@ -49,11 +49,31 @@ async function copyConversation(): Promise<void> {
     )
     .join('\n\n')
   try {
-    await navigator.clipboard.writeText(text)
+    await copyText(text)
     await message.success('对话已复制')
   } catch {
     await message.error('复制失败')
   }
+}
+
+/** 复制文本：优先 Clipboard API，非安全上下文（http LAN）降级为 execCommand */
+async function copyText(text: string): Promise<void> {
+  if (typeof navigator !== 'undefined' && navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.top = '-1000vh'
+  textarea.style.left = '-1000vw'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  const ok = document.execCommand('copy')
+  textarea.remove()
+  if (!ok) throw new Error('copy failed')
 }
 </script>
 
@@ -192,10 +212,15 @@ async function copyConversation(): Promise<void> {
   letter-spacing: 0;
 }
 
+.detail-heading > div {
+  min-width: 0;
+}
+
 .detail-heading p {
   margin: 5px 0 0;
   color: #667085;
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .icon-button {
@@ -207,6 +232,11 @@ async function copyConversation(): Promise<void> {
 .detail-tabs {
   min-width: 0;
   margin-top: 8px;
+}
+
+.detail-tabs :deep(.ant-tabs-content-holder) {
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
 }
 
 .turn-list {
@@ -336,7 +366,6 @@ async function copyConversation(): Promise<void> {
 
 .raw-sections pre {
   max-width: 100%;
-  max-height: 420px;
   overflow: auto;
   margin: 0;
   padding: 12px;

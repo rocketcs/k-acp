@@ -5,8 +5,8 @@ import type {
   TracingPageItem,
   TracingResultStatus,
   TracingUser,
-} from '@/types/sessionTracing'
-import { formatTracingUserLabel, tracingStatusTone } from '@/utils/sessionTracing'
+} from './types'
+import { formatTracingUserLabel, tracingStatusTone } from './utils'
 
 defineProps<{
   users: TracingUser[]

@@ -7,7 +7,7 @@ import type {
   TracingRaw,
   TracingSummary,
   TracingUser,
-} from '@/types/sessionTracing'
+} from '@/features/session-tracing/types'
 
 export function getTracingUsers() {
   return request.get<ApiResponse<TracingUser[]>>('/api/langfuse/session-tracing/users')

@@ -10,9 +10,9 @@ import {
 } from '@/api/sessionTracing'
 import TracingConversation, {
   type TracingDetailTab,
-} from '@/components/session-tracing/TracingConversation.vue'
-import TracingInspector from '@/components/session-tracing/TracingInspector.vue'
-import TracingSessionList from '@/components/session-tracing/TracingSessionList.vue'
+} from '@/features/session-tracing/TracingConversation.vue'
+import TracingInspector from '@/features/session-tracing/TracingInspector.vue'
+import TracingSessionList from '@/features/session-tracing/TracingSessionList.vue'
 import type { PageResult } from '@/types'
 import type {
   TracingDetail,
@@ -21,7 +21,7 @@ import type {
   TracingResultStatus,
   TracingSummary,
   TracingUser,
-} from '@/types/sessionTracing'
+} from '@/features/session-tracing/types'
 
 const PAGE_SIZE = 20
 const emptyPage = (): PageResult<TracingPageItem> => ({
@@ -303,7 +303,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .tracing-page {
-  min-height: 100dvh;
+  min-height: calc(100vh - 20px);
   padding: 20px;
   color: #1f2329;
   background: #f5f6f8;
