@@ -14,7 +14,8 @@ ARG VITE_APP_CONTEXT_PATH=/web
 ENV VITE_APP_BASE_API=${VITE_APP_BASE_API}
 ENV VITE_APP_CONTEXT_PATH=${VITE_APP_CONTEXT_PATH}
 ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com \
-    npm_config_registry=https://registry.npmmirror.com
+    npm_config_registry=https://registry.npmmirror.com \
+    NODE_OPTIONS=--max-old-space-size=4096
 
 # 安装 pnpm
 RUN corepack enable && corepack prepare pnpm@9.4.0 --activate

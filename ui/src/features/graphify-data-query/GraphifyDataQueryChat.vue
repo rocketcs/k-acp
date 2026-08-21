@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import Chat from '@/views/Chat/index.vue'
+import AgentRunActivity from '@/components/chat/AgentRunActivity.vue'
 import * as agentApi from '@/api/agent'
-import { ShareAltOutlined } from '@ant-design/icons-vue'
-import GraphifyAssistantMessage from './GraphifyAssistantMessage.vue'
+import { MedicineBoxOutlined, ShareAltOutlined } from '@ant-design/icons-vue'
 import GraphifyGraphView from './GraphifyGraphView.vue'
+import { parseGraphifyEvidence } from './evidenceAdapter'
 import { buildSessionEvidence } from './sessionEvidence'
-import { splitAssistantContent } from './tablePlacement'
-import type { ChatMessageVO, ChatMessagePresentation, ChatMessagePresentationInput } from '@/types'
+import type { ChatMessageVO, ChatMessagePresentation, ChatMessagePresentationInput, RunActivity } from '@/types'
 import type { TurnEvidence } from './turnEvidence'
 
 const GRAPHIFY_DATA_QUERY_AGENT_CODE = 'default-graphify-data-query'
@@ -28,8 +28,66 @@ const latestEvidence = ref<TurnEvidence | null>(null)
 const graphViewOpen = ref(false)
 const chatRef = ref<{
   submitExternalSubmission: (submission: GraphifyChatSubmission) => Promise<boolean>
+  abortRun: () => void
 } | null>(null)
 const quickSending = ref(false)
+
+/** 仅保存完整的已执行查询结果；预检、语义上下文和普通工具结果不进入会话结果表。 */
+function persistableGraphifyToolResult({ content }: { content: string }): string | null {
+  return parseGraphifyEvidence('', content) ? content : null
+}
+
+/** 查询流程活动（业务标签，替代原始工具调用条），供 AgentRunActivity 以参考样式呈现。 */
+const queryFlowActivities = ref<RunActivity[]>([])
+const queryFlowStartedAt = ref<number | null>(null)
+const queryFlowRunning = ref(false)
+
+/** MCP 工具名 → 业务阶段标签；不在表内的工具按「其他处理」折叠，不占步骤。 */
+const QUERY_FLOW_LABEL: Record<string, string> = {
+  semantic_context: '语义解析',
+  query_preflight: '查询预检',
+  wren_query_preflight: '查询预检',
+  query: '执行查询',
+  run_template_query: '执行查询',
+  wren_query: '执行查询',
+  list_datasets: '定位数据集',
+  describe_dataset: '定位数据集',
+}
+
+/** 把工具执行活动转化为业务化的查询流程摘要（隐藏原始工具参数/JSON）。 */
+function handleToolCallActivity(t: { toolName: string; status: 'running' | 'completed' | 'failed' }) {
+  const label = QUERY_FLOW_LABEL[t.toolName]
+  if (!label) return
+  // 新的一轮：上一轮已结束（未在运行）且又出现新的 running 活动时，重置列表并记录起始时间。
+  if (t.status === 'running' && !queryFlowRunning.value) {
+    queryFlowActivities.value = []
+    queryFlowStartedAt.value = Date.now()
+  }
+  if (t.status === 'failed') {
+    queryFlowRunning.value = false
+    const failed = queryFlowActivities.value.find((a) => a.id === label)
+    if (failed) { failed.status = 'failed'; failed.elapsed = Date.now() - failed.startTime }
+    return
+  }
+  // 新步骤启动：将此前运行中的步骤置为完成。
+  queryFlowActivities.value.forEach((a) => {
+    if (a.status === 'running') { a.status = 'completed'; a.elapsed = Date.now() - a.startTime }
+  })
+  let step = queryFlowActivities.value.find((a) => a.id === label)
+  if (!step) {
+    step = { id: label, name: label, status: t.status === 'running' ? 'running' : 'completed', startTime: Date.now() }
+    queryFlowActivities.value.push(step)
+  } else {
+    step.status = t.status === 'running' ? 'running' : 'completed'
+    if (t.status === 'completed') step.elapsed = Date.now() - step.startTime
+  }
+  queryFlowRunning.value = t.status === 'running'
+}
+
+/** 停止本次查询运行（查询流程卡上的「停止处理」）。 */
+function handleStopQuery() {
+  chatRef.value?.abortRun?.()
+}
 
 function onSessionMessagesChanged({ messages }: { sessionId: string | null; messages: readonly ChatMessageVO[] }) {
   evidenceByMessageId.value = buildSessionEvidence(messages)
@@ -38,34 +96,40 @@ function onSessionMessagesChanged({ messages }: { sessionId: string | null; mess
   latestEvidence.value = latestAssistant ? evidenceByMessageId.value[String(latestAssistant.id)] ?? null : null
 }
 
-// 空状态快捷问题池：覆盖药品/耗材/服务/诊疗各域的随机高质量问题池。
+// 空状态快捷问题池：覆盖真实药品、耗材和医疗服务目录的随机问题池。
 const QUICK_QUESTIONS: readonly string[] = [
-  '查询医保支付类别为甲类的药品目录',
-  '查询药名含“阿莫西林”的药品及生产企业',
-  '列出医保支付类别为乙类的药品及最高价格',
-  '查询医保通用名为“布洛芬”的药品记录',
-  '查询名称含“胰岛素”的药品及其生产企业',
-  '查询有效期内的高血压用药目录',
-  '按生产企业查询感冒类药品目录',
-  '查询医保支付类别为丙类的药品及最高价格',
-  '查询名称含“一次性”的耗材目录及自付比例',
-  '列出医保支付类别为乙类的耗材及最高限额',
-  '查询某耗材企业的注册备案号与材质信息',
-  '查询名称含“导管”的耗材及其管理类别',
-  '查询名称含“口罩”的耗材及自付比例',
-  '查询名称含“支架”的高值耗材及最高限额',
-  '查询名称含“康复”的医疗服务项目及支付类别',
-  '列出医疗服务项目的最省级一档最高限额',
-  '查询名称含“透析”的医疗服务及最高限额',
-  '查询名称含“检查”的诊疗项目及其价格',
-  '统计药品目录中一共收录了多少条记录',
-  '按注册备案号查询某耗材的完整目录详情',
-  '查询自付比例为 20% 的医疗服务项目',
-  '查询名称含“采样”的耗材目录及医用支付类别',
-  '查询最近新生效（2026-03-10 起）的目录记录',
-  '列出支付类别为丙类的医疗服务项目',
+  '查询“复方氯己定含漱液”的生产企业和规格',
+  '查询“聚维酮碘含漱液”的生产企业和规格',
+  '查询“西吡氯铵含漱液”的支付类别、最高价格和价格口径',
+  '查询“氯己定苯佐卡因含片”的规格和生产企业',
+  '查询“西地碘含片”的支付类别、最高价格和价格口径',
+  '查询“复方氢氧化铝片”的生产企业和规格',
+  '查询生产企业为“杭州民生药业股份有限公司”的药品名称和规格',
+  '查询甲类药品的名称、生产企业、最高价格和价格口径',
+  '查询乙类药品的名称、规格和生产企业',
+  '查询药品目录的最高价格和价格口径',
+  '查询“覆膜气管支架”的分类、材质和生产企业',
+  '查询“一次性使用支气管定位支架”的材质、生产企业和支付类别',
+  '查询“镍钛记忆合金自扩张式医用内支架(气道支架)”的分类和生产企业',
+  '查询“气管支架”的材质、生产企业和支付类别',
+  '查询呼吸介入材料的目录名称、材质和生产企业',
+  '查询非血管介入治疗类材料的二级分类和支付类别',
+  '查询材质为不锈钢的耗材名称、分类和生产企业',
+  '查询材质为合金的耗材名称、分类和生产企业',
+  '查询乙类耗材的名称、二级分类和生产企业',
+  '查询耗材目录的一级分类、二级分类和支付类别',
+  '查询“互联网首诊（普通医师）”的支付类别和省级一档最高限额',
+  '查询“互联网首诊(副主任医师)”的支付类别和省级一档最高限额',
+  '查询“互联网首诊(主任医师)”的支付类别和省级一档最高限额',
+  '查询不同医师级别的互联网首诊项目和最高限额',
+  '查询“门诊诊查费（普通门诊）”的支付类别和自付比例',
+  '查询政策号为“豫医保办〔2025〕51号”的医疗服务项目',
+  '查询甲类医疗服务项目的名称、自付比例和最高限额',
+  '查询丙类医疗服务项目的名称、自付比例和最高限额',
+  '查询名称含“诊查”的医疗服务项目和支付类别',
+  '查询医疗服务项目的自付比例和省级一档最高限额',
 ]
-/** 每次进入空状态随机取 16 条、乱序。 */
+/** 每次进入空状态随机取 8 条、乱序。 */
 const quickQuestions = ref<string[]>([])
 
 function shuffle<T>(list: readonly T[]): T[] {
@@ -78,7 +142,7 @@ function shuffle<T>(list: readonly T[]): T[] {
 }
 
 function initializeQuickQuestions() {
-  quickQuestions.value = shuffle(QUICK_QUESTIONS).slice(0, 16)
+  quickQuestions.value = shuffle(QUICK_QUESTIONS).slice(0, 8)
 }
 
 async function sendQuickQuestion(question: string) {
@@ -97,40 +161,25 @@ async function sendQuickQuestion(question: string) {
 }
 
 const showQuickQuestions = computed(() => Boolean(agentId.value) && !hasMessages.value)
+/** 只有最近一次查询实际返回业务记录时，才提供图谱入口。 */
+const canViewLatestGraph = computed(() => Boolean(latestEvidence.value?.evidence?.result.rows.length))
 
-/** 剔除 [[data-table]] 占位符，避免普通 chat 气泡里出现字面占位符。 */
+/** 助手消息完整渲染（数据即正文 Markdown 表格/详情，不剔除任何内容）。 */
 function messageDisplayAdapter(input: { role: string; content: string }): string {
   if (input.role === 'assistant') return assistantBody(input.content)
   return input.content
 }
 
-/** 助手正文：剔除 [[data-table]] 占位符（普通 chat 气泡/流式都不应出现字面占位符）。 */
+/** 助手正文原样渲染：数据以 Markdown 表格/详情直接呈现在正文里，不做截断、不剔除占位符。 */
 function assistantBody(content: string): string {
-  return splitAssistantContent(content).before
+  return content
 }
 
 /**
- * 助手回答的展示适配：有语义依据的非流式回答以自定义组件渲染
- * （正文 markdown + 内联数据表 + 可折叠语义依据）；其余保持普通 markdown。
+ * 医药问数只以助手保存的 Markdown 正文作为结果表面，正文即完整数据（表格/详情）。
  */
 function messagePresentationAdapter(input: ChatMessagePresentationInput): ChatMessagePresentation {
-  if (input.role !== 'assistant' || input.isStreaming) {
-    return { kind: 'markdown', content: assistantBody(input.content) }
-  }
-  const turn = evidenceByMessageId.value[input.id]
-  if (!turn) {
-    return { kind: 'markdown', content: assistantBody(input.content) }
-  }
-  return {
-    kind: 'custom',
-    component: GraphifyAssistantMessage,
-    props: {
-      content: input.content,
-      isStreaming: false,
-      evidence: turn.evidence,
-      outcome: turn.outcome,
-    },
-  }
+  return { kind: 'markdown', content: assistantBody(input.content) }
 }
 
 async function loadAgent() {
@@ -142,14 +191,14 @@ async function loadAgent() {
     const agents = (response.data?.data?.records ?? []).filter((item) => item.agentCode === GRAPHIFY_DATA_QUERY_AGENT_CODE)
     if (agents.length > 1) throw new Error('Duplicate default-graphify-data-query agents')
     if (!agents[0]) {
-      loadError.value = '医药问数助手尚未配置或未启用'
+      loadError.value = '医保问数助手尚未配置或未启用'
       return
     }
     agentId.value = String(agents[0].id)
   } catch (error) {
     loadError.value = error instanceof Error && error.message.includes('Duplicate')
-      ? '检测到重复的医药问数助手，请联系管理员处理'
-      : '医药问数助手加载失败，请稍后重试'
+      ? '检测到重复的医保问数助手，请联系管理员处理'
+      : '医保问数助手加载失败，请稍后重试'
   } finally {
     loading.value = false
   }
@@ -170,15 +219,26 @@ watch(showQuickQuestions, (show) => {
       class="graphify-data-query-chat"
       :chat-agent-id="agentId"
       :show-account="true"
-      :force-tool-process-active="true"
       :message-display-adapter="messageDisplayAdapter"
       :message-presentation-adapter="messagePresentationAdapter"
       :on-session-messages-changed="onSessionMessagesChanged"
+      :on-tool-call-activity="handleToolCallActivity"
+      :hide-tool-messages="true"
+      :tool-result-persistence-adapter="persistableGraphifyToolResult"
     />
 
-    <!-- 空状态快捷问题：16 个高质量问题胶囊，整齐两列排布（无整块表格容器） -->
+    <!-- 查询流程摘要：参考标书智能体运行效果，用 AgentRunActivity 呈现业务化查询流程。 -->
+    <div v-if="queryFlowRunning" class="graphify-query-flow" aria-live="polite" role="status" aria-label="查询过程">
+      <AgentRunActivity :activities="queryFlowActivities" :started-at="queryFlowStartedAt" @abort="handleStopQuery" />
+    </div>
+
+    <!-- 空状态快捷问题：业务引导与自适应换行的胶囊问题。 -->
     <div v-if="showQuickQuestions" class="graphify-quick-pills" aria-label="快捷问题">
-      <span class="graphify-quick-caption">试试这些问题</span>
+      <div class="graphify-quick-intro">
+        <MedicineBoxOutlined class="graphify-quick-intro-icon" aria-hidden="true" />
+        <h2>从业务问题开始</h2>
+        <p>选择一个快捷问题，快速查看结构化表格数据。</p>
+      </div>
       <div class="graphify-quick-pills-list">
         <button v-for="(question, i) in quickQuestions" :key="`${i}-${question}`" type="button"
           class="graphify-quick-pill" :disabled="quickSending" @click="sendQuickQuestion(question)">
@@ -187,17 +247,17 @@ watch(showQuickQuestions, (show) => {
       </div>
     </div>
 
-    <!-- 知识图谱查看入口 -->
-    <button v-if="agentId" type="button" class="graphify-graph-entry" title="查看知识图谱" :aria-label="`查看知识图谱（${latestEvidence ? '最近一次查询' : '暂无查询'}）`"
+    <!-- 最近查询的证据图谱入口：定位在输入框上方。 -->
+    <button v-if="canViewLatestGraph" type="button" class="graphify-graph-entry" title="查看最近查询图谱" aria-label="查看最近查询图谱"
       @click="graphViewOpen = true">
       <ShareAltOutlined />
-      <span>知识图谱</span>
+      <span>最近查询图谱</span>
     </button>
 
     <GraphifyGraphView :open="graphViewOpen" :evidence="latestEvidence?.evidence" @close="graphViewOpen = false" />
   </section>
   <main v-else class="graphify-route-state" aria-live="polite">
-    <ASpin v-if="loading" tip="正在加载医药问数助手…" />
+    <ASpin v-if="loading" tip="正在加载医保问数助手…" />
     <section v-else>
       <p>{{ loadError }}</p>
       <AButton type="primary" @click="loadAgent">重新加载</AButton>
@@ -229,49 +289,113 @@ watch(showQuickQuestions, (show) => {
 }
 
 .graphify-data-query-chat-shell {
+  --graphify-composer-bottom: clamp(32px, 5vh, 72px);
+
   position: relative;
   min-width: 0;
   height: 100%;
 }
 
-/* 空状态快捷问题：深浅蓝边框圆角胶囊，整齐两列排布（无整块表格容器） */
+/* 查询流程摘要卡：业务化步骤，隐藏原始工具调用/SQL。 */
+/* 查询流程摘要卡：定位容器；AgentRunActivity 自带脉动圆点/标题/计时/停止/查看进度样式。 */
+.graphify-query-flow {
+  position: absolute;
+  z-index: 21;
+  top: clamp(84px, 14vh, 160px);
+  left: calc(50% + 130px);
+  transform: translateX(-50%);
+  width: min(960px, calc(100% - 48px));
+  pointer-events: auto;
+}
+
+@media (max-width: 900px) {
+  .graphify-query-flow {
+    left: 50%;
+    width: min(760px, calc(100% - 32px));
+  }
+}
+
+/* 此路由已有业务引导，隐藏 Chat 通用欢迎文案，并将输入区停靠在底部。 */
+:deep(.graphify-data-query-chat .chat-welcome) {
+  padding: 0 32px;
+  justify-content: flex-end;
+}
+
+:deep(.graphify-data-query-chat .chat-welcome-title),
+:deep(.graphify-data-query-chat .chat-welcome-desc) {
+  display: none;
+}
+
+:deep(.graphify-data-query-chat .chat-welcome-input) {
+  margin-top: 0;
+  margin-bottom: var(--graphify-composer-bottom);
+}
+
+/* 空状态快捷问题：居中业务引导与自适应换行的圆角胶囊。 */
 .graphify-quick-pills {
   position: absolute;
   z-index: 20;
-  top: 13%;
+  top: clamp(96px, 13vh, 156px);
   left: calc(50% + 130px);
   transform: translateX(-50%);
-  width: min(780px, 92%);
+  width: min(1000px, calc(100% - 64px));
+  pointer-events: none;
 }
 
-.graphify-quick-caption {
-  display: block;
-  margin-bottom: 14px;
-  color: #667b8e;
-  font-size: 13px;
-  font-weight: 600;
+.graphify-quick-intro {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin-bottom: 40px;
   text-align: center;
 }
 
+.graphify-quick-intro-icon {
+  color: #5d7991;
+  font-size: 24px;
+}
+
+.graphify-quick-intro h2,
+.graphify-quick-intro p {
+  margin: 0;
+}
+
+.graphify-quick-intro h2 {
+  color: #30343c;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.graphify-quick-intro p {
+  color: #71879b;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
 .graphify-quick-pills-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px 14px;
 }
 
 .graphify-quick-pill {
-  padding: 11px 16px;
-  border: 1px solid #bcd9ec;
+  flex: 0 0 auto;
+  max-width: 100%;
+  padding: 9px 18px;
+  border: 1px solid #bdd9ee;
   border-radius: 999px;
-  background: rgb(255 255 255 / 96%);
-  color: #2c6fa8;
-  font-size: 13px;
+  background: rgb(247 251 255 / 94%);
+  color: #2f6fa8;
+  font-size: 15px;
   line-height: 1.5;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
   box-shadow: 0 1px 4px rgb(31 58 58 / 6%);
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
   overflow-wrap: anywhere;
+  pointer-events: auto;
 }
 
 .graphify-quick-pill:hover:not(:disabled) {
@@ -286,12 +410,13 @@ watch(showQuickQuestions, (show) => {
   opacity: 0.55;
 }
 
-/* 知识图谱查看入口（主列左下、输入区上方） */
+/* 最近查询的证据图谱入口（输入区上方）。 */
 .graphify-graph-entry {
   position: absolute;
   z-index: 20;
-  left: 276px;
-  bottom: 118px;
+  left: calc(50% + min(130px, 12vw));
+  bottom: calc(var(--graphify-composer-bottom) + 88px);
+  transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -308,23 +433,36 @@ watch(showQuickQuestions, (show) => {
 }
 
 .graphify-graph-entry:hover {
-  transform: translateY(-1px);
+  transform: translateX(-50%) translateY(-1px);
   border-color: #69a7d4;
   background: #eaf4fb;
 }
 
 @media (max-width: 900px) {
+  :deep(.graphify-data-query-chat .chat-welcome) {
+    padding: 0 16px;
+  }
+
   .graphify-quick-pills {
     left: 50%;
-    top: 12%;
-    width: min(660px, 94%);
+    width: min(760px, calc(100% - 32px));
+  }
+
+  .graphify-quick-intro {
+    margin-bottom: 28px;
+  }
+
+  .graphify-quick-intro h2 {
+    font-size: 24px;
+  }
+
+  .graphify-quick-intro p {
+    font-size: 15px;
+  }
+
+  .graphify-graph-entry {
+    left: 50%;
   }
 }
 
-@media (max-width: 680px) {
-  .graphify-graph-entry {
-    left: 16px;
-    bottom: 96px;
-  }
-}
 </style>
