@@ -31,6 +31,9 @@ export function persistTurnEvidence(messageId: string, turn: TurnEvidence) {
 }
 
 function parseSavedToolResult(content: string): TurnEvidence | null {
+  const directEvidence = parseGraphifyEvidence('', content)
+  if (directEvidence) return { evidence: directEvidence }
+
   try {
     const saved: unknown = JSON.parse(content)
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return null

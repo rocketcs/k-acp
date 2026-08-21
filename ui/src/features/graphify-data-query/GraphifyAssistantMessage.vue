@@ -7,7 +7,7 @@ import { splitAssistantContent } from './tablePlacement'
 import type { GraphifyEvidenceEnvelope, GraphifyToolOutcome } from './types'
 
 /**
- * 医药问数助手回答的普通 chat 展示：正文 markdown + 内联数据表 + 可折叠语义依据。
+ * 医保问数助手回答的普通 chat 展示：正文 markdown + 内联数据表 + 可折叠语义依据。
  * 由 messagePresentationAdapter 的 kind:'custom' 分支渲染（替代默认 markdown 气泡内容）。
  */
 const props = defineProps<{

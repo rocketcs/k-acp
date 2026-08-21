@@ -85,7 +85,7 @@ const edgeCount = computed(() => props.evidence?.evidence.edges.length ?? 0)
           </template>
           <div v-else class="graphify-graph-view-empty">
             <ShareAltOutlined />
-            <p>暂无知识图谱。请先提出一个医药问数问题，查询完成后即可查看结果图谱。</p>
+            <p>暂无知识图谱。请先提出一个医保问数问题，查询完成后即可查看结果图谱。</p>
           </div>
         </div>
       </div>

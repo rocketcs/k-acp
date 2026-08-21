@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import Chat from '@/views/Chat/index.vue'
-import AgentRunActivity from '@/components/chat/AgentRunActivity.vue'
 import * as agentApi from '@/api/agent'
 import { MedicineBoxOutlined, ShareAltOutlined } from '@ant-design/icons-vue'
 import GraphifyGraphView from './GraphifyGraphView.vue'
@@ -28,7 +27,6 @@ const latestEvidence = ref<TurnEvidence | null>(null)
 const graphViewOpen = ref(false)
 const chatRef = ref<{
   submitExternalSubmission: (submission: GraphifyChatSubmission) => Promise<boolean>
-  abortRun: () => void
 } | null>(null)
 const quickSending = ref(false)
 
@@ -39,8 +37,6 @@ function persistableGraphifyToolResult({ content }: { content: string }): string
 
 /** 查询流程活动（业务标签，替代原始工具调用条），供 AgentRunActivity 以参考样式呈现。 */
 const queryFlowActivities = ref<RunActivity[]>([])
-const queryFlowStartedAt = ref<number | null>(null)
-const queryFlowRunning = ref(false)
 
 /** MCP 工具名 → 业务阶段标签；不在表内的工具按「其他处理」折叠，不占步骤。 */
 const QUERY_FLOW_LABEL: Record<string, string> = {
@@ -50,6 +46,7 @@ const QUERY_FLOW_LABEL: Record<string, string> = {
   query: '执行查询',
   run_template_query: '执行查询',
   wren_query: '执行查询',
+  evidence_subgraph: '查询知识图谱',
   list_datasets: '定位数据集',
   describe_dataset: '定位数据集',
 }
@@ -58,13 +55,7 @@ const QUERY_FLOW_LABEL: Record<string, string> = {
 function handleToolCallActivity(t: { toolName: string; status: 'running' | 'completed' | 'failed' }) {
   const label = QUERY_FLOW_LABEL[t.toolName]
   if (!label) return
-  // 新的一轮：上一轮已结束（未在运行）且又出现新的 running 活动时，重置列表并记录起始时间。
-  if (t.status === 'running' && !queryFlowRunning.value) {
-    queryFlowActivities.value = []
-    queryFlowStartedAt.value = Date.now()
-  }
   if (t.status === 'failed') {
-    queryFlowRunning.value = false
     const failed = queryFlowActivities.value.find((a) => a.id === label)
     if (failed) { failed.status = 'failed'; failed.elapsed = Date.now() - failed.startTime }
     return
@@ -81,12 +72,18 @@ function handleToolCallActivity(t: { toolName: string; status: 'running' | 'comp
     step.status = t.status === 'running' ? 'running' : 'completed'
     if (t.status === 'completed') step.elapsed = Date.now() - step.startTime
   }
-  queryFlowRunning.value = t.status === 'running'
 }
 
-/** 停止本次查询运行（查询流程卡上的「停止处理」）。 */
-function handleStopQuery() {
-  chatRef.value?.abortRun?.()
+/** 每轮运行开始时清空业务步骤，供消息流内的运行状态卡展示。 */
+function handleRunStateChanged(isRunning: boolean) {
+  if (isRunning) {
+    queryFlowActivities.value = []
+  }
+}
+
+/** 仅将医保问数的工具过程映射为业务步骤，状态卡仍由 Chat 消息流就近渲染。 */
+function adaptQueryFlowActivities(_activities: readonly RunActivity[]): RunActivity[] {
+  return queryFlowActivities.value
 }
 
 function onSessionMessagesChanged({ messages }: { sessionId: string | null; messages: readonly ChatMessageVO[] }) {
@@ -96,7 +93,7 @@ function onSessionMessagesChanged({ messages }: { sessionId: string | null; mess
   latestEvidence.value = latestAssistant ? evidenceByMessageId.value[String(latestAssistant.id)] ?? null : null
 }
 
-// 空状态快捷问题池：覆盖真实药品、耗材和医疗服务目录的随机问题池。
+// 空状态快捷问题池：覆盖真实药品、耗材和医保服务目录的随机问题池。
 const QUICK_QUESTIONS: readonly string[] = [
   '查询“复方氯己定含漱液”的生产企业和规格',
   '查询“聚维酮碘含漱液”的生产企业和规格',
@@ -123,11 +120,11 @@ const QUICK_QUESTIONS: readonly string[] = [
   '查询“互联网首诊(主任医师)”的支付类别和省级一档最高限额',
   '查询不同医师级别的互联网首诊项目和最高限额',
   '查询“门诊诊查费（普通门诊）”的支付类别和自付比例',
-  '查询政策号为“豫医保办〔2025〕51号”的医疗服务项目',
-  '查询甲类医疗服务项目的名称、自付比例和最高限额',
-  '查询丙类医疗服务项目的名称、自付比例和最高限额',
-  '查询名称含“诊查”的医疗服务项目和支付类别',
-  '查询医疗服务项目的自付比例和省级一档最高限额',
+  '查询政策号为“豫医保办〔2025〕51号”的医保服务项目',
+  '查询甲类医保服务项目的名称、自付比例和最高限额',
+  '查询丙类医保服务项目的名称、自付比例和最高限额',
+  '查询名称含“诊查”的医保服务项目和支付类别',
+  '查询医保服务项目的自付比例和省级一档最高限额',
 ]
 /** 每次进入空状态随机取 8 条、乱序。 */
 const quickQuestions = ref<string[]>([])
@@ -176,7 +173,7 @@ function assistantBody(content: string): string {
 }
 
 /**
- * 医药问数只以助手保存的 Markdown 正文作为结果表面，正文即完整数据（表格/详情）。
+ * 医保问数只以助手保存的 Markdown 正文作为结果表面，正文即完整数据（表格/详情）。
  */
 function messagePresentationAdapter(input: ChatMessagePresentationInput): ChatMessagePresentation {
   return { kind: 'markdown', content: assistantBody(input.content) }
@@ -223,14 +220,13 @@ watch(showQuickQuestions, (show) => {
       :message-presentation-adapter="messagePresentationAdapter"
       :on-session-messages-changed="onSessionMessagesChanged"
       :on-tool-call-activity="handleToolCallActivity"
+      :on-run-state-changed="handleRunStateChanged"
+      :run-activity-adapter="adaptQueryFlowActivities"
+      run-activity-placement="after-latest-user"
+      :force-run-activity="true"
       :hide-tool-messages="true"
       :tool-result-persistence-adapter="persistableGraphifyToolResult"
     />
-
-    <!-- 查询流程摘要：参考标书智能体运行效果，用 AgentRunActivity 呈现业务化查询流程。 -->
-    <div v-if="queryFlowRunning" class="graphify-query-flow" aria-live="polite" role="status" aria-label="查询过程">
-      <AgentRunActivity :activities="queryFlowActivities" :started-at="queryFlowStartedAt" @abort="handleStopQuery" />
-    </div>
 
     <!-- 空状态快捷问题：业务引导与自适应换行的胶囊问题。 -->
     <div v-if="showQuickQuestions" class="graphify-quick-pills" aria-label="快捷问题">
@@ -294,25 +290,6 @@ watch(showQuickQuestions, (show) => {
   position: relative;
   min-width: 0;
   height: 100%;
-}
-
-/* 查询流程摘要卡：业务化步骤，隐藏原始工具调用/SQL。 */
-/* 查询流程摘要卡：定位容器；AgentRunActivity 自带脉动圆点/标题/计时/停止/查看进度样式。 */
-.graphify-query-flow {
-  position: absolute;
-  z-index: 21;
-  top: clamp(84px, 14vh, 160px);
-  left: calc(50% + 130px);
-  transform: translateX(-50%);
-  width: min(960px, calc(100% - 48px));
-  pointer-events: auto;
-}
-
-@media (max-width: 900px) {
-  .graphify-query-flow {
-    left: 50%;
-    width: min(760px, calc(100% - 32px));
-  }
 }
 
 /* 此路由已有业务引导，隐藏 Chat 通用欢迎文案，并将输入区停靠在底部。 */

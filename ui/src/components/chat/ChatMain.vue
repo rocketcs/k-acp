@@ -26,6 +26,8 @@ const props = defineProps<{
   messages: DisplayMessage[]
   toolCalls: any[]
   runActivities: RunActivity[]
+  runActivityPlacement?: 'tail' | 'after-latest-user'
+  forceRunActivity?: boolean
   isDiyChat: boolean
   hasVisibleAnswer: boolean
   runStartedAt: number | null
@@ -96,10 +98,10 @@ const workspaceFilePreviewNode = ref<FlatFileItem | null>(null)
 const welcomeRef = ref<InstanceType<typeof Welcome> | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const showRunActivity = computed(() =>
-  shouldShowRunActivity(props.isDiyChat, props.isRunning, props.hasVisibleAnswer),
+  props.forceRunActivity ? props.isRunning : shouldShowRunActivity(props.isDiyChat, props.isRunning, props.hasVisibleAnswer),
 )
 const showRunWaiting = computed(() =>
-  shouldShowRunWaiting(props.isDiyChat, props.isRunning, props.hasVisibleAnswer),
+  !props.forceRunActivity && shouldShowRunWaiting(props.isDiyChat, props.isRunning, props.hasVisibleAnswer),
 )
 const showInput = computed(() => shouldShowChatInput(props.isDiyChat, props.isRunning))
 
@@ -355,6 +357,7 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
             :tool-calls="toolCalls"
             :run-activities="runActivities"
             :is-diy-chat="isDiyChat"
+            :run-activity-placement="runActivityPlacement"
             :show-run-activity="showRunActivity"
             :show-run-waiting="showRunWaiting"
             :run-started-at="runStartedAt"

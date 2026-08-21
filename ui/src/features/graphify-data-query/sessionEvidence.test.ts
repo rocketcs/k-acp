@@ -55,6 +55,15 @@ test('maps a turn tool result to the following assistant message', () => {
   assert.equal(map['3']?.evidence?.question, 'q1')
 })
 
+test('restores a directly persisted executed result for the following assistant message', () => {
+  const map = buildSessionEvidence([
+    message({ id: 1, role: 'user', content: '查询药品' }),
+    message({ id: 2, role: 'tool', content: executedEnvelope('persisted-query') }),
+    message({ id: 3, role: 'assistant', content: '以下是结果' }),
+  ])
+  assert.equal(map['3']?.evidence?.question, 'persisted-query')
+})
+
 test('each assistant message only receives its own preceding tool result', () => {
   const map = buildSessionEvidence([
     toolMessage(1, executedEnvelope('q1')),

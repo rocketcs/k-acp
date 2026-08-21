@@ -33,6 +33,8 @@ export function useChatStream(
   onMessageSaved?: (chatMsg: ChatMessageVO) => void,
   options?: {
     onToolResult?: (event: { toolCallId: string; toolName: string; args: string; content: string; messageId: string }) => void
+    /** 特定路由用：以业务标签驱动「干净的查询流程摘要」，替代原始工具调用条。 */
+    onToolCallActivity?: (t: { toolName: string; status: 'running' | 'completed' | 'failed' }) => void
   }) {
 
   const { userInfo } = useAccountStore()
@@ -224,6 +226,8 @@ export function useChatStream(
         // 计划追踪：记录工具调用名称
         onPlanToolStart(e.toolCallId, e.toolCallName)
 
+        options?.onToolCallActivity?.({ toolName: e.toolCallName, status: 'running' })
+
         agentHasResult.value = true
         toolCallsInProgress.value = [
           ...toolCallsInProgress.value,
@@ -243,6 +247,8 @@ export function useChatStream(
         // 计划追踪：处理工具结果
         onPlanToolResult(e.toolCallId)
         const activeTool = toolCallsInProgress.value.find((item) => item.id === e.toolCallId)
+
+        options?.onToolCallActivity?.({ toolName: activeTool?.name ?? '', status: 'completed' })
 
         try {
           if (agentDetail.value?.agentCode === 'default-tender') {
@@ -380,6 +386,7 @@ export function useChatStream(
         agentHasResult.value = true
         finalizeStreamingMessage()
         appendTenderFallbackIfNeeded()
+        options?.onToolCallActivity?.({ toolName: '', status: 'failed' })
         runActivities.value = runActivities.value.map((activity) =>
           activity.status === 'running'
             ? { ...activity, status: 'failed', elapsed: Date.now() - activity.startTime }

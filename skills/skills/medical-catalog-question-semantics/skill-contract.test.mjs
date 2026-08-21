@@ -19,7 +19,7 @@ function present(document, needle) {
 test('skill explains question-to-semantic parsing', () => {
   present(skill, '已发布字段白名单')
   present(skill, 'insurance_category')
-  present(skill, 'get_by_registration_no')
+  present(skill, 'registration_no')
   present(skill, '语义依据与知识图谱')
   present(skill, 'MDL 结构展示')
 })
@@ -49,6 +49,13 @@ test('skill separates execution path from result subgraph', () => {
   assert.match(kg, /结果子图/)
   assert.match(kg, /Wren 语义层/)
   assert.match(kg, /PostgreSQL 数据源/)
-  assert.match(kg, /Neo4j 语义图谱/)
+  assert.match(kg, /Neo4j 证据子图/)
   assert.match(kg, /不得/)
+})
+
+test('skill requires a distinct Neo4j evidence step after non-empty fact results', () => {
+  const protocol = section(skill, '工具协议（执行顺序）')
+  assert.match(protocol, /evidence_subgraph\(dataset_id, trace_id\)/)
+  assert.match(protocol, /仅在 `query` 返回至少一条记录后调用/)
+  assert.match(protocol, /不改变 PostgreSQL 查询结果/)
 })

@@ -32,7 +32,6 @@ export type GraphifyEvidenceEnvelope = {
   execution_path?: {
     question: string
     intent: string
-    template_id: string | null
     stages: Array<{ step: string; system: string; title: string; detail: string; icon: string }>
     models: string[]
     columns: string[]

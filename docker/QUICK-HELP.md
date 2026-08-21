@@ -15,8 +15,8 @@ kacp help
 | 命令 | 参数 | 作用 | 是否构建镜像 | 是否操作数据容器 |
 |---|---|---|---:|---:|
 | `help` | 无 | 显示帮助 | 否 | 否 |
-| `build` | `--no-cache` 可选 | 构建 console、runtime、proxy、websocket、frontend 五个应用镜像 | 是 | 否 |
-| `rebuild` | `--no-cache` 可选 | 构建镜像并强制重建五个应用容器 | 是 | 否 |
+| `build` | `--no-cache`、服务名可选 | 构建指定应用镜像；不填服务名时构建全部五个 | 是 | 否 |
+| `rebuild` | `--no-cache`、服务名可选 | 构建镜像并强制重建指定应用容器；不填服务名时重建全部五个 | 是 | 否 |
 | `restart` | 服务名，可多个 | 重启已有应用容器，不重新构建 | 否 | 否 |
 | `start` | 无 | 启动完整本地栈，包括中间件和应用 | 镜像缺失时由 Compose 决定 | 是（启动） |
 | `stop` | 无 | 停止完整本地栈 | 否 | 是（停止） |
@@ -26,7 +26,7 @@ kacp help
 
 ## 应用服务参数
 
-`restart` 和 `logs` 使用下面的短名称：
+`build`、`rebuild`、`restart` 和 `logs` 使用下面的短名称：
 
 | 短名称 | Compose 服务 | 容器 |
 |---|---|---|
@@ -36,7 +36,7 @@ kacp help
 | `websocket` | `apboa-websocket` | `k-acp-websocket` |
 | `frontend` | `apboa-frontend` | `k-acp-frontend` |
 
-不传服务名时，`restart` 和 `logs` 默认作用于全部五个应用服务。
+不传服务名时，这些命令默认作用于全部五个应用服务。
 
 ## 常用命令
 
@@ -47,8 +47,14 @@ kacp help
 # 快速构建五个应用镜像
 kacp build
 
+# 只构建前端镜像
+kacp build frontend
+
 # 不使用构建缓存重新构建并重建应用容器
 kacp rebuild --no-cache
+
+# 只重新构建并重建前端容器
+kacp rebuild frontend
 
 # 重启全部应用容器
 kacp restart

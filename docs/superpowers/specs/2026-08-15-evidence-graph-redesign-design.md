@@ -1,8 +1,8 @@
-# 医疗目录问数智能体 · 右侧证据图谱语义展示优化设计
+# 医保目录问数智能体 · 右侧证据图谱语义展示优化设计
 
 > 状态：待用户审阅（2026-08-16）
 >
-> 范围：优化右侧“语义依据”中知识图谱相关的语义文案，并微调医疗目录语义 skill 与该智能体的本地执行 Prompt，使查询稳定带回可读的关系与来源证据。
+> 范围：优化右侧“语义依据”中知识图谱相关的语义文案，并微调医保目录语义 skill 与该智能体的本地执行 Prompt，使查询稳定带回可读的关系与来源证据。
 > 不在本次范围：页面布局、主题色、MDL 结构页、图谱布局/交互、Neo4j、MCP 证据契约。
 
 ## 1. 背景
@@ -35,7 +35,7 @@
 - 保持现有主题色、字体、背景和视觉语言不变；只复用现有绿色、青蓝、蓝灰和橙色语义色。
 - 不调整 MDL 结构 Tab，不变更其数据与文案。
 - 不改变节点、边、`semantic_context` 或来源记录的返回结构；不修改 Neo4j、MCP、Wren MDL 或后端。
-- 医疗目录语义 skill 和本地智能体执行 Prompt 只约束字段选择、模板执行和证据完整性；它们不生成面向用户的自由图谱文案。
+- 医保目录语义 skill 和本地智能体执行 Prompt 只约束字段选择、模板执行和证据完整性；它们不生成面向用户的自由图谱文案。
 - 不新增、猜测或补全业务事实；所有语句必须由当前 evidence envelope 的节点、边和来源信息推导。
 
 ## 3. 核心设计决策
@@ -118,7 +118,7 @@
 
 ## 5. 上游证据选择
 
-### 5.1 医疗目录语义 skill
+### 5.1 医保目录语义 skill
 
 在现有“字段落点”和“模板优先”规则之后，新增证据字段规则。语义解析的结果应包含 `evidence_columns`，其值必须来自已发布字段白名单，且是 `published_columns` 的子集。
 
@@ -136,7 +136,7 @@
 
 本地 `default-graphify-data-query` 智能体的执行 Prompt 增加以下硬规则：
 
-1. 涉及具体医疗目录事实时，必须执行 `run_template_query` 或经预检的 `query`，不能仅依据 `semantic_context` 回答。
+1. 涉及具体医保目录事实时，必须执行经 `query_preflight` 允许的 `query`（不使用任何预定义查询模板），不能仅依据 `semantic_context` 回答。
 2. 最终查询除回答字段外，必须投影 skill 给出的 `evidence_columns`。
 3. `catalog_name` 是业务主体；如结果缺少它，智能体不得声称返回记录具有可读关系。
 4. `source_record_id` 仅用于 MCP 生成证据节点或来源追溯，不在回答文本和业务图谱文案中直接展示。
@@ -148,7 +148,7 @@ Prompt 只控制工具调用和投影字段；面向用户的节点标题、关�
 
 ```text
 用户问题
-  → 医疗目录语义 skill（字段落点 + evidence_columns）
+  → 医保目录语义 skill（字段落点 + evidence_columns）
   → 智能体执行 Prompt（工具调用 + 最终字段投影）
   → 当前 evidence envelope（nodes / edges / 来源信息）
   → 关系展示适配层
@@ -184,7 +184,7 @@ Prompt 只控制工具调用和投影字段；面向用户的节点标题、关�
 | 数据忠实 | 所有文案可由原始 nodes/edges/来源字段反向验证；不新增事实 |
 | 视觉无回归 | 页面布局、主题色、MDL Tab、图谱交互和布局保持现状 |
 | 上游完整性 | 注册备案、企业、分类三类问题的最终投影均包含 `catalog_name`、关系字段和 `source_record_id` |
-| 工具纪律 | 具体目录事实必须有 `run_template_query` 或 `query` 的 executed evidence，不能由 `semantic_context` 直接作答 |
+| 工具纪律 | 具体目录事实必须有 `query` 的 executed evidence（经 `query_preflight` 允许），不能由 `semantic_context` 直接作答 |
 
 ## 9. 典型验收样例
 

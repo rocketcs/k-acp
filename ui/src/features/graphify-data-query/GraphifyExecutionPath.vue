@@ -17,7 +17,7 @@ const stagesToRender = computed(() => {
   if (p.stages?.length) return p.stages
   const cols = (p.columns ?? []).length
   return [
-    { step: 'agent', system: 'agent', title: 'Agent 语义分析', detail: `识别为医疗目录问题（${p.intent || '—'}）`, icon: 'analysis' },
+    { step: 'agent', system: 'agent', title: 'Agent 语义分析', detail: `识别为医保目录问题（${p.intent || '—'}）`, icon: 'analysis' },
     { step: 'wren_mdl', system: 'wren_mdl', title: 'Wren 语义层（MDL）', detail: `命中的业务模型：${(p.models ?? []).join('、') || 'medical_catalog'}；查询字段 ${cols} 个`, icon: 'mdl' },
     { step: 'postgres', system: 'postgres', title: 'PostgreSQL 数据源', detail: '查询位于统一目录视图 medical_catalog', icon: 'postgres' },
     { step: 'neo4j', system: 'neo4j', title: 'Neo4j 语义图谱', detail: '来源追溯与语义关联', icon: 'neo4j' },

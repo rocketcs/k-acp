@@ -1,10 +1,10 @@
 import type { GraphifyEvidenceEdge, GraphifyEvidenceEnvelope, GraphifyEvidenceNode, GraphifyToolOutcome } from './types'
 
-const FINAL_QUERY_TOOLS = new Set(['run_template_query', 'query'])
+const FINAL_QUERY_TOOLS = new Set(['query'])
 const OUTCOME_TOOLS = new Set([...FINAL_QUERY_TOOLS, 'query_preflight'])
 
 const DISPLAY_LABELS: Record<string, string> = {
-  medical_catalog: '医疗目录',
+  medical_catalog: '医保目录',
   catalog_code: '目录编码',
   catalog_name: '目录名称',
   catalog_domain: '目录领域',

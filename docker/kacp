@@ -43,8 +43,8 @@ usage() {
 
 命令：
   help                  显示命令、参数、服务和示例说明
-  build [--no-cache]    顺序构建五个应用镜像，不重建容器，不操作数据容器
-  rebuild [--no-cache]  顺序构建镜像并强制重建五个应用容器，完成后检查运行状态
+  build [--no-cache] [服务...]    顺序构建指定应用镜像，不重建容器，不操作数据容器
+  rebuild [--no-cache] [服务...]  顺序构建指定镜像并强制重建对应应用容器，完成后检查运行状态
   restart [服务...]     重启已有应用容器，不重新构建镜像
   start                 拉取缺失的数据镜像并启动完整本地容器栈
   stop                  停止完整本地容器栈，保留容器、数据卷和配置
@@ -52,13 +52,13 @@ usage() {
   logs [服务...]        查看应用日志，默认跟踪五个应用服务最近 200 行
   release [参数...]     调用发布脚本生成 x86_64 离线发布包
 
-服务简称（可用于 restart、logs）：
+服务简称（可用于 build、rebuild、restart、logs）：
   console               管理控制台服务
   runtime               AI 运行时服务
   proxy                 Shell 执行代理服务
   websocket             WebSocket 推送服务
   frontend              Nginx 前端服务
-  不填写服务名          restart、logs 默认作用于全部五个应用服务
+  不填写服务名          build、rebuild、restart、logs 默认作用于全部五个应用服务
 
 环境变量：
   KACP_ENV_FILE         指定 Compose 环境文件，默认为 docker/.env.kacp
@@ -75,8 +75,10 @@ usage() {
 
 示例：
   kacp build                         # 构建应用镜像
-  kacp build --no-cache               # 不使用缓存构建
+  kacp build --no-cache               # 不使用缓存构建全部应用镜像
+  kacp build frontend                 # 只构建前端镜像
   kacp rebuild                        # 构建并强制重建应用容器
+  kacp rebuild frontend               # 只构建并重建前端容器
   kacp restart frontend               # 只重启前端
   kacp logs runtime                    # 查看 runtime 日志
   kacp status                         # 查看完整栈状态
@@ -210,23 +212,45 @@ resolve_services() {
   done
 }
 
+resolve_build_arguments() {
+  local argument
+  local services=()
+  BUILD_OPTIONS=()
+
+  for argument in "$@"; do
+    case "$argument" in
+      --no-cache) BUILD_OPTIONS+=(--no-cache) ;;
+      --) die 'build、rebuild 不支持 -- 分隔符' ;;
+      -*) die "未知构建选项：$argument" ;;
+      *) services+=("$argument") ;;
+    esac
+  done
+
+  resolve_services "${services[@]}"
+}
+
 build_apps() {
   local service
 
+  resolve_build_arguments "$@"
   clean_source_build_artifacts
   printf '使用国内 Docker 镜像源构建应用镜像：%s\n' "$DOMESTIC_REGISTRY"
   ensure_base_images
-  for service in "${APP_SERVICES[@]}"; do
+  for service in "${SELECTED_SERVICES[@]}"; do
     printf '顺序构建应用镜像：%s\n' "$service"
-    compose build "$@" "$service"
+    if [[ -n "${BUILD_OPTIONS[0]:-}" ]]; then
+      compose build "${BUILD_OPTIONS[@]}" "$service"
+    else
+      compose build "$service"
+    fi
   done
 }
 
 rebuild_apps() {
   build_apps "$@"
-  compose up -d --no-deps --force-recreate "${APP_SERVICES[@]}"
-  wait_for_applications
-  compose ps "${APP_SERVICES[@]}"
+  compose up -d --no-deps --force-recreate "${SELECTED_SERVICES[@]}"
+  wait_for_applications "${SELECTED_SERVICES[@]}"
+  compose ps "${SELECTED_SERVICES[@]}"
 }
 
 wait_for_applications() {
@@ -236,11 +260,18 @@ wait_for_applications() {
   local running
   local service
   local all_running
+  local services=()
+
+  if [[ $# -eq 0 ]]; then
+    services=("${APP_SERVICES[@]}")
+  else
+    services=("$@")
+  fi
 
   for ((attempt = 1; attempt <= attempts; attempt++)); do
     running="$(compose ps --status running --services 2>/dev/null || true)"
     all_running=true
-    for service in "${APP_SERVICES[@]}"; do
+    for service in "${services[@]}"; do
       if ! grep -Fxq "$service" <<<"$running"; then
         all_running=false
         break
@@ -257,9 +288,9 @@ wait_for_applications() {
     fi
   done
 
-  compose ps -a "${APP_SERVICES[@]}" || true
+  compose ps -a "${services[@]}" || true
   printf '应用容器未能在 %s 秒内稳定运行，输出异常服务日志：\n' "$((attempts * interval))" >&2
-  for service in "${APP_SERVICES[@]}"; do
+  for service in "${services[@]}"; do
     if ! grep -Fxq "$service" <<<"$running"; then
       printf '\n--- %s ---\n' "$service" >&2
       compose logs --tail=80 "$service" >&2 || true
@@ -271,7 +302,7 @@ wait_for_applications() {
 restart_apps() {
   resolve_services "$@"
   compose restart "${SELECTED_SERVICES[@]}"
-  wait_for_applications
+  wait_for_applications "${SELECTED_SERVICES[@]}"
   compose ps "${SELECTED_SERVICES[@]}"
 }
 

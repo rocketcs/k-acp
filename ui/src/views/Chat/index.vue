@@ -13,7 +13,7 @@ import ChatSidebar from '@/components/chat/ChatSidebar.vue'
 import ChatMain from '@/components/chat/ChatMain.vue'
 import RenameModal from '@/components/chat/RenameModal.vue'
 import WorkspacePanel from '@/components/workspace/WorkspacePanel.vue'
-import type { DisplayMessage, ChatMessageVO, UploadedFileItem, ChatSessionVO, ChatMessagePresentation, ChatMessagePresentationInput } from '@/types'
+import type { DisplayMessage, ChatMessageVO, UploadedFileItem, ChatSessionVO, ChatMessagePresentation, ChatMessagePresentationInput, RunActivity } from '@/types'
 import type { ChatAttachmentPolicy } from '@/composables/chat/useChatAttachments'
 import * as chatSessionApi from '@/api/chatSession'
 import * as agentDiyApi from '@/api/agentDiy'
@@ -28,6 +28,7 @@ import type { DiyOutputFormat, DiyPageConfig } from '@/types'
 import { buildOutputInstruction } from '@/utils/diy/questionTemplate'
 import { prependChatAttachmentContent, splitChatAttachmentContent } from '@/utils/chat/messageContent'
 import { createRuntimeUserMessage } from '@/utils/chat/runtimeMessages'
+import { shouldDisplayChatMessage } from '@/utils/chat/messageVisibility'
 
 type ChatSubmissionInput = {
   text: string
@@ -48,6 +49,14 @@ type ChatMessageDisplayInput = {
   content: string
 }
 
+type ToolResultPersistenceInput = {
+  toolCallId: string
+  toolName: string
+  args: string
+  content: string
+  messageId: string
+}
+
 const props = withDefaults(defineProps<{
   showAccount: boolean
   chatAgentId: string | null | undefined
@@ -59,6 +68,20 @@ const props = withDefaults(defineProps<{
   attachmentAutoSubmitAdapter?: (input: ChatSubmissionInput & { uploadedFile: UploadedFileItem }) => ChatSubmission | null
   onAttachmentRemoved?: (file: UploadedFileItem) => void
   onSessionMessagesChanged?: (input: { sessionId: string | null; messages: readonly ChatMessageVO[] }) => void
+  /** 特定路由可只保留助手的最终回答，隐藏持久化的工具执行轨迹。 */
+  hideToolMessages?: boolean
+  /** 仅由特定路由使用：将满足其结果契约的工具返回写入当前会话，以便刷新后重建展示。 */
+  toolResultPersistenceAdapter?: (input: ToolResultPersistenceInput) => string | null
+  /** 特定路由用：把工具执行活动以业务标签回调出去，替代原始工具调用条。 */
+  onToolCallActivity?: (t: { toolName: string; status: 'running' | 'completed' | 'failed' }) => void
+  /** 特定路由用：在整轮请求的开始和结束时同步运行状态，供固定进度区持续展示。 */
+  onRunStateChanged?: (isRunning: boolean) => void
+  /** 特定路由可将工具活动转换为面向业务的步骤名称。 */
+  runActivityAdapter?: (activities: readonly RunActivity[]) => RunActivity[]
+  /** 运行状态默认出现在消息末尾；特定路由可要求紧跟最新用户消息。 */
+  runActivityPlacement?: 'tail' | 'after-latest-user'
+  /** 特定路由即使未按通用 DIY 路由命名，也始终显示运行状态卡。 */
+  forceRunActivity?: boolean
   /** 强制开启工具执行过程展示（用于需要保留 MCP 工具结果的受治理数据查询类 agent）。 */
   forceToolProcessActive?: boolean
 }>(), {
@@ -195,6 +218,9 @@ const {
   toolProcessActive,
   (chatMsg: ChatMessageVO) => {
     messagesList.value.push(chatMsg)
+  }, {
+    onToolResult: (event) => { void persistAdaptedToolResult(event) },
+    onToolCallActivity: props.onToolCallActivity,
   })
 
 // 输入框内容
@@ -202,6 +228,22 @@ const inputText = ref('')
 const chatMainRef = ref<InstanceType<typeof ChatMain> | null>(null)
 /** Newly-created sessions cannot notify feature hooks until their first persisted user message is present. */
 const createdSessionPersistedMessageIds = new Map<string, string | null>()
+
+async function persistAdaptedToolResult(input: ToolResultPersistenceInput) {
+  const content = props.toolResultPersistenceAdapter?.(input)
+  const sessionId = currentSessionId.value
+  if (!content || !sessionId) return
+
+  try {
+    const response = await chatSessionApi.appendMessage(sessionId, { role: 'tool', content })
+    const persisted = response.data?.data
+    if (persisted && !messagesList.value.some((message) => String(message.id) === String(persisted.id))) {
+      messagesList.value.push(persisted)
+    }
+  } catch (error) {
+    console.warn('[Chat] 持久化工具结果失败', error)
+  }
+}
 
 // 记录最近一次流式消息的 ID，用于 DOM key 桥接，避免流式→保存切换时的闪烁
 const lastStreamingKey = ref<string | null>(null)
@@ -226,12 +268,20 @@ watch(
   { deep: true, flush: 'post' },
 )
 
+watch(isRunning, (isRunning) => {
+  props.onRunStateChanged?.(isRunning)
+})
+
+const presentationRunActivities = computed(() =>
+  props.runActivityAdapter ? props.runActivityAdapter(runActivities.value) : runActivities.value,
+)
+
 // 构建展示消息
 const displayMessages = computed<DisplayMessage[]>(() => {
   const list: DisplayMessage[] = []
   for (let i = 0; i < messagesList.value.length; i++) {
     const m = messagesList.value[i]
-    if (!m || m.role === 'system' || m.role === 'thinking' || !m.content) continue
+    if (!m || m.role === 'system' || m.role === 'thinking' || !m.content || !shouldDisplayChatMessage(m.role, props.hideToolMessages)) continue
     const { attachmentPrefix, text } = splitChatAttachmentContent(m.content)
     const content = attachmentPrefix + (props.messageDisplayAdapter?.({ role: m.role, content: text }) ?? text)
 
@@ -756,7 +806,7 @@ const requestAttachmentPicker = (options?: { replace?: boolean }) => {
   chatMainRef.value?.requestAttachmentPicker(options)
 }
 
-defineExpose({ submitExternalSubmission, requestAttachmentPicker })
+defineExpose({ submitExternalSubmission, requestAttachmentPicker, abortRun })
 </script>
 
 <template>
@@ -797,7 +847,9 @@ defineExpose({ submitExternalSubmission, requestAttachmentPicker })
       :welcome-desc="agentDetail?.description || '有什么想说的，直接发给我就好～'"
       :messages="displayMessages"
       :tool-calls="toolCallsInProgress"
-      :run-activities="runActivities"
+      :run-activities="presentationRunActivities"
+      :run-activity-placement="runActivityPlacement"
+      :force-run-activity="forceRunActivity"
       :is-diy-chat="isDiyRoute"
       :has-visible-answer="hasVisibleAnswer"
       :run-started-at="runStartedAt"

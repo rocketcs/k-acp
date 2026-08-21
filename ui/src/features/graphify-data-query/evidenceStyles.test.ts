@@ -3,8 +3,8 @@ import test from 'node:test'
 import { isBusinessEntity, isSourceKind, nodeTypeLabel, nodeVisual } from './evidenceStyles.ts'
 
 const MOCK_SEMANTICS = {
-  labels: { DRUG: '药品', CONSUMABLE: '耗材', SERVICE: '医疗服务项目', DIAGNOSIS: '诊疗项目' },
-  headings: { DRUG: '药品目录项', CONSUMABLE: '耗材目录项', SERVICE: '医疗服务项目', DIAGNOSIS: '诊疗项目' },
+  labels: { DRUG: '药品', CONSUMABLE: '耗材', SERVICE: '医保服务项目', DIAGNOSIS: '诊疗项目' },
+  headings: { DRUG: '药品目录项', CONSUMABLE: '耗材目录项', SERVICE: '医保服务项目', DIAGNOSIS: '诊疗项目' },
 }
 
 const visualFor = (kind: string, domain?: string, semantics = MOCK_SEMANTICS) => nodeVisual({ kind, domain }, semantics)
@@ -21,7 +21,7 @@ test('maps every business/source kind to a visual', () => {
 test('product heading reflects the catalog domain from injected semantics', () => {
   assert.equal(visualFor('product', 'DRUG').heading, '药品目录项')
   assert.equal(visualFor('product', 'CONSUMABLE').heading, '耗材目录项')
-  assert.equal(visualFor('product', 'SERVICE').heading, '医疗服务项目')
+  assert.equal(visualFor('product', 'SERVICE').heading, '医保服务项目')
   assert.equal(visualFor('product', 'DIAGNOSIS').heading, '诊疗项目')
 })
 
@@ -32,7 +32,7 @@ test('product heading falls back to a neutral word without injected semantics', 
 
 test('node type label reflects the catalog domain for products', () => {
   assert.equal(nodeTypeLabel({ kind: 'product', domain: 'DRUG' }, MOCK_SEMANTICS), '药品')
-  assert.equal(nodeTypeLabel({ kind: 'product', domain: 'SERVICE' }, MOCK_SEMANTICS), '医疗服务项目')
+  assert.equal(nodeTypeLabel({ kind: 'product', domain: 'SERVICE' }, MOCK_SEMANTICS), '医保服务项目')
   assert.equal(nodeTypeLabel({ kind: 'product', domain: 'CONSUMABLE' }, MOCK_SEMANTICS), '耗材')
   assert.equal(nodeTypeLabel({ kind: 'product' }), '目录项')
   assert.equal(nodeTypeLabel({ kind: 'organization' }), '生产企业')

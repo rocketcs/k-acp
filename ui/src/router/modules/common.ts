@@ -38,7 +38,7 @@ const commonRoutes: AppRouteRecordRaw[] = [
     name: RouteNames.GRAPHIFY_DATA_QUERY_CHAT,
     component: () => import('@/features/graphify-data-query/GraphifyDataQueryChat.vue'),
     meta: {
-      title: '医药问数助手',
+      title: '医保问数助手',
       hidden: true,
     },
   },

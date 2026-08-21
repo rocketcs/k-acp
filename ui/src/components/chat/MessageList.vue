@@ -20,6 +20,7 @@ const props = defineProps<{
   toolCalls: Array<{ id: string; name: string; args: string; result?: string; elapsed?: number, needConfirm?: boolean }>
   runActivities: RunActivity[]
   isDiyChat: boolean
+  runActivityPlacement?: 'tail' | 'after-latest-user'
   showRunActivity: boolean
   showRunWaiting: boolean
   runStartedAt: number | null
@@ -70,6 +71,14 @@ const messageGroups = computed<MessageGroup[]>(() => {
   }
 
   return groups
+})
+
+/** 运行状态可紧贴最新用户提问，避免悬浮或跟随正在生成的助手正文移动。 */
+const latestUserGroupIndex = computed(() => {
+  for (let index = messageGroups.value.length - 1; index >= 0; index--) {
+    if (firstMessage(messageGroups.value[index]!).role === 'user') return index
+  }
+  return -1
 })
 
 const expandedMap = ref<Record<string, boolean>>({})
@@ -139,6 +148,19 @@ function firstMessage(group: MessageGroup): DisplayMessage {
         @uip-retry="$emit('uipRetry', $event)"
         @vep-retry="$emit('vepRetry', $event)"
       />
+      <template v-if="runActivityPlacement === 'after-latest-user' && gIdx === latestUserGroupIndex">
+        <AgentRunActivity
+          v-if="showRunActivity"
+          :activities="runActivities"
+          :started-at="runStartedAt"
+          @abort="$emit('abort')"
+        />
+        <AgentRunWaiting
+          v-else-if="showRunWaiting"
+          :started-at="runStartedAt"
+          @abort="$emit('abort')"
+        />
+      </template>
     </template>
     <TransitionGroup name="jelly">
       <ToolCallItem
@@ -154,17 +176,19 @@ function firstMessage(group: MessageGroup): DisplayMessage {
         @toolContent="(content: any) => $emit('toolContent', content)"
       />
     </TransitionGroup>
-    <AgentRunActivity
-      v-if="showRunActivity"
-      :activities="runActivities"
-      :started-at="runStartedAt"
-      @abort="$emit('abort')"
-    />
-    <AgentRunWaiting
-      v-else-if="showRunWaiting"
-      :started-at="runStartedAt"
-      @abort="$emit('abort')"
-    />
+    <template v-if="runActivityPlacement !== 'after-latest-user'">
+      <AgentRunActivity
+        v-if="showRunActivity"
+        :activities="runActivities"
+        :started-at="runStartedAt"
+        @abort="$emit('abort')"
+      />
+      <AgentRunWaiting
+        v-else-if="showRunWaiting"
+        :started-at="runStartedAt"
+        @abort="$emit('abort')"
+      />
+    </template>
   </div>
 </template>
 
