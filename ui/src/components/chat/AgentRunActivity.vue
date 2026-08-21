@@ -13,7 +13,7 @@ defineEmits<{
   (e: 'abort'): void
 }>()
 
-const expanded = ref(false)
+const expanded = ref(true)
 const now = ref(Date.now())
 let timer: ReturnType<typeof setInterval> | null = null
 
@@ -34,11 +34,12 @@ const elapsed = computed(() => {
   return minutes > 0 ? `${minutes} 分 ${seconds % 60} 秒` : `${seconds} 秒`
 })
 const headline = computed(() => activeActivity.value ? `正在${activeActivity.value.label}` : '正在启动工作流')
-const visibleActivities = computed(() => expanded.value ? aggregatedActivities.value : aggregatedActivities.value.slice(-3))
+const visibleActivities = computed(() => expanded.value ? aggregatedActivities.value : [])
 
 function activityLabel(activity: ReturnType<typeof aggregateRunActivities>[number]) {
   if (activity.status === 'completed') return `${activity.label}完成`
   if (activity.status === 'failed') return `${activity.label}待重试`
+  if (activity.status === 'pending') return `等待${activity.label}`
   return `正在${activity.label}`
 }
 
@@ -170,6 +171,7 @@ onBeforeUnmount(() => {
   .is-running { color: #3977b7; }
   .is-completed { color: #5d7d6b; }
   .is-failed { color: #a1704a; }
+  .is-pending { color: #9aabbc; }
   i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
   em { color: #8194aa; font-style: normal; }
 }

@@ -38,6 +38,19 @@ function persistableGraphifyToolResult({ content }: { content: string }): string
 /** 查询流程活动（业务标签，替代原始工具调用条），供 AgentRunActivity 以参考样式呈现。 */
 const queryFlowActivities = ref<RunActivity[]>([])
 
+/** 每次问数预置完整业务流程；只有工具真实完成后才改变步骤标记。 */
+const QUERY_FLOW_STEPS = [
+  { id: 'semantic', name: '语义解析' },
+  { id: 'preflight', name: '查询预检' },
+  { id: 'query', name: '执行查询' },
+  { id: 'evidence', name: '查询知识图谱' },
+] as const
+
+function createQueryFlowActivities(): RunActivity[] {
+  const startTime = Date.now()
+  return QUERY_FLOW_STEPS.map((step) => ({ ...step, status: 'pending', startTime }))
+}
+
 /** MCP 工具名 → 业务阶段标签；不在表内的工具按「其他处理」折叠，不占步骤。 */
 const QUERY_FLOW_LABEL: Record<string, string> = {
   semantic_context: '语义解析',
@@ -48,15 +61,13 @@ const QUERY_FLOW_LABEL: Record<string, string> = {
   wren_query: '执行查询',
   evidence_subgraph: '查询知识图谱',
   'read-cypher': '查询知识图谱',
-  list_datasets: '定位数据集',
-  describe_dataset: '定位数据集',
 }
 
 /** 把工具执行活动转化为业务化的查询流程摘要（隐藏原始工具参数/JSON）。 */
 function appendCompletedEvidenceGraphStep(content?: string) {
   if (!content || !parseGraphifyEvidence('', content)) return
   const label = '查询知识图谱'
-  const existing = queryFlowActivities.value.find((a) => a.id === label)
+  const existing = queryFlowActivities.value.find((a) => a.name === label)
   if (existing) {
     existing.status = 'completed'
     existing.elapsed ??= Date.now() - existing.startTime
@@ -69,15 +80,11 @@ function handleToolCallActivity(t: { toolName: string; status: 'running' | 'comp
   const label = QUERY_FLOW_LABEL[t.toolName]
   if (!label) return
   if (t.status === 'failed') {
-    const failed = queryFlowActivities.value.find((a) => a.id === label)
+    const failed = queryFlowActivities.value.find((a) => a.name === label)
     if (failed) { failed.status = 'failed'; failed.elapsed = Date.now() - failed.startTime }
     return
   }
-  // 新步骤启动：将此前运行中的步骤置为完成。
-  queryFlowActivities.value.forEach((a) => {
-    if (a.status === 'running') { a.status = 'completed'; a.elapsed = Date.now() - a.startTime }
-  })
-  let step = queryFlowActivities.value.find((a) => a.id === label)
+  let step = queryFlowActivities.value.find((a) => a.name === label)
   if (!step) {
     step = { id: label, name: label, status: t.status === 'running' ? 'running' : 'completed', startTime: Date.now() }
     queryFlowActivities.value.push(step)
@@ -91,7 +98,7 @@ function handleToolCallActivity(t: { toolName: string; status: 'running' | 'comp
 /** 每轮运行开始时清空业务步骤，供消息流内的运行状态卡展示。 */
 function handleRunStateChanged(isRunning: boolean) {
   if (isRunning) {
-    queryFlowActivities.value = []
+    queryFlowActivities.value = createQueryFlowActivities()
   }
 }
 
@@ -181,8 +188,14 @@ function messageDisplayAdapter(input: { role: string; content: string }): string
   return input.content
 }
 
-/** 助手正文原样渲染：数据以 Markdown 表格/详情直接呈现在正文里，不做截断、不剔除占位符。 */
+/** 旧会话或模型偶发把过程叙述混进助手正文时，只保留以结果标题起始的最终答复。 */
+const FINAL_ANSWER_ANCHOR = /^#{1,6}\s+.*(?:查询结果|结果)/m
+const PROCESS_NARRATION = /trace_id|语义上下文|构造\s*SQL|现在(?:开始)?(?:执行|构造|查询)|(?:执行|进行)\s*preflight|\bSELECT\b|\bFROM\s+medical_catalog\b/i
+
 function assistantBody(content: string): string {
+  const resultTitle = content.match(FINAL_ANSWER_ANCHOR)
+  if (resultTitle?.index !== undefined) return content.slice(resultTitle.index)
+  if (PROCESS_NARRATION.test(content)) return ''
   return content
 }
 

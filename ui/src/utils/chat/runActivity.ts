@@ -42,7 +42,10 @@ export interface AggregatedRunActivity {
 }
 
 export function getActivityLabel(name: string): string {
-  return name
+  return {
+    wren_query: '查询业务数据',
+    wren_models: '准备分析能力',
+  }[name] ?? name
 }
 
 /** 合并同一工具的重复调用，保留首次出现顺序和本轮最新状态。 */
@@ -52,30 +55,33 @@ export function aggregateRunActivities(activities: RunActivity[]): AggregatedRun
     label: string
     count: number
     elapsed: number
+    hasPending: boolean
     hasRunning: boolean
     hasFailed: boolean
   }>()
 
   for (const activity of activities) {
-    const current = grouped.get(activity.id) || {
+    const current = grouped.get(activity.name) || {
       id: activity.id,
       label: getActivityLabel(activity.name),
       count: 0,
       elapsed: 0,
+      hasPending: false,
       hasRunning: false,
       hasFailed: false,
     }
     current.count += 1
     current.elapsed += activity.elapsed || 0
+    current.hasPending ||= activity.status === 'pending'
     current.hasRunning ||= activity.status === 'running'
     current.hasFailed ||= activity.status === 'failed'
-    grouped.set(activity.id, current)
+    grouped.set(activity.name, current)
   }
 
   return [...grouped.values()].map((activity) => ({
     id: activity.id,
     label: activity.label,
-    status: activity.hasRunning ? 'running' : activity.hasFailed ? 'failed' : 'completed',
+    status: activity.hasRunning ? 'running' : activity.hasFailed ? 'failed' : activity.hasPending ? 'pending' : 'completed',
     count: activity.count,
     elapsed: activity.elapsed || undefined,
   }))

@@ -28,7 +28,7 @@ export interface RunActivity {
   id: string
   name: string
   args?: string
-  status: 'running' | 'completed' | 'failed'
+  status: 'pending' | 'running' | 'completed' | 'failed'
   startTime: number
   elapsed?: number
 }

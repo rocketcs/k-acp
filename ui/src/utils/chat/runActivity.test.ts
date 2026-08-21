@@ -55,3 +55,15 @@ test('连续同类工具调用聚合为一个业务步骤', () => {
     { id: '3', label: '准备分析能力', status: 'completed', count: 1, elapsed: 100 },
   ])
 })
+
+test('待执行的预置步骤保持等待状态', () => {
+  const steps = aggregateRunActivities([
+    { id: 'semantic', name: '语义解析', status: 'pending', startTime: 1 },
+    { id: 'query', name: '执行查询', status: 'pending', startTime: 1 },
+  ])
+
+  assert.deepEqual(steps, [
+    { id: 'semantic', label: '语义解析', status: 'pending', count: 1, elapsed: undefined },
+    { id: 'query', label: '执行查询', status: 'pending', count: 1, elapsed: undefined },
+  ])
+})
