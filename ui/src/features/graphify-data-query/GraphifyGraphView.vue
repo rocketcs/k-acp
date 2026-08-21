@@ -9,8 +9,7 @@ import GraphifyExecutionPath from './GraphifyExecutionPath.vue'
 import type { GraphifyEvidenceEnvelope } from './types'
 
 /**
- * 知识图谱查看（大屏态）。graphify 特性专属：从聊天下方入口打开，
- * 展示最近一次查询的证据图谱；尚无查询时给出引导提示。
+ * 知识图谱查看（大屏态）。由对应回答的图谱按钮打开，展示该轮证据子图。
  */
 const props = defineProps<{
   open: boolean
@@ -51,7 +50,7 @@ const edgeCount = computed(() => props.evidence?.evidence.edges.length ?? 0)
         <div class="graphify-graph-view-body">
           <template v-if="evidence">
             <header class="graphify-graph-view-summary">
-              <small>最近一次查询 · {{ evidence.trace_id }}</small>
+              <small>本次查询 · {{ evidence.trace_id }}</small>
               <strong>{{ evidence.question }}</strong>
               <span>{{ evidence.result.rows.length }} 条结果 · {{ evidence.evidence.source_record_count ?? evidence.evidence.source_record_ids.length }} 条来源记录</span>
             </header>

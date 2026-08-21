@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { DatabaseOutlined, ExperimentOutlined, MedicineBoxOutlined, SearchOutlined, ShareAltOutlined } from '@ant-design/icons-vue'
 import { displayGraphifyLabel } from './evidenceAdapter'
+import { stagesForEvidence } from './executionPath'
 import type { GraphifyEvidenceEnvelope } from './types'
 
 const props = defineProps<{ evidence: GraphifyEvidenceEnvelope }>()
@@ -9,21 +10,7 @@ const props = defineProps<{ evidence: GraphifyEvidenceEnvelope }>()
 const path = computed(() => props.evidence.execution_path)
 const hasPath = computed(() => Boolean(path.value))
 
-// 优先展示服务端生成的阶段链路；对旧版（修复前落库、无 stages）数据，
-// 依据 models/columns/source_record_count 降级生成一条基础链路。
-const stagesToRender = computed(() => {
-  const p = path.value
-  if (!p) return []
-  if (p.stages?.length) return p.stages
-  const cols = (p.columns ?? []).length
-  return [
-    { step: 'agent', system: 'agent', title: 'Agent 语义分析', detail: `识别为医保目录问题（${p.intent || '—'}）`, icon: 'analysis' },
-    { step: 'wren_mdl', system: 'wren_mdl', title: 'Wren 语义层（MDL）', detail: `命中的业务模型：${(p.models ?? []).join('、') || 'medical_catalog'}；查询字段 ${cols} 个`, icon: 'mdl' },
-    { step: 'postgres', system: 'postgres', title: 'PostgreSQL 数据源', detail: '查询位于统一目录视图 medical_catalog', icon: 'postgres' },
-    { step: 'neo4j', system: 'neo4j', title: 'Neo4j 语义图谱', detail: '来源追溯与语义关联', icon: 'neo4j' },
-    { step: 'result', system: 'result', title: '查询结果', detail: `关联 ${p.source_record_count ?? 0} 条来源记录`, icon: 'result' },
-  ]
-})
+const stagesToRender = computed(() => stagesForEvidence(props.evidence))
 
 // 每个阶段对应一个展示图标与强调色；不认识的 system 回退到通用图标。
 const SYSTEM_META: Record<string, { icon: string; color: string; label: string }> = {

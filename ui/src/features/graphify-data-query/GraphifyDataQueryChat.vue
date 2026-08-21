@@ -2,8 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import Chat from '@/views/Chat/index.vue'
 import * as agentApi from '@/api/agent'
-import { MedicineBoxOutlined, ShareAltOutlined } from '@ant-design/icons-vue'
-import GraphifyGraphView from './GraphifyGraphView.vue'
+import { MedicineBoxOutlined } from '@ant-design/icons-vue'
+import GraphifyAssistantMessage from './GraphifyAssistantMessage.vue'
 import { parseGraphifyEvidence, parseNeo4jReadCypherGraph } from './evidenceAdapter'
 import { buildSessionEvidence } from './sessionEvidence'
 import type { ChatMessageVO, ChatMessagePresentation, ChatMessagePresentationInput, RunActivity } from '@/types'
@@ -21,18 +21,18 @@ const loadError = ref('')
 const evidenceByMessageId = ref<Record<string, TurnEvidence>>({})
 /** 聊天是否已有内容（用于决定是否展示空状态快捷问题）。 */
 const hasMessages = ref(false)
-/** 最近一次查询的证据（供“知识图谱查看”入口使用）。 */
-const latestEvidence = ref<TurnEvidence | null>(null)
-/** 知识图谱查看弹窗开关。 */
-const graphViewOpen = ref(false)
 const chatRef = ref<{
   submitExternalSubmission: (submission: GraphifyChatSubmission) => Promise<boolean>
 } | null>(null)
 const quickSending = ref(false)
 
-/** 仅保存完整的已执行查询结果；预检、语义上下文和普通工具结果不进入会话结果表。 */
-function persistableGraphifyToolResult({ content }: { content: string }): string | null {
-  return parseGraphifyEvidence('', content) ? content : null
+/** 持久化查询结果及官方 Neo4j 投影，刷新后仍可按回答恢复真实图谱。 */
+function persistableGraphifyToolResult({ toolName, content }: { toolName: string; content: string }): string | null {
+  if (parseGraphifyEvidence('', content)) return content
+  if (toolName === 'read-cypher' && parseNeo4jReadCypherGraph(content)) {
+    return JSON.stringify({ name: toolName, result: content })
+  }
+  return null
 }
 
 /** 查询流程活动（业务标签，替代原始工具调用条），供 AgentRunActivity 以参考样式呈现。 */
@@ -128,8 +128,6 @@ function adaptQueryFlowActivities(_activities: readonly RunActivity[]): RunActiv
 function onSessionMessagesChanged({ messages }: { sessionId: string | null; messages: readonly ChatMessageVO[] }) {
   evidenceByMessageId.value = buildSessionEvidence(messages)
   hasMessages.value = messages.some((m) => m.role === 'user' || m.role === 'assistant')
-  const latestAssistant = [...messages].reverse().find((m) => m.role === 'assistant')
-  latestEvidence.value = latestAssistant ? evidenceByMessageId.value[String(latestAssistant.id)] ?? null : null
 }
 
 // 空状态快捷问题池：覆盖真实药品、耗材和医保服务目录的随机问题池。
@@ -197,8 +195,6 @@ async function sendQuickQuestion(question: string) {
 }
 
 const showQuickQuestions = computed(() => Boolean(agentId.value) && !hasMessages.value)
-/** 仅在官方 Neo4j 实际返回关联子图时提供入口，避免用表格结果伪造图谱。 */
-const canViewLatestGraph = computed(() => Boolean(latestEvidence.value?.evidence?.evidence.nodes.length && latestEvidence.value?.evidence?.evidence.edges.length))
 
 /** 助手消息完整渲染（数据即正文 Markdown 表格/详情，不剔除任何内容）。 */
 function messageDisplayAdapter(input: { role: string; content: string }): string {
@@ -218,10 +214,22 @@ function assistantBody(content: string): string {
 }
 
 /**
- * 医保问数只以助手保存的 Markdown 正文作为结果表面，正文即完整数据（表格/详情）。
+ * 每条助手消息绑定自己的证据；只有同轮官方 Neo4j `read-cypher` 返回 nodes + edges 才提供查看图谱。
  */
 function messagePresentationAdapter(input: ChatMessagePresentationInput): ChatMessagePresentation {
-  return { kind: 'markdown', content: assistantBody(input.content) }
+  if (input.role !== 'assistant') return { kind: 'markdown', content: input.content }
+  const turn = evidenceByMessageId.value[input.id]
+  return {
+    kind: 'custom',
+    component: GraphifyAssistantMessage,
+    props: {
+      content: assistantBody(input.content),
+      isStreaming: input.isStreaming,
+      evidence: turn?.evidence,
+      outcome: turn?.outcome,
+      neo4jGraph: turn?.neo4jGraph,
+    },
+  }
 }
 
 async function loadAgent() {
@@ -289,14 +297,6 @@ watch(showQuickQuestions, (show) => {
       </div>
     </div>
 
-    <!-- 最近查询的证据图谱入口：定位在输入框上方。 -->
-    <button v-if="canViewLatestGraph" type="button" class="graphify-graph-entry" title="查看最近查询图谱" aria-label="查看最近查询图谱"
-      @click="graphViewOpen = true">
-      <ShareAltOutlined />
-      <span>最近查询图谱</span>
-    </button>
-
-    <GraphifyGraphView :open="graphViewOpen" :evidence="latestEvidence?.evidence" @close="graphViewOpen = false" />
   </section>
   <main v-else class="graphify-route-state" aria-live="polite">
     <ASpin v-if="loading" tip="正在加载医保问数助手…" />
@@ -331,8 +331,6 @@ watch(showQuickQuestions, (show) => {
 }
 
 .graphify-data-query-chat-shell {
-  --graphify-composer-bottom: clamp(32px, 5vh, 72px);
-
   position: relative;
   min-width: 0;
   height: 100%;
@@ -351,7 +349,7 @@ watch(showQuickQuestions, (show) => {
 
 :deep(.graphify-data-query-chat .chat-welcome-input) {
   margin-top: 0;
-  margin-bottom: var(--graphify-composer-bottom);
+  margin-bottom: clamp(32px, 5vh, 72px);
 }
 
 /* 空状态快捷问题：居中业务引导与自适应换行的圆角胶囊。 */
@@ -433,34 +431,6 @@ watch(showQuickQuestions, (show) => {
   opacity: 0.55;
 }
 
-/* 最近查询的证据图谱入口（输入区上方）。 */
-.graphify-graph-entry {
-  position: absolute;
-  z-index: 20;
-  left: calc(50% + min(130px, 12vw));
-  bottom: calc(var(--graphify-composer-bottom) + 88px);
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 14px;
-  border: 1px solid #c3d9ec;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 94%);
-  color: #2f6fa8;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgb(31 58 58 / 10%);
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
-}
-
-.graphify-graph-entry:hover {
-  transform: translateX(-50%) translateY(-1px);
-  border-color: #69a7d4;
-  background: #eaf4fb;
-}
-
 @media (max-width: 900px) {
   :deep(.graphify-data-query-chat .chat-welcome) {
     padding: 0 16px;
@@ -483,9 +453,6 @@ watch(showQuickQuestions, (show) => {
     font-size: 15px;
   }
 
-  .graphify-graph-entry {
-    left: 50%;
-  }
 }
 
 </style>

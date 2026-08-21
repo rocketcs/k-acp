@@ -57,6 +57,8 @@ test('skill requires a distinct Neo4j evidence step after non-empty fact results
   const protocol = section(skill, '工具协议（执行顺序）')
   assert.match(protocol, /read-cypher/)
   assert.match(protocol, /catalog_codes/)
+  assert.match(protocol, /所有可能返回目录项的查询都必须在内部投影 `catalog_code`、`registration_no` 与 `source_record_id`/)
+  assert.match(protocol, /`read-cypher` 是有数据回答的必经步骤/)
   assert.match(protocol, /registration_numbers/)
   assert.match(protocol, /nodes \+ edges/)
   assert.match(protocol, /仅在 `query` 返回至少一条记录后，调用/)

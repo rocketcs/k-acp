@@ -91,8 +91,8 @@ MCP 数据集协议按以下顺序推进，`trace_id` 从 `semantic_context` 返
 
 1. `list_datasets` / `describe_dataset(dataset_id)`：仅在数据集或字段范围不明确时调用。
 2. `semantic_context(dataset_id, question)`：每个自然语言问数请求先调用；保存返回的 `trace_id` 供后续使用。
-3. 直接编排 MDL SQL 查询（不使用任何预定义查询模板）：先 `query_preflight(dataset_id, question, sql, trace_id)`，仅当结果 `allowed` 或 `warning` 才调用 `query(dataset_id, sql, limit, trace_id)` 取得实际数据。该步骤是唯一的 PostgreSQL 事实查询，不得由图谱补充或修改表格行。
-4. 仅在 `query` 返回至少一条记录后，调用官方只读 Neo4j MCP 的 `read-cypher`。从 **本轮 Wren 结果行** 提取去重后的 `catalog_code`（最多 6 个）作为 `catalog_codes`，提取 `registration_no`（最多 6 个）作为 `registration_numbers`；不得从用户问题猜测或自行补造这些参数。0 行时不调用图谱工具，也不展示知识图谱。
+3. 直接编排 MDL SQL 查询（不使用任何预定义查询模板）：先 `query_preflight(dataset_id, question, sql, trace_id)`，仅当结果 `allowed` 或 `warning` 才调用 `query(dataset_id, sql, limit, trace_id)` 取得实际数据。该步骤是唯一的 PostgreSQL 事实查询，不得由图谱补充或修改表格行。**所有可能返回目录项的查询都必须在内部投影 `catalog_code`、`registration_no` 与 `source_record_id`，即使最终面向用户的表格不展示这些证据列；不得为了精简展示列而省略它们。**
+4. 仅在 `query` 返回至少一条记录后，调用官方只读 Neo4j MCP 的 `read-cypher`。从 **本轮 Wren 结果行** 提取去重后的 `catalog_code`（最多 6 个）作为 `catalog_codes`，提取 `registration_no`（最多 6 个）作为 `registration_numbers`；不得从用户问题猜测或自行补造这些参数。`read-cypher` 是有数据回答的必经步骤：只有它真实返回非空关系行后，才能将该轮标记为“查询知识图谱已完成”；若参数缺失、工具失败或空命中，只完成表格回答且绝不声称已查询图谱。0 行时不调用图谱工具，也不展示知识图谱。
    - `read-cypher` 只能执行下列固定的、单语句、参数化 Cypher 投影；只替换参数数组，禁止拼接用户输入、禁止使用 `CREATE`/`MERGE`/`SET`/`DELETE`/`CALL`、禁止调用 `get-schema`：
      ```cypher
      MATCH (product)

@@ -68,6 +68,29 @@ test('projects official Neo4j read-cypher relationship rows into bounded graph n
   ])
 })
 
+test('projects official Neo4j organizations that expose normalized_name', () => {
+  const graph = parseNeo4jReadCypherGraph(JSON.stringify([{
+    source_id: '4:product:real', source_labels: ['DrugProduct'], source_properties: { generic_name: '复方氢氧化铝片' },
+    relation_type: 'MANUFACTURED_BY',
+    target_id: '4:organization:real', target_labels: ['Organization'],
+    target_properties: { normalized_name: '鸿祥(黑龙江)制药有限公司' },
+  }]))
+
+  assert.deepEqual(graph, {
+    nodes: [
+      { id: 'neo4j:4:product:real', label: '复方氢氧化铝片', kind: 'product', domain: 'DRUG' },
+      { id: 'neo4j:4:organization:real', label: '鸿祥(黑龙江)制药有限公司', kind: 'organization' },
+    ],
+    edges: [{
+      id: 'neo4j:4:product:real:MANUFACTURED_BY:neo4j:4:organization:real',
+      source: 'neo4j:4:product:real',
+      target: 'neo4j:4:organization:real',
+      label: '生产企业',
+      kind: 'business',
+    }],
+  })
+})
+
 test('accepts an empty official Neo4j result as an empty graph instead of reusing a synthetic graph', () => {
   assert.deepEqual(parseNeo4jReadCypherGraph('[]'), { nodes: [], edges: [] })
   assert.equal(parseNeo4jReadCypherGraph('{"unexpected":true}'), null)

@@ -42,17 +42,22 @@ test('empty state hides the duplicate chat welcome and anchors its input at the 
   assert.match(component, /:deep\(\.graphify-data-query-chat \.chat-welcome-input\)\s*\{[\s\S]*?margin-bottom:/)
 })
 
-test('recent-query evidence graph entry is shown only for a non-empty Neo4j subgraph', () => {
-  assert.match(component, /<span>最近查询图谱<\/span>/)
-  assert.match(component, /const canViewLatestGraph = computed\(\(\) => Boolean\(latestEvidence\.value\?\.evidence\?\.evidence\.nodes\.length && latestEvidence\.value\?\.evidence\?\.evidence\.edges\.length\)\)/)
-  assert.match(component, /<button v-if="canViewLatestGraph" type="button" class="graphify-graph-entry"/)
-  assert.match(component, /<GraphifyGraphView :open="graphViewOpen" :evidence="latestEvidence\?\.evidence"/)
+test('each answer owns a Neo4j graph action instead of a global recent-query action', () => {
+  assert.doesNotMatch(component, /最近查询图谱/)
+  assert.doesNotMatch(component, /GraphifyGraphView/)
+  assert.match(component, /component: GraphifyAssistantMessage/)
+  assert.match(component, /neo4jGraph: turn\?\.neo4jGraph/)
+  assert.match(assistantMessage, /const hasNeo4jGraph = computed\(\(\) => Boolean\(props\.neo4jGraph\?\.nodes\.length && props\.neo4jGraph\?\.edges\.length\)\)/)
+  assert.match(assistantMessage, /<div v-if="hasNeo4jGraph"[\s\S]*?<button[\s\S]*?查看知识图谱/)
+  assert.match(assistantMessage, /<GraphifyGraphView :open="graphViewOpen" :evidence="evidence"/)
 })
 
-test('recent-query evidence graph entry follows the responsive composer anchor', () => {
-  assert.match(component, /\.graphify-data-query-chat-shell\s*\{[\s\S]*?--graphify-composer-bottom:\s*clamp\(32px, 5vh, 72px\)/)
-  assert.match(component, /\.graphify-graph-entry\s*\{[\s\S]*?left:\s*calc\(50% \+ min\(130px, 12vw\)\)[\s\S]*?bottom:\s*calc\(var\(--graphify-composer-bottom\) \+ 88px\)[\s\S]*?transform:\s*translateX\(-50%\)/)
-  assert.match(component, /@media \(max-width: 900px\)\s*\{[\s\S]*?\.graphify-graph-entry\s*\{[\s\S]*?left:\s*50%/)
+test('answer graph action only appears for real Neo4j nodes and edges', () => {
+  assert.match(assistantMessage, /neo4jGraph\?: Neo4jReadCypherGraph/)
+  assert.match(assistantMessage, /v-if="hasNeo4jGraph"/)
+  assert.match(assistantMessage, /:evidence="evidence"/)
+  assert.match(assistantMessage, /const shouldRenderResultTable = computed\(\(\) => Boolean\(contentParts\.value\.hasPlaceholder && props\.evidence && hasRows\.value\)\)/)
+  assert.match(assistantMessage, /v-if="shouldRenderResultTable && evidence"/)
 })
 
 test('query progress follows the latest user message for the entire run', () => {
@@ -81,7 +86,7 @@ test('query progress follows the latest user message for the entire run', () => 
   assert.match(runActivity, /const expanded = ref\(true\)/)
   assert.match(runActivity, /等待\$\{activity\.label\}/)
   assert.doesNotMatch(component, /graphify-query-flow/)
-  assert.match(component, /<button v-if="canViewLatestGraph" type="button" class="graphify-graph-entry"/)
+  assert.match(component, /component: GraphifyAssistantMessage/)
   assert.match(chat, /onRunStateChanged\?: \(isRunning: boolean\) => void/)
   assert.match(chat, /onAssistantTextActivity\?: \(content: string\) => void/)
   assert.match(chatStream, /onAssistantTextActivity\?\.\(currentText\)/)

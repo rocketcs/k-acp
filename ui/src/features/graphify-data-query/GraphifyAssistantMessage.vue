@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { ShareAltOutlined } from '@ant-design/icons-vue'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer.vue'
-import GraphifyEvidenceCard from './GraphifyEvidenceCard.vue'
+import GraphifyGraphView from './GraphifyGraphView.vue'
 import { buildResultColumns } from './resultTable'
 import { splitAssistantContent } from './tablePlacement'
 import type { GraphifyEvidenceEnvelope, GraphifyToolOutcome } from './types'
+import type { Neo4jReadCypherGraph } from './evidenceAdapter'
 
 /**
  * 医保问数助手回答的普通 chat 展示：正文 markdown + 内联数据表 + 可折叠语义依据。
@@ -15,12 +17,21 @@ const props = defineProps<{
   isStreaming: boolean
   evidence?: GraphifyEvidenceEnvelope
   outcome?: GraphifyToolOutcome
+  /** 仅由官方只读 Neo4j `read-cypher` 结果生成，绝不以 Wren 查询结果兜底。 */
+  neo4jGraph?: Neo4jReadCypherGraph
 }>()
 
-// 正文剔除 [[data-table]] 占位符（平台证据表格改为下方内联渲染）。
-const bodyText = computed(() => splitAssistantContent(props.content).before)
+// 仅当正文显式给出 [[data-table]] 占位符时，才以平台结果表替换该位置；否则保留模型的原表格。
+const contentParts = computed(() => splitAssistantContent(props.content))
+const bodyText = computed(() => contentParts.value.before)
+const afterTableText = computed(() => contentParts.value.after)
 const resultColumns = computed(() => props.evidence ? buildResultColumns(props.evidence, props.evidence.semantic_context.domain_labels) : [])
 const hasRows = computed(() => Boolean(props.evidence?.result.rows.length))
+const shouldRenderResultTable = computed(() => Boolean(contentParts.value.hasPlaceholder && props.evidence && hasRows.value))
+const shouldShowEmptyResult = computed(() => Boolean(contentParts.value.hasPlaceholder && props.evidence && !hasRows.value && !props.isStreaming))
+const graphViewOpen = ref(false)
+/** 必须同时存在官方 Neo4j nodes 与 edges，才显示该回答的图谱按钮。 */
+const hasNeo4jGraph = computed(() => Boolean(props.neo4jGraph?.nodes.length && props.neo4jGraph?.edges.length))
 </script>
 
 <template>
@@ -34,7 +45,7 @@ const hasRows = computed(() => Boolean(props.evidence?.result.rows.length))
     />
 
     <!-- 内联数据结果表 -->
-    <div v-if="evidence && hasRows" class="graphify-result-table">
+    <div v-if="shouldRenderResultTable && evidence" class="graphify-result-table">
       <table>
         <thead>
           <tr>
@@ -50,7 +61,15 @@ const hasRows = computed(() => Boolean(props.evidence?.result.rows.length))
       </table>
       <p v-if="evidence.result.truncated" class="graphify-result-truncated">结果较多，已截断展示。</p>
     </div>
-    <p v-else-if="evidence && !hasRows && !isStreaming" class="graphify-inline-state">本次查询未返回业务记录。</p>
+    <p v-else-if="shouldShowEmptyResult" class="graphify-inline-state">本次查询未返回业务记录。</p>
+
+    <MarkdownRenderer
+      v-if="afterTableText"
+      class="graphify-assistant-text graphify-assistant-text--after-table"
+      :content="afterTableText"
+      :is-streaming="isStreaming"
+      :is-diy-chat="true"
+    />
 
     <!-- 被拦截 / 暂不可用的提示 -->
     <p v-if="outcome && !evidence" class="graphify-state-error">
@@ -58,8 +77,17 @@ const hasRows = computed(() => Boolean(props.evidence?.result.rows.length))
       {{ outcome.reason || '' }} <template v-if="outcome.trace_id">Trace: {{ outcome.trace_id }}</template>
     </p>
 
-    <!-- 可折叠语义依据 / 图谱 -->
-    <GraphifyEvidenceCard v-if="evidence" :evidence="evidence" />
+    <!-- 每条回答只展示自身官方 Neo4j 子图；没有真实 nodes + edges 时不出现按钮。 -->
+    <div v-if="hasNeo4jGraph" class="graphify-answer-graph-action">
+      <button type="button" class="graphify-answer-graph-button" title="查看知识图谱" aria-label="查看知识图谱"
+        @click="graphViewOpen = true">
+        <ShareAltOutlined />
+        <span>查看知识图谱</span>
+        <small>{{ neo4jGraph?.nodes.length }} 节点 · {{ neo4jGraph?.edges.length }} 关系</small>
+      </button>
+    </div>
+
+    <GraphifyGraphView :open="graphViewOpen" :evidence="evidence" @close="graphViewOpen = false" />
   </div>
 </template>
 
@@ -127,5 +155,40 @@ const hasRows = computed(() => Boolean(props.evidence?.result.rows.length))
   color: #50605d;
   font-size: 12px;
   line-height: 1.6;
+}
+
+.graphify-answer-graph-action {
+  display: flex;
+  margin-top: 14px;
+}
+
+.graphify-answer-graph-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid #c3d9ec;
+  border-radius: 7px;
+  background: #f7fbff;
+  color: #2f6fa8;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.graphify-answer-graph-button:hover {
+  border-color: #69a7d4;
+  background: #eaf4fb;
+}
+
+.graphify-answer-graph-button svg {
+  color: #2f80c5;
+}
+
+.graphify-answer-graph-button small {
+  padding-left: 2px;
+  color: #7891a6;
+  font-size: 11px;
+  font-weight: 500;
 }
 </style>

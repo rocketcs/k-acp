@@ -140,7 +140,9 @@ function neo4jNodeLabel(kind: GraphifyEvidenceNode['kind'], properties: Record<s
   const candidates = kind === 'product'
     ? ['catalog_name', 'generic_name', 'product_name', 'single_product_name', 'name', 'drug_code', 'base_code']
     : kind === 'organization'
-      ? ['name', 'organization_name', 'manufacturer', 'enterprise_name']
+      // 官方 Neo4j 导入将去重后的企业名称保存为 normalized_name；优先使用
+      // 可读名称，避免真实关系行因节点无标签而被过滤。
+      ? ['name', 'normalized_name', 'organization_name', 'manufacturer', 'enterprise_name']
       : kind === 'registration'
         ? ['registration_no', 'approval_number', 'raw_value', 'name']
         : kind === 'base'

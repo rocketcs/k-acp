@@ -117,6 +117,19 @@ test('replaces the query fallback graph with official Neo4j read-cypher nodes fo
   ])
   assert.equal(map['3']?.evidence?.evidence.edges[0]?.label, '生产企业')
   assert.deepEqual(map['3']?.evidence?.evidence.source_record_ids, ['source-1'])
+  assert.deepEqual(map['3']?.neo4jGraph, {
+    nodes: [
+      { id: 'neo4j:4:product:1', label: '阿莫西林', kind: 'product', domain: 'DRUG' },
+      { id: 'neo4j:4:org:1', label: '示例制药有限公司', kind: 'organization' },
+    ],
+    edges: [{
+      id: 'neo4j:4:product:1:MANUFACTURED_BY:neo4j:4:org:1',
+      source: 'neo4j:4:product:1',
+      target: 'neo4j:4:org:1',
+      label: '生产企业',
+      kind: 'business',
+    }],
+  })
 })
 
 test('returns empty mapping when no tool results', () => {

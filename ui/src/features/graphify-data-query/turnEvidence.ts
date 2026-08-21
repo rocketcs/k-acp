@@ -18,9 +18,14 @@ function replaceWithOfficialNeo4jGraph(evidence: GraphifyEvidenceEnvelope, graph
 export function mergeTurnEvidence(existing: TurnEvidence | undefined, incoming: TurnEvidence): TurnEvidence {
   if (incoming.evidence) {
     const neo4jGraph = incoming.neo4jGraph ?? existing?.neo4jGraph
-    return { evidence: neo4jGraph ? replaceWithOfficialNeo4jGraph(incoming.evidence, neo4jGraph) : incoming.evidence }
+    return {
+      evidence: neo4jGraph ? replaceWithOfficialNeo4jGraph(incoming.evidence, neo4jGraph) : incoming.evidence,
+      ...(neo4jGraph ? { neo4jGraph } : {}),
+    }
   }
-  if (incoming.neo4jGraph && existing?.evidence) return { evidence: replaceWithOfficialNeo4jGraph(existing.evidence, incoming.neo4jGraph) }
+  if (incoming.neo4jGraph && existing?.evidence) {
+    return { evidence: replaceWithOfficialNeo4jGraph(existing.evidence, incoming.neo4jGraph), neo4jGraph: incoming.neo4jGraph }
+  }
   if (incoming.neo4jGraph) return { neo4jGraph: incoming.neo4jGraph }
   if (existing?.evidence) return existing
   return incoming.outcome ? { outcome: incoming.outcome } : existing ?? {}
