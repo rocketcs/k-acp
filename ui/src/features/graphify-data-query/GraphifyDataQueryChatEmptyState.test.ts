@@ -4,6 +4,8 @@ import test from 'node:test'
 
 const component = readFileSync(new URL('./GraphifyDataQueryChat.vue', import.meta.url), 'utf8')
 const assistantMessage = readFileSync(new URL('./GraphifyAssistantMessage.vue', import.meta.url), 'utf8')
+const graphView = readFileSync(new URL('./GraphifyGraphView.vue', import.meta.url), 'utf8')
+const evidenceGraph = readFileSync(new URL('./GraphifyEvidenceGraph.vue', import.meta.url), 'utf8')
 const executionPath = readFileSync(new URL('./GraphifyExecutionPath.vue', import.meta.url), 'utf8')
 const evidenceAdapter = readFileSync(new URL('./evidenceAdapter.ts', import.meta.url), 'utf8')
 const chat = readFileSync(new URL('../../views/Chat/index.vue', import.meta.url), 'utf8')
@@ -58,6 +60,18 @@ test('answer graph action only appears for real Neo4j nodes and edges', () => {
   assert.match(assistantMessage, /:evidence="evidence"/)
   assert.match(assistantMessage, /const shouldRenderResultTable = computed\(\(\) => Boolean\(contentParts\.value\.hasPlaceholder && props\.evidence && hasRows\.value\)\)/)
   assert.match(assistantMessage, /v-if="shouldRenderResultTable && evidence"/)
+})
+
+test('knowledge graph dialog renders only the complete Neo4j graph', () => {
+  assert.match(graphView, /<GraphifyEvidenceGraph[\s\S]*?view-mode="full"[\s\S]*?fullscreen/)
+  assert.match(graphView, /:show-summary="false"/)
+  assert.doesNotMatch(graphView, /GraphifyExecutionPath/)
+  assert.doesNotMatch(graphView, /graphify-graph-view-summary/)
+  assert.doesNotMatch(graphView, /graphify-graph-view-legend/)
+  assert.doesNotMatch(graphView, /graphify-graph-view-actions/)
+  assert.doesNotMatch(graphView, /查询执行链路|Wren MDL|查询字段|来源记录/)
+  assert.match(evidenceGraph, /showSummary\?: boolean/)
+  assert.match(evidenceGraph, /v-if="showSummary"/)
 })
 
 test('query progress follows the latest user message for the entire run', () => {

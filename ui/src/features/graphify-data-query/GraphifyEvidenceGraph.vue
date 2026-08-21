@@ -13,7 +13,8 @@ const props = withDefaults(defineProps<{
   fullscreen: boolean
   viewMode?: 'focused' | 'full'
   showFields?: boolean
-}>(), { showFields: false, viewMode: 'focused' })
+  showSummary?: boolean
+}>(), { showFields: false, showSummary: true, viewMode: 'focused' })
 const emit = defineEmits<{
   select: [nodeId: string]
 }>()
@@ -30,9 +31,9 @@ const graphOpts = computed<{
   showFields: boolean
   visibleIds?: ReadonlySet<string>
 }>(() => ({
-  viewMode: props.showFields ? 'full' : 'focused',
+  viewMode: props.showFields || props.viewMode === 'full' ? 'full' : 'focused',
   showFields: props.showFields,
-  visibleIds: props.showFields
+  visibleIds: props.showFields || props.viewMode === 'full'
     ? undefined
     : expandSelection(
         props.evidence.evidence.nodes,
@@ -244,7 +245,7 @@ defineExpose({ zoomIn, zoomOut, fit, relayout })
   <div class="evidence-graph" :class="{ 'is-fullscreen': fullscreen }" aria-label="业务逻辑关系图谱">
     <div ref="canvas" class="cy-canvas" />
     <div ref="tooltipEl" class="cy-tooltip" role="tooltip" />
-    <div class="graph-summary" :class="{ expandable: totalNodeCount > visibleNodeCount }" role="button" tabindex="0" aria-label="图谱节点统计" @click="expandAll" @keydown.enter="expandAll">
+    <div v-if="showSummary" class="graph-summary" :class="{ expandable: totalNodeCount > visibleNodeCount }" role="button" tabindex="0" aria-label="图谱节点统计" @click="expandAll" @keydown.enter="expandAll">
       {{ visibleNodeCount }} 个节点 · {{ visibleEdgeCount }} 条关系
       <template v-if="totalNodeCount > visibleNodeCount">
         · 另有 {{ totalNodeCount - visibleNodeCount }} 个节点，点击展开
