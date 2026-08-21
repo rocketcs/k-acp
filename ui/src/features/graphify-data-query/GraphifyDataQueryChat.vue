@@ -47,12 +47,25 @@ const QUERY_FLOW_LABEL: Record<string, string> = {
   run_template_query: '执行查询',
   wren_query: '执行查询',
   evidence_subgraph: '查询知识图谱',
+  'read-cypher': '查询知识图谱',
   list_datasets: '定位数据集',
   describe_dataset: '定位数据集',
 }
 
 /** 把工具执行活动转化为业务化的查询流程摘要（隐藏原始工具参数/JSON）。 */
-function handleToolCallActivity(t: { toolName: string; status: 'running' | 'completed' | 'failed' }) {
+function appendCompletedEvidenceGraphStep(content?: string) {
+  if (!content || !parseGraphifyEvidence('', content)) return
+  const label = '查询知识图谱'
+  const existing = queryFlowActivities.value.find((a) => a.id === label)
+  if (existing) {
+    existing.status = 'completed'
+    existing.elapsed ??= Date.now() - existing.startTime
+    return
+  }
+  queryFlowActivities.value.push({ id: label, name: label, status: 'completed', startTime: Date.now(), elapsed: 0 })
+}
+
+function handleToolCallActivity(t: { toolName: string; status: 'running' | 'completed' | 'failed'; content?: string }) {
   const label = QUERY_FLOW_LABEL[t.toolName]
   if (!label) return
   if (t.status === 'failed') {
@@ -72,6 +85,7 @@ function handleToolCallActivity(t: { toolName: string; status: 'running' | 'comp
     step.status = t.status === 'running' ? 'running' : 'completed'
     if (t.status === 'completed') step.elapsed = Date.now() - step.startTime
   }
+  if (t.status === 'completed' && label === '执行查询') appendCompletedEvidenceGraphStep(t.content)
 }
 
 /** 每轮运行开始时清空业务步骤，供消息流内的运行状态卡展示。 */
