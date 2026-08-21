@@ -37,6 +37,8 @@ function persistableGraphifyToolResult({ content }: { content: string }): string
 
 /** 查询流程活动（业务标签，替代原始工具调用条），供 AgentRunActivity 以参考样式呈现。 */
 const queryFlowActivities = ref<RunActivity[]>([])
+/** 最终正文已开始时，以回答阶段为准，避免迟到的工具开始事件回退进度。 */
+const answerCompositionStarted = ref(false)
 
 /** 每次问数预置完整业务流程；只有工具真实完成后才改变步骤标记。 */
 const QUERY_FLOW_STEPS = [
@@ -44,6 +46,7 @@ const QUERY_FLOW_STEPS = [
   { id: 'preflight', name: '查询预检' },
   { id: 'query', name: '执行查询' },
   { id: 'evidence', name: '查询知识图谱' },
+  { id: 'answer', name: '整理回答' },
 ] as const
 
 function createQueryFlowActivities(): RunActivity[] {
@@ -66,6 +69,8 @@ function handleToolCallActivity(t: { toolName: string; status: 'running' | 'comp
   const label = QUERY_FLOW_LABEL[t.toolName]
   if (!label) return
   if (t.toolName === 'read-cypher' && t.status === 'completed' && !parseNeo4jReadCypherGraph(t.content ?? '')) return
+  // 流式事件可能乱序抵达。最终正文已出现后，不允许旧工具的“开始”事件把进度重新标回处理中。
+  if (answerCompositionStarted.value && t.status === 'running') return
   if (t.status === 'failed') {
     const failed = queryFlowActivities.value.find((a) => a.name === label)
     if (failed) { failed.status = 'failed'; failed.elapsed = Date.now() - failed.startTime }
@@ -81,10 +86,37 @@ function handleToolCallActivity(t: { toolName: string; status: 'running' | 'comp
   }
 }
 
-/** 每轮运行开始时清空业务步骤，供消息流内的运行状态卡展示。 */
+/** 最终业务正文开始输出时，结束滞后的工具活动并进入回答整理阶段。 */
+function beginAnswerComposition(content: string) {
+  if (!content.trim()) return
+  answerCompositionStarted.value = true
+  const now = Date.now()
+  queryFlowActivities.value.forEach((activity) => {
+    if (activity.status === 'running') {
+      activity.status = 'completed'
+      activity.elapsed = now - activity.startTime
+    }
+  })
+  const answer = queryFlowActivities.value.find((activity) => activity.id === 'answer')
+  if (answer?.status === 'pending') answer.status = 'running'
+}
+
+/** 整轮结束时收口“整理回答”，避免最终结果已出现却仍显示加载中。 */
+function completeAnswerComposition() {
+  const answer = queryFlowActivities.value.find((activity) => activity.id === 'answer')
+  if (answer?.status === 'running') {
+    answer.status = 'completed'
+    answer.elapsed = Date.now() - answer.startTime
+  }
+}
+
+/** 每轮运行开始时预置业务步骤，结束时收口回答整理状态。 */
 function handleRunStateChanged(isRunning: boolean) {
   if (isRunning) {
     queryFlowActivities.value = createQueryFlowActivities()
+    answerCompositionStarted.value = false
+  } else {
+    completeAnswerComposition()
   }
 }
 
@@ -233,6 +265,7 @@ watch(showQuickQuestions, (show) => {
       :message-presentation-adapter="messagePresentationAdapter"
       :on-session-messages-changed="onSessionMessagesChanged"
       :on-tool-call-activity="handleToolCallActivity"
+      :on-assistant-text-activity="beginAnswerComposition"
       :on-run-state-changed="handleRunStateChanged"
       :run-activity-adapter="adaptQueryFlowActivities"
       run-activity-placement="after-latest-user"

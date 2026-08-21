@@ -74,6 +74,8 @@ const props = withDefaults(defineProps<{
   toolResultPersistenceAdapter?: (input: ToolResultPersistenceInput) => string | null
   /** 特定路由用：把工具执行活动以业务标签回调出去，替代原始工具调用条。 */
   onToolCallActivity?: (t: { toolName: string; status: 'running' | 'completed' | 'failed'; content?: string }) => void
+  /** 特定路由可在助手开始输出最终正文时同步业务阶段。 */
+  onAssistantTextActivity?: (content: string) => void
   /** 特定路由用：在整轮请求的开始和结束时同步运行状态，供固定进度区持续展示。 */
   onRunStateChanged?: (isRunning: boolean) => void
   /** 特定路由可将工具活动转换为面向业务的步骤名称。 */
@@ -221,6 +223,7 @@ const {
   }, {
     onToolResult: (event) => { void persistAdaptedToolResult(event) },
     onToolCallActivity: props.onToolCallActivity,
+    onAssistantTextActivity: props.onAssistantTextActivity,
   })
 
 // 输入框内容

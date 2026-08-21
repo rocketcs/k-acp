@@ -35,6 +35,8 @@ export function useChatStream(
     onToolResult?: (event: { toolCallId: string; toolName: string; args: string; content: string; messageId: string }) => void
     /** 特定路由用：以业务标签驱动「干净的查询流程摘要」，替代原始工具调用条。 */
     onToolCallActivity?: (t: { toolName: string; status: 'running' | 'completed' | 'failed'; content?: string }) => void
+    /** 特定路由用：助手开始输出最终正文时更新业务阶段。 */
+    onAssistantTextActivity?: (content: string) => void
   }) {
 
   const { userInfo } = useAccountStore()
@@ -207,9 +209,13 @@ export function useChatStream(
       onTextMessageContent: (_e, currentText) => {
         agentHasResult.value = true
         streamingContent.value = currentText
-        if (currentText.trim()) hasVisibleAnswer.value = true
+        if (currentText.trim()) {
+          hasVisibleAnswer.value = true
+          options?.onAssistantTextActivity?.(currentText)
+        }
       },
       onTextMessageEnd: (_e, finalText) => {
+        if (finalText.trim()) options?.onAssistantTextActivity?.(finalText)
         finalizeStreamingMessage(finalText)
       },
       onReasoningMessageStart: (_e) => {
