@@ -44,6 +44,14 @@ function toolMessage(id: string | number, resultJson: string) {
   })
 }
 
+function namedToolMessage(id: string | number, name: string, resultJson: string) {
+  return message({
+    id,
+    role: 'tool',
+    content: JSON.stringify({ name, result: resultJson }),
+  })
+}
+
 test('maps a turn tool result to the following assistant message', () => {
   const evidence = executedEnvelope('q1')
   const map = buildSessionEvidence([
@@ -82,6 +90,33 @@ test('maps a blocked outcome without evidence', () => {
   ])
   assert.equal(map['2']?.outcome?.status, 'blocked')
   assert.equal(map['2']?.evidence, undefined)
+})
+
+test('replaces the query fallback graph with official Neo4j read-cypher nodes for the same turn', () => {
+  const initial = JSON.parse(executedEnvelope('阿莫西林'))
+  initial.evidence = {
+    source_record_ids: ['source-1'],
+    nodes: [{ id: 'product:阿莫西林', label: '阿莫西林', kind: 'product' }],
+    edges: [],
+  }
+  const officialGraph = JSON.stringify([{
+    source_id: '4:product:1', source_labels: ['DrugProduct'], source_properties: { generic_name: '阿莫西林' },
+    relation_type: 'MANUFACTURED_BY',
+    target_id: '4:org:1', target_labels: ['Organization'], target_properties: { name: '示例制药有限公司' },
+  }])
+
+  const map = buildSessionEvidence([
+    toolMessage(1, JSON.stringify(initial)),
+    namedToolMessage(2, 'read-cypher', officialGraph),
+    message({ id: 3, role: 'assistant', content: '以下是结果' }),
+  ])
+
+  assert.deepEqual(map['3']?.evidence?.evidence.nodes, [
+    { id: 'neo4j:4:product:1', label: '阿莫西林', kind: 'product', domain: 'DRUG' },
+    { id: 'neo4j:4:org:1', label: '示例制药有限公司', kind: 'organization' },
+  ])
+  assert.equal(map['3']?.evidence?.evidence.edges[0]?.label, '生产企业')
+  assert.deepEqual(map['3']?.evidence?.evidence.source_record_ids, ['source-1'])
 })
 
 test('returns empty mapping when no tool results', () => {

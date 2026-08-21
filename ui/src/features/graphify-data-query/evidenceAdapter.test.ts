@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { displayGraphifyLabel, displayGraphifyNodeLabel, parseGraphifyEvidence, parseGraphifyToolOutcome } from './evidenceAdapter.ts'
+import { displayGraphifyLabel, displayGraphifyNodeLabel, parseGraphifyEvidence, parseGraphifyToolOutcome, parseNeo4jReadCypherGraph } from './evidenceAdapter.ts'
 
 const evidence = {
   status: 'executed', trace_id: 'trace-1', dataset_id: 'medical_catalog', question: '覆膜气管支架',
@@ -40,6 +40,37 @@ test('accepts a blocked preflight outcome without treating it as evidence', () =
     status: 'blocked', trace_id: 'trace-blocked', findings: [{ message: 'Only SELECT statements are allowed.' }],
   }))
   assert.deepEqual(result, { status: 'blocked', trace_id: 'trace-blocked', reason: 'Only SELECT statements are allowed.' })
+})
+
+test('projects official Neo4j read-cypher relationship rows into bounded graph nodes and edges', () => {
+  const graph = parseNeo4jReadCypherGraph(JSON.stringify([
+    {
+      source_id: '4:product:1', source_labels: ['DrugProduct'], source_properties: { generic_name: '阿莫西林胶囊', drug_code: 'D001' },
+      relation_type: 'MANUFACTURED_BY',
+      target_id: '4:organization:1', target_labels: ['Organization'], target_properties: { name: '示例制药有限公司' },
+    },
+    {
+      source_id: '4:product:1', source_labels: ['DrugProduct'], source_properties: { generic_name: '阿莫西林胶囊', drug_code: 'D001' },
+      relation_type: 'REGISTERED_AS',
+      target_id: '4:registration:1', target_labels: ['RegistrationIdentifier'], target_properties: { registration_no: '国药准字H00001' },
+    },
+  ]))
+
+  assert.ok(graph)
+  assert.deepEqual(graph.nodes, [
+    { id: 'neo4j:4:product:1', label: '阿莫西林胶囊', kind: 'product', domain: 'DRUG' },
+    { id: 'neo4j:4:organization:1', label: '示例制药有限公司', kind: 'organization' },
+    { id: 'neo4j:4:registration:1', label: '国药准字H00001', kind: 'registration' },
+  ])
+  assert.deepEqual(graph.edges, [
+    { id: 'neo4j:4:product:1:MANUFACTURED_BY:neo4j:4:organization:1', source: 'neo4j:4:product:1', target: 'neo4j:4:organization:1', label: '生产企业', kind: 'business' },
+    { id: 'neo4j:4:product:1:REGISTERED_AS:neo4j:4:registration:1', source: 'neo4j:4:product:1', target: 'neo4j:4:registration:1', label: '注册备案', kind: 'business' },
+  ])
+})
+
+test('accepts an empty official Neo4j result as an empty graph instead of reusing a synthetic graph', () => {
+  assert.deepEqual(parseNeo4jReadCypherGraph('[]'), { nodes: [], edges: [] })
+  assert.equal(parseNeo4jReadCypherGraph('{"unexpected":true}'), null)
 })
 
 test('uses Chinese labels for user-visible fields and graph evidence', () => {

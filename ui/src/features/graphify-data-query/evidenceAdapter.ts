@@ -1,5 +1,10 @@
 import type { GraphifyEvidenceEdge, GraphifyEvidenceEnvelope, GraphifyEvidenceNode, GraphifyToolOutcome } from './types'
 
+export type Neo4jReadCypherGraph = {
+  nodes: GraphifyEvidenceNode[]
+  edges: GraphifyEvidenceEdge[]
+}
+
 const FINAL_QUERY_TOOLS = new Set(['query'])
 const OUTCOME_TOOLS = new Set([...FINAL_QUERY_TOOLS, 'query_preflight'])
 
@@ -92,6 +97,112 @@ const DISPLAY_LABELS: Record<string, string> = {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const isStrings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string')
+
+const MAX_NEO4J_NODES = 80
+const MAX_NEO4J_EDGES = 120
+
+const NEO4J_KIND_BY_LABEL: Record<string, GraphifyEvidenceNode['kind']> = {
+  DrugProduct: 'product',
+  ConsumableProduct: 'product',
+  ServiceProduct: 'product',
+  DiagnosisProduct: 'product',
+  RegistrationIdentifier: 'registration',
+  Organization: 'organization',
+  ConsumableBase: 'base',
+  MappingConcept: 'concept',
+  CatalogRecord: 'catalog_record',
+  SourceFile: 'source_file',
+  ImportBatch: 'import_batch',
+}
+
+const NEO4J_DOMAIN_BY_LABEL: Record<string, string> = {
+  DrugProduct: 'DRUG',
+  ConsumableProduct: 'CONSUMABLE',
+  ServiceProduct: 'SERVICE',
+  DiagnosisProduct: 'DIAGNOSIS',
+}
+
+const NEO4J_RELATIONS: Record<string, Pick<GraphifyEvidenceEdge, 'label' | 'kind'>> = {
+  MANUFACTURED_BY: { label: '生产企业', kind: 'business' },
+  REGISTERED_AS: { label: '注册备案', kind: 'business' },
+  PRODUCT_OF: { label: '对应基础耗材', kind: 'business' },
+  ASSERTED_MAPS_TO_CONCEPT: { label: '目录映射', kind: 'semantic' },
+  EVIDENCE_FOR: { label: '原始目录记录', kind: 'provenance' },
+  CONTAINS_RECORD: { label: '来源工作簿', kind: 'provenance' },
+  CONTAINS_SOURCE: { label: '导入批次', kind: 'provenance' },
+}
+
+function neo4jNodeKind(labels: string[]): GraphifyEvidenceNode['kind'] | null {
+  return labels.map((label) => NEO4J_KIND_BY_LABEL[label]).find((kind): kind is GraphifyEvidenceNode['kind'] => Boolean(kind)) ?? null
+}
+
+function neo4jNodeLabel(kind: GraphifyEvidenceNode['kind'], properties: Record<string, unknown>): string | null {
+  const candidates = kind === 'product'
+    ? ['catalog_name', 'generic_name', 'product_name', 'single_product_name', 'name', 'drug_code', 'base_code']
+    : kind === 'organization'
+      ? ['name', 'organization_name', 'manufacturer', 'enterprise_name']
+      : kind === 'registration'
+        ? ['registration_no', 'approval_number', 'raw_value', 'name']
+        : kind === 'base'
+          ? ['name', 'base_name', 'base_code']
+          : kind === 'concept'
+            ? ['name', 'concept_name', 'code']
+            : kind === 'catalog_record'
+              ? ['catalog_name', 'name', 'source_record_id']
+              : kind === 'source_file'
+                ? ['file_name', 'name', 'source_name']
+                : kind === 'import_batch'
+                  ? ['batch_name', 'name', 'batch_id']
+                  : ['name']
+  for (const key of candidates) {
+    const value = properties[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return kind === 'catalog_record' ? '原始目录记录'
+    : kind === 'source_file' ? '来源工作簿'
+      : kind === 'import_batch' ? '导入批次'
+        : null
+}
+
+function neo4jNode(id: string, labels: string[], properties: Record<string, unknown>): GraphifyEvidenceNode | null {
+  const kind = neo4jNodeKind(labels)
+  const label = kind ? neo4jNodeLabel(kind, properties) : null
+  if (!kind || !label) return null
+  const domain = labels.map((item) => NEO4J_DOMAIN_BY_LABEL[item]).find(Boolean)
+  return { id: `neo4j:${id}`, label, kind, ...(domain ? { domain } : {}) }
+}
+
+/**
+ * 将官方只读 MCP 的固定 Cypher 投影转换为前端图谱契约。
+ * 不接受任意 Cypher/任意 JSON：调用方必须返回 source/relationship/target 的扁平关系行。
+ */
+export function parseNeo4jReadCypherGraph(content: string): Neo4jReadCypherGraph | null {
+  if (!content || !content.trim()) return null
+  try {
+    const value: unknown = JSON.parse(content)
+    if (!Array.isArray(value)) return null
+    const nodes = new Map<string, GraphifyEvidenceNode>()
+    const edges = new Map<string, GraphifyEvidenceEdge>()
+    for (const row of value) {
+      if (!isRecord(row) || typeof row.source_id !== 'string' || typeof row.target_id !== 'string'
+        || !isStrings(row.source_labels) || !isStrings(row.target_labels)
+        || !isRecord(row.source_properties) || !isRecord(row.target_properties)
+        || typeof row.relation_type !== 'string') continue
+      const source = neo4jNode(row.source_id, row.source_labels, row.source_properties)
+      const target = neo4jNode(row.target_id, row.target_labels, row.target_properties)
+      if (!source || !target || source.id === target.id) continue
+      if (nodes.size < MAX_NEO4J_NODES || nodes.has(source.id)) nodes.set(source.id, source)
+      if (nodes.size < MAX_NEO4J_NODES || nodes.has(target.id)) nodes.set(target.id, target)
+      if (!nodes.has(source.id) || !nodes.has(target.id) || edges.size >= MAX_NEO4J_EDGES) continue
+      const relation = NEO4J_RELATIONS[row.relation_type] ?? { label: '相关', kind: 'semantic' as const }
+      const id = `${source.id}:${row.relation_type}:${target.id}`
+      edges.set(id, { id, source: source.id, target: target.id, ...relation })
+    }
+    return { nodes: [...nodes.values()], edges: [...edges.values()] }
+  } catch {
+    return null
+  }
+}
 
 export function displayGraphifyLabel(value: string, fallback?: string): string {
   // 未映射的键回显原值（诚实），绝不显示"业务字段"这类误导性占位表头。

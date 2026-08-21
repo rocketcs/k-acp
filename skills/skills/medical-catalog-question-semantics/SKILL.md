@@ -92,7 +92,22 @@ MCP 数据集协议按以下顺序推进，`trace_id` 从 `semantic_context` 返
 1. `list_datasets` / `describe_dataset(dataset_id)`：仅在数据集或字段范围不明确时调用。
 2. `semantic_context(dataset_id, question)`：每个自然语言问数请求先调用；保存返回的 `trace_id` 供后续使用。
 3. 直接编排 MDL SQL 查询（不使用任何预定义查询模板）：先 `query_preflight(dataset_id, question, sql, trace_id)`，仅当结果 `allowed` 或 `warning` 才调用 `query(dataset_id, sql, limit, trace_id)` 取得实际数据。该步骤是唯一的 PostgreSQL 事实查询，不得由图谱补充或修改表格行。
-4. 仅在 `query` 返回至少一条记录后调用 `evidence_subgraph(dataset_id, trace_id)` 查询本轮结果对应的 Neo4j 证据子图；它只返回来源文件、原始记录、映射关系、导入/审核依据，不改变 PostgreSQL 查询结果。0 行时不调用该工具，也不展示知识图谱。
+4. 仅在 `query` 返回至少一条记录后，调用官方只读 Neo4j MCP 的 `read-cypher`。从 **本轮 Wren 结果行** 提取去重后的 `catalog_code`（最多 6 个）作为 `catalog_codes`，提取 `registration_no`（最多 6 个）作为 `registration_numbers`；不得从用户问题猜测或自行补造这些参数。0 行时不调用图谱工具，也不展示知识图谱。
+   - `read-cypher` 只能执行下列固定的、单语句、参数化 Cypher 投影；只替换参数数组，禁止拼接用户输入、禁止使用 `CREATE`/`MERGE`/`SET`/`DELETE`/`CALL`、禁止调用 `get-schema`：
+     ```cypher
+     MATCH (product)
+     WHERE (product:ConsumableProduct AND (product.base_code IN $catalog_codes OR product.registration_no IN $registration_numbers))
+        OR (product:DrugProduct AND product.drug_code IN $catalog_codes)
+     WITH product LIMIT 6
+     MATCH (product)-[relationship]-(related)
+     WHERE type(relationship) IN ['MANUFACTURED_BY', 'REGISTERED_AS', 'PRODUCT_OF', 'ASSERTED_MAPS_TO_CONCEPT']
+     RETURN elementId(product) AS source_id, labels(product) AS source_labels, properties(product) AS source_properties,
+            type(relationship) AS relation_type,
+            elementId(related) AS target_id, labels(related) AS target_labels, properties(related) AS target_properties
+     LIMIT 72
+     ```
+   - 若需要来源路径，再用同样的结果锚点执行一个固定投影：`CatalogRecord-[:EVIDENCE_FOR]-product`、`SourceFile-[:CONTAINS_RECORD]-CatalogRecord`、`ImportBatch-[:CONTAINS_SOURCE]-SourceFile`，保持相同的 `source_id/source_labels/source_properties/relation_type/target_id/target_labels/target_properties` 返回列，最多 48 行。前端将这些真实关系行转换为 `nodes + edges` 后展示；Neo4j 命中为空或工具失败时不显示图谱入口。
+   - 该步骤只提供来源文件、原始行、映射关系与审核依据，绝不修改 PostgreSQL 表格数据，也不得把 Neo4j 属性补写成表格事实。
 5. 兼容路径：仅当通用数据集工具不可用时，才使用旧版 `wren_graph_context(question)` → `wren_query_preflight(question, sql)` → `wren_query(sql, limit)`。`wren_query` 是唯一的旧版事实执行入口。
 6. 不要调用不存在的 `wren_context_instructions`、`wren_memory_recall`；不要假定 `wren_models` 返回字段清单——字段存在性以语义上下文、预检与已发布模型为准；`raw` 与桥接层不是业务查询来源，禁止读取。
 
@@ -135,10 +150,10 @@ MCP 数据集协议按以下顺序推进，`trace_id` 从 `semantic_context` 返
 「语义依据」面板包含**两条互补信息**，不要混淆，也**不得把图谱当作数据库事实**：
 
 1. **执行链路（`execution_path`）**——回答"这条查询是怎么一步步执行的"，通常分几个阶段：
-   `Agent 语义分析`（识别意图/命中的语义词与字段）→ `Wren 语义层（MDL）`（命中业务模型 `medical_catalog`、查询字段数）→ `PostgreSQL 数据源`（读取物理视图，如 `medical_catalog_consumables`/`medical_catalog_drugs`）→ `Neo4j 证据子图`（仅针对已命中记录投影来源、映射和审核依据）→ `查询结果`（行数、来源记录数、是否截断）。
+   `Agent 语义分析`（识别意图/命中的语义词与字段）→ `Wren 语义层（MDL）`（命中业务模型 `medical_catalog`、查询字段数）→ `PostgreSQL 数据源`（读取物理视图，如 `medical_catalog_consumables`/`medical_catalog_drugs`）→ `Neo4j 证据子图`（官方只读 `read-cypher` 仅针对已命中记录投影来源、映射和审核依据）→ `查询结果`（行数、来源记录数、是否截断）。
    用户想看"查询思路"时，优先依托 `execution_path` 讲链路，而不是罗列结果节点。
 
-2. **结果子图（`evidence.nodes`/`edges`）**——回答"结果产品的来龙去脉"，按结果行的 `catalog_code` 从 Neo4j 投影出的关联子图。常见节点类型：
+2. **结果子图（`evidence.nodes`/`edges`）**——回答"结果产品的来龙去脉"，按本轮 Wren 结果行的 `catalog_code` / `registration_no` 通过官方只读 Neo4j `read-cypher` 投影出的关联子图。常见节点类型：
    `product`（产品）、`organization`（生产企业）、`catalog_record`（原始目录记录）、`source_file`（来源工作簿）、`import_batch`（导入批次）、`registration`（注册备案/批准文号）、`base`（基础耗材）、`concept`（映射概念）；边类型 `business`（业务关系）、`provenance`（来源追溯）、`semantic`（语义关系）、`query`（查询返回）。
 
 原则：

@@ -42,9 +42,9 @@ test('empty state hides the duplicate chat welcome and anchors its input at the 
   assert.match(component, /:deep\(\.graphify-data-query-chat \.chat-welcome-input\)\s*\{[\s\S]*?margin-bottom:/)
 })
 
-test('recent-query evidence graph entry is shown only for a non-empty result', () => {
+test('recent-query evidence graph entry is shown only for a non-empty Neo4j subgraph', () => {
   assert.match(component, /<span>最近查询图谱<\/span>/)
-  assert.match(component, /const canViewLatestGraph = computed\(\(\) => Boolean\(latestEvidence\.value\?\.evidence\?\.result\.rows\.length\)\)/)
+  assert.match(component, /const canViewLatestGraph = computed\(\(\) => Boolean\(latestEvidence\.value\?\.evidence\?\.evidence\.nodes\.length && latestEvidence\.value\?\.evidence\?\.evidence\.edges\.length\)\)/)
   assert.match(component, /<button v-if="canViewLatestGraph" type="button" class="graphify-graph-entry"/)
   assert.match(component, /<GraphifyGraphView :open="graphViewOpen" :evidence="latestEvidence\?\.evidence"/)
 })
@@ -64,10 +64,8 @@ test('query progress follows the latest user message for the entire run', () => 
   assert.match(component, /const QUERY_FLOW_STEPS/)
   assert.match(component, /function createQueryFlowActivities\(\)/)
   assert.match(component, /queryFlowActivities\.value = createQueryFlowActivities\(\)/)
-  assert.match(component, /evidence_subgraph:\s*'查询知识图谱'/)
   assert.match(component, /'read-cypher':\s*'查询知识图谱'/)
-  assert.match(component, /function appendCompletedEvidenceGraphStep\(content\?: string\)/)
-  assert.match(component, /parseGraphifyEvidence\('', content\)/)
+  assert.match(component, /parseNeo4jReadCypherGraph\(t\.content \?\? ''\)/)
   assert.match(chatStream, /const failedTool = toolCallsInProgress\.value\[toolCallsInProgress\.value\.length - 1\]/)
   assert.match(chatStream, /onToolCallActivity\?\.\(\{ toolName: failedTool\?\.name \?\? '', status: 'failed' \}\)/)
   assert.match(chatStream, /onToolCallActivity\?\.\(\{ toolName: activeTool\?\.name \?\? '', status: 'completed', content: e\.content \}\)/)

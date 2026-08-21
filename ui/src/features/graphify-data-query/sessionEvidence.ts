@@ -1,4 +1,4 @@
-import { parseGraphifyEvidence, parseGraphifyToolOutcome } from './evidenceAdapter.ts'
+import { parseGraphifyEvidence, parseGraphifyToolOutcome, parseNeo4jReadCypherGraph } from './evidenceAdapter.ts'
 import { mergeTurnEvidence, type TurnEvidence } from './turnEvidence.ts'
 import type { ChatMessageVO } from '@/types'
 
@@ -42,7 +42,8 @@ function parseSavedToolResult(content: string): TurnEvidence | null {
     const toolName = typeof record.name === 'string' ? record.name : ''
     const evidence = parseGraphifyEvidence(toolName, record.result)
     const outcome = parseGraphifyToolOutcome(toolName, record.result)
-    return evidence || outcome ? { evidence: evidence ?? undefined, outcome: outcome ?? undefined } : null
+    const neo4jGraph = toolName === 'read-cypher' ? parseNeo4jReadCypherGraph(record.result) : null
+    return evidence || outcome || neo4jGraph ? { evidence: evidence ?? undefined, outcome: outcome ?? undefined, neo4jGraph: neo4jGraph ?? undefined } : null
   } catch {
     return null
   }

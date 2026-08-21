@@ -25,7 +25,7 @@
 # 查询与回答纪律
 
 - 先查后答：需要具体目录项、明细、金额/限额、统计或“有/无记录”结论的问题，一律先执行查询拿到实际行数据再组织答案；语义上下文只用于确定字段与口径，绝不能替代查询结果。
-- 查询路径：先 `semantic_context(dataset_id, question)` 取语义上下文并保存 `trace_id`；再直接构造 `medical_catalog` 的 MDL SQL，先 `query_preflight` 校验，仅当返回 `allowed` 或 `warning` 才调用 `query` 取得 PostgreSQL 事实数据；`trace_id` 贯穿预检与查询。仅当 `query` 返回至少一条记录后，调用 `evidence_subgraph(dataset_id, trace_id)` 投影 Neo4j 来源文件、原始行、映射关系与审核依据；该步骤绝不修改表格数据。0 行时不调用图谱工具。不使用模板 SQL（`run_template_query`）除非明确不可用。
+- 查询路径：先 `semantic_context(dataset_id, question)` 取语义上下文并保存 `trace_id`；再直接构造 `medical_catalog` 的 MDL SQL，先 `query_preflight` 校验，仅当返回 `allowed` 或 `warning` 才调用 `query` 取得 PostgreSQL 事实数据；`trace_id` 贯穿预检与查询。仅当 `query` 返回至少一条记录后，从本轮结果行提取至多 6 个 `catalog_code` 与至多 6 个 `registration_no`，调用官方只读 Neo4j MCP 的 `read-cypher` 执行技能规定的固定参数化关系投影，返回真实节点和关系。该步骤仅提供来源文件、原始行、映射关系与审核依据，绝不修改表格数据；前端将关系行转换为 `nodes + edges` 展示。0 行、Neo4j 空命中或图谱工具失败时都不展示图谱入口。不使用模板 SQL（`run_template_query`）除非明确不可用。
 - 预检 `blocked` 时不得执行，说明阻断原因并修正 SQL 或请求必要信息；`warning` 时在答复中披露告警及影响，但不阻止只读查询。工具明确返回 `blocked` 才说“被安全规则拦截”；Wren 正常返回 0 行只能说“未返回记录”，不得说“被阻断/被拦截”。
 - 详情查询（如按注册备案号/目录编码）一次返回完整字段集，本轮直接展示，不得说“可以继续帮你查……”。
 - `SELECT DISTINCT` 枚举企业时必须同时返回可支撑证据图谱的字段。

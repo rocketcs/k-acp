@@ -4,7 +4,7 @@ import Chat from '@/views/Chat/index.vue'
 import * as agentApi from '@/api/agent'
 import { MedicineBoxOutlined, ShareAltOutlined } from '@ant-design/icons-vue'
 import GraphifyGraphView from './GraphifyGraphView.vue'
-import { parseGraphifyEvidence } from './evidenceAdapter'
+import { parseGraphifyEvidence, parseNeo4jReadCypherGraph } from './evidenceAdapter'
 import { buildSessionEvidence } from './sessionEvidence'
 import type { ChatMessageVO, ChatMessagePresentation, ChatMessagePresentationInput, RunActivity } from '@/types'
 import type { TurnEvidence } from './turnEvidence'
@@ -59,26 +59,13 @@ const QUERY_FLOW_LABEL: Record<string, string> = {
   query: '执行查询',
   run_template_query: '执行查询',
   wren_query: '执行查询',
-  evidence_subgraph: '查询知识图谱',
   'read-cypher': '查询知识图谱',
-}
-
-/** 把工具执行活动转化为业务化的查询流程摘要（隐藏原始工具参数/JSON）。 */
-function appendCompletedEvidenceGraphStep(content?: string) {
-  if (!content || !parseGraphifyEvidence('', content)) return
-  const label = '查询知识图谱'
-  const existing = queryFlowActivities.value.find((a) => a.name === label)
-  if (existing) {
-    existing.status = 'completed'
-    existing.elapsed ??= Date.now() - existing.startTime
-    return
-  }
-  queryFlowActivities.value.push({ id: label, name: label, status: 'completed', startTime: Date.now(), elapsed: 0 })
 }
 
 function handleToolCallActivity(t: { toolName: string; status: 'running' | 'completed' | 'failed'; content?: string }) {
   const label = QUERY_FLOW_LABEL[t.toolName]
   if (!label) return
+  if (t.toolName === 'read-cypher' && t.status === 'completed' && !parseNeo4jReadCypherGraph(t.content ?? '')) return
   if (t.status === 'failed') {
     const failed = queryFlowActivities.value.find((a) => a.name === label)
     if (failed) { failed.status = 'failed'; failed.elapsed = Date.now() - failed.startTime }
@@ -92,7 +79,6 @@ function handleToolCallActivity(t: { toolName: string; status: 'running' | 'comp
     step.status = t.status === 'running' ? 'running' : 'completed'
     if (t.status === 'completed') step.elapsed = Date.now() - step.startTime
   }
-  if (t.status === 'completed' && label === '执行查询') appendCompletedEvidenceGraphStep(t.content)
 }
 
 /** 每轮运行开始时清空业务步骤，供消息流内的运行状态卡展示。 */
@@ -179,8 +165,8 @@ async function sendQuickQuestion(question: string) {
 }
 
 const showQuickQuestions = computed(() => Boolean(agentId.value) && !hasMessages.value)
-/** 只有最近一次查询实际返回业务记录时，才提供图谱入口。 */
-const canViewLatestGraph = computed(() => Boolean(latestEvidence.value?.evidence?.result.rows.length))
+/** 仅在官方 Neo4j 实际返回关联子图时提供入口，避免用表格结果伪造图谱。 */
+const canViewLatestGraph = computed(() => Boolean(latestEvidence.value?.evidence?.evidence.nodes.length && latestEvidence.value?.evidence?.evidence.edges.length))
 
 /** 助手消息完整渲染（数据即正文 Markdown 表格/详情，不剔除任何内容）。 */
 function messageDisplayAdapter(input: { role: string; content: string }): string {

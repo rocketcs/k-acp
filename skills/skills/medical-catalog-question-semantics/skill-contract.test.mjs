@@ -55,7 +55,11 @@ test('skill separates execution path from result subgraph', () => {
 
 test('skill requires a distinct Neo4j evidence step after non-empty fact results', () => {
   const protocol = section(skill, '工具协议（执行顺序）')
-  assert.match(protocol, /evidence_subgraph\(dataset_id, trace_id\)/)
-  assert.match(protocol, /仅在 `query` 返回至少一条记录后调用/)
-  assert.match(protocol, /不改变 PostgreSQL 查询结果/)
+  assert.match(protocol, /read-cypher/)
+  assert.match(protocol, /catalog_codes/)
+  assert.match(protocol, /registration_numbers/)
+  assert.match(protocol, /nodes \+ edges/)
+  assert.match(protocol, /仅在 `query` 返回至少一条记录后，调用/)
+  assert.match(protocol, /绝不修改 PostgreSQL 表格数据/)
+  assert.doesNotMatch(protocol, /evidence_subgraph/)
 })
