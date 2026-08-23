@@ -86,11 +86,15 @@ const props = withDefaults(defineProps<{
   forceRunActivity?: boolean
   /** 强制开启工具执行过程展示（用于需要保留 MCP 工具结果的受治理数据查询类 agent）。 */
   forceToolProcessActive?: boolean
+  /** 仅特定路由在输入框上方显示完整知识图谱入口。 */
+  showGraphExplorer?: boolean
 }>(), {
   showAccount: true,
   chatAgentId: null,
   forceToolProcessActive: false
 })
+
+const emit = defineEmits<{ (e: 'graphExplorer'): void }>()
 
 const route = useRoute()
 const accountStore = useAccountStore()
@@ -880,6 +884,7 @@ defineExpose({ submitExternalSubmission, requestAttachmentPicker, abortRun })
       :history-loading="historyLoading"
       :current-plan="currentPlan"
       :diy-config="diyConfig"
+      :show-graph-explorer="showGraphExplorer"
       @update:input-value="inputText = $event"
       @update:uploaded-files="uploadedFiles = $event"
       @memory="handleMemoryChange"
@@ -897,6 +902,7 @@ defineExpose({ submitExternalSubmission, requestAttachmentPicker, abortRun })
       @uip-retry="handleUIPRetry"
       @vep-retry="handleVEPRetry"
       @quick-send="handleQuickSend"
+      @graph-explorer="emit('graphExplorer')"
     />
     <!-- 工作空间面板（作为 flex 子项从右侧滑出） -->
     <WorkspacePanel

@@ -6,7 +6,7 @@
  * @component
  */
 import { computed, onMounted, ref } from 'vue'
-import { MessageOutlined } from '@ant-design/icons-vue'
+import { MessageOutlined, ShareAltOutlined } from '@ant-design/icons-vue'
 import ChatInputAttachments from './ChatInputAttachments.vue'
 import ChatInputEditor from './ChatInputEditor.vue'
 import ChatInputToolbar from './ChatInputToolbar.vue'
@@ -36,6 +36,8 @@ const props = withDefaults(
     sessionId?: string | null
     mentionAllowed?: boolean
     needInit?: boolean
+    /** 仅特定助手在输入框上方显示完整知识图谱入口。 */
+    showGraphExplorer?: boolean
   }>(),
   {
     uploadedFiles: () => [],
@@ -48,7 +50,8 @@ const props = withDefaults(
     attachmentDropEnabled: false,
     sessionId: null,
     mentionAllowed: false,
-    needInit: false
+    needInit: false,
+    showGraphExplorer: false
   }
 )
 
@@ -62,6 +65,7 @@ const emit = defineEmits<{
   (e: 'toolProcess', value: boolean): void
   (e: 'inputTagPreview', value: FlatFileItem): void
   (e: 'newSession'): void
+  (e: 'graphExplorer'): void
 }>()
 
 const fileInputRef = ref<HTMLInputElement | null>()
@@ -156,6 +160,16 @@ defineExpose({ requestAttachmentPicker })
 </script>
 
 <template>
+  <div class="chat-input-container">
+  <div v-if="showGraphExplorer" class="chat-input-top-actions">
+    <ATooltip placement="top" title="打开完整知识图谱">
+      <button type="button" class="chat-input-top-action-btn" title="打开知识图谱"
+        @click="emit('graphExplorer')">
+        <ShareAltOutlined />
+        <span>知识图谱</span>
+      </button>
+    </ATooltip>
+  </div>
   <!--
     外层 stage：flex 居中容器，确保 shell 的宽度变化由中轴向两侧同步扩收。
     单容器形变方案：是同一个 div 在 needInit 变化时同步调整
@@ -234,6 +248,7 @@ defineExpose({ requestAttachmentPicker })
       />
     </div>
     </div>
+    </div>
   </div>
 </template>
 
@@ -249,6 +264,38 @@ defineExpose({ requestAttachmentPicker })
   display: flex;
   justify-content: center;
   width: 100%;
+}
+
+.chat-input-container {
+  width: 100%;
+}
+
+.chat-input-top-actions {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  margin-bottom: 8px;
+}
+
+.chat-input-top-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #c3d9ec;
+  border-radius: 999px;
+  background: #f7fbff;
+  color: #2f6fa8;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+.chat-input-top-action-btn:hover {
+  border-color: #69a7d4;
+  background: #eaf4fb;
+  color: #1f5b8f;
 }
 
 /**

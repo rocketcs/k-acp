@@ -58,6 +58,7 @@ const props = defineProps<{
   /** 当前计划信息 */
   currentPlan?: PlanInfo | null
   diyConfig?: DiyPageConfig | null
+  showGraphExplorer?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -81,6 +82,7 @@ const emit = defineEmits<{
   (e: 'uipRetry', uipCode: string): void
   (e: 'vepRetry', vepCode: string): void
   (e: 'quickSend', payload: { text: string; outputFormat: DiyOutputFormat }): void
+  (e: 'graphExplorer'): void
 }>()
 
 // 滚动容器 ref
@@ -316,6 +318,7 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
         :has-code-execution-config="hasCodeExecutionConfig"
         :mention-allowed="true"
         :diy-config="diyConfig"
+        :show-graph-explorer="showGraphExplorer"
         @update:input-value="$emit('update:inputValue', $event)"
         @update:uploaded-files="$emit('update:uploadedFiles', $event)"
         @memory="$emit('memory', $event)"
@@ -395,6 +398,7 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
             :tool-process-active="toolProcessActive"
             :session-id="sessionId"
             :mention-allowed="true"
+            :show-graph-explorer="showGraphExplorer"
             @inputTagPreview="inputTagPreviewHandle"
             @update:model-value="$emit('update:inputValue', $event)"
             @update:uploaded-files="$emit('update:uploadedFiles', $event)"
@@ -403,6 +407,7 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
             @toolProcess="$emit('toolProcess', $event)"
             @send="handleSend"
             @abort="$emit('abort')"
+            @graph-explorer="$emit('graphExplorer')"
           />
           <div class="text-placeholder text-xs mt-sm" style="text-align: center; margin: 5px 0;">内容由AI生成，仅供参考</div>
         </div>

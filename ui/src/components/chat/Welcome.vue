@@ -35,6 +35,7 @@ const props = defineProps<{
   mentionAllowed?: boolean
   hasCodeExecutionConfig?: boolean
   diyConfig?: DiyPageConfig | null
+  showGraphExplorer?: boolean
 }>()
 
 const needInit = computed(() => {
@@ -51,6 +52,7 @@ defineEmits<{
   (e: 'newSession'): void
   (e: 'abort'): void
   (e: 'quickSend', payload: { text: string; outputFormat: DiyOutputFormat }): void
+  (e: 'graphExplorer'): void
 }>()
 
 const diyFormActive = ref(false)
@@ -115,6 +117,7 @@ defineExpose({ requestAttachmentPicker })
         :session-id="sessionId"
         :mention-allowed="mentionAllowed"
         :need-init="needInit"
+        :show-graph-explorer="showGraphExplorer"
         @update:model-value="$emit('update:inputValue', $event)"
         @update:uploaded-files="$emit('update:uploadedFiles', $event)"
         @memory="$emit('memory', $event)"
@@ -122,6 +125,7 @@ defineExpose({ requestAttachmentPicker })
         @toolProcess="$emit('toolProcess', $event)"
         @send="$emit('send')"
         @new-session="$emit('newSession')"
+        @graph-explorer="$emit('graphExplorer')"
       />
     </div>
   </div>

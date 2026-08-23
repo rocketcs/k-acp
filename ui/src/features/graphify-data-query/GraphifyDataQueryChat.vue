@@ -4,6 +4,7 @@ import Chat from '@/views/Chat/index.vue'
 import * as agentApi from '@/api/agent'
 import { MedicineBoxOutlined } from '@ant-design/icons-vue'
 import GraphifyAssistantMessage from './GraphifyAssistantMessage.vue'
+import GraphExplorerModal from './GraphExplorerModal.vue'
 import { parseGraphifyEvidence, parseNeo4jReadCypherGraph } from './evidenceAdapter'
 import { buildSessionEvidence } from './sessionEvidence'
 import type { ChatMessageVO, ChatMessagePresentation, ChatMessagePresentationInput, RunActivity } from '@/types'
@@ -16,6 +17,7 @@ type GraphifyChatSubmission = { displayText: string; runtimeText: string; titleT
 const agentId = ref('')
 const loading = ref(true)
 const loadError = ref('')
+const graphExplorerOpen = ref(false)
 
 /** 助手消息 id → 该轮语义依据（重构自会话消息 + 本地缓存，普通 chat 内联展示用）。 */
 const evidenceByMessageId = ref<Record<string, TurnEvidence>>({})
@@ -280,7 +282,10 @@ watch(showQuickQuestions, (show) => {
       :force-run-activity="true"
       :hide-tool-messages="true"
       :tool-result-persistence-adapter="persistableGraphifyToolResult"
+      @graph-explorer="graphExplorerOpen = true"
     />
+
+    <GraphExplorerModal v-model:open="graphExplorerOpen" />
 
     <!-- 空状态快捷问题：业务引导与自适应换行的胶囊问题。 -->
     <div v-if="showQuickQuestions" class="graphify-quick-pills" aria-label="快捷问题">
