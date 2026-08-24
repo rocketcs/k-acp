@@ -2,6 +2,7 @@
 import {computed, ref, watch, onMounted} from 'vue'
 import {
   MenuOutlined,
+  DatabaseOutlined,
   FolderOutlined,
   FolderOpenOutlined,
   LoadingOutlined
@@ -272,6 +273,19 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
         <MenuOutlined />
       </button>
       <h1 class="chat-main-title" :title="title">{{ title }}</h1>
+      <!-- 页面级数据管理入口：始终固定在标题栏右侧，避免与输入区争夺注意力。 -->
+      <ATooltip v-if="showGraphExplorer" placement="left" title="打开数据管理">
+        <button
+          type="button"
+          class="chat-data-management-btn"
+          title="打开数据管理"
+          aria-label="打开数据管理"
+          @click="$emit('graphExplorer')"
+        >
+          <DatabaseOutlined />
+          <span>数据管理</span>
+        </button>
+      </ATooltip>
       <!-- 工作空间入口按钮（与左侧菜单按钮对称） -->
       <ATooltip placement="left" title="工作空间">
         <button
@@ -318,7 +332,6 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
         :has-code-execution-config="hasCodeExecutionConfig"
         :mention-allowed="true"
         :diy-config="diyConfig"
-        :show-graph-explorer="showGraphExplorer"
         @update:input-value="$emit('update:inputValue', $event)"
         @update:uploaded-files="$emit('update:uploadedFiles', $event)"
         @memory="$emit('memory', $event)"
@@ -398,7 +411,6 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
             :tool-process-active="toolProcessActive"
             :session-id="sessionId"
             :mention-allowed="true"
-            :show-graph-explorer="showGraphExplorer"
             @inputTagPreview="inputTagPreviewHandle"
             @update:model-value="$emit('update:inputValue', $event)"
             @update:uploaded-files="$emit('update:uploadedFiles', $event)"
@@ -407,7 +419,6 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
             @toolProcess="$emit('toolProcess', $event)"
             @send="handleSend"
             @abort="$emit('abort')"
-            @graph-explorer="$emit('graphExplorer')"
           />
           <div class="text-placeholder text-xs mt-sm" style="text-align: center; margin: 5px 0;">内容由AI生成，仅供参考</div>
         </div>

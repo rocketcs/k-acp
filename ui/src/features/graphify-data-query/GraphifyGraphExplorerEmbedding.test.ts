@@ -7,7 +7,6 @@ const modal = readFileSync(new URL('./GraphExplorerModal.vue', import.meta.url),
 const chat = readFileSync(new URL('../../views/Chat/index.vue', import.meta.url), 'utf8')
 const chatMain = readFileSync(new URL('../../components/chat/ChatMain.vue', import.meta.url), 'utf8')
 const welcome = readFileSync(new URL('../../components/chat/Welcome.vue', import.meta.url), 'utf8')
-const input = readFileSync(new URL('../../components/chat/ChatInput.vue', import.meta.url), 'utf8')
 
 test('医保问数路由 enables a route-scoped full-page Graph Explorer modal', () => {
   assert.match(route, /import GraphExplorerModal from '\.\/GraphExplorerModal\.vue'/)
@@ -29,20 +28,19 @@ test('Graph Explorer modal embeds the complete external page in an iframe', () =
   assert.match(modal, /@keydown\.esc="close"/)
 })
 
-test('Graph Explorer action is forwarded through shared chat components and rendered above input', () => {
+test('Graph Explorer action is forwarded through the shared chat header', () => {
   for (const content of [chat, chatMain, welcome]) {
     assert.match(content, /showGraphExplorer\?: boolean/)
     assert.match(content, /graphExplorer/)
   }
-  assert.match(input, /showGraphExplorer\?: boolean/)
-  assert.match(input, /v-if="showGraphExplorer" class="chat-input-top-actions"/)
-  assert.match(input, /title="打开数据管理"/)
-  assert.match(input, /<span>数据管理<\/span>/)
-  assert.match(input, /@click="emit\('graphExplorer'\)"/)
+  assert.match(chatMain, /class="chat-data-management-btn"/)
+  assert.match(chatMain, /<span>数据管理<\/span>/)
+  assert.match(chatMain, /@click="\$emit\('graphExplorer'\)"/)
+  assert.doesNotMatch(chatMain, /:show-graph-explorer="showGraphExplorer"/)
 })
 
-test('Graph Explorer action is prominent and right-aligned above the input', () => {
-  assert.match(input, /DatabaseOutlined/)
-  assert.match(route, /:deep\(\.graphify-data-query-chat \.chat-input-top-actions\)\s*\{[\s\S]*?justify-content:\s*flex-end/)
-  assert.match(route, /:deep\(\.graphify-data-query-chat \.chat-input-top-action-btn\)\s*\{[\s\S]*?min-height:\s*42px[\s\S]*?min-width:\s*124px[\s\S]*?background:\s*#2d7fbd[\s\S]*?color:\s*#fff[\s\S]*?font-weight:\s*600/)
+test('Graph Explorer action is prominent in the chat header', () => {
+  assert.match(chatMain, /DatabaseOutlined/)
+  assert.match(route, /:deep\(\.graphify-data-query-chat \.chat-main-header\)\s*\{[\s\S]*?position:\s*relative/)
+  assert.match(route, /:deep\(\.graphify-data-query-chat \.chat-data-management-btn\)\s*\{[\s\S]*?min-height:\s*42px[\s\S]*?background:\s*#2d7fbd[\s\S]*?color:\s*#fff[\s\S]*?font-weight:\s*600/)
 })

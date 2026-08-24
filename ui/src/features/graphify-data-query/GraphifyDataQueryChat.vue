@@ -313,17 +313,24 @@ onMounted(() => { void loadAgent() })
   margin-top: auto;
 }
 
-/* 数据管理是本页面的主入口：贴近输入区但右对齐，避免与问数卡片争夺视觉焦点。 */
-:deep(.graphify-data-query-chat .chat-input-top-actions) {
-  justify-content: flex-end;
-  min-height: 42px;
-  margin-bottom: 10px;
+/* 数据管理是页面级工具入口：固定在标题栏右侧，进入页面即可发现。 */
+:deep(.graphify-data-query-chat .chat-main-header) {
+  min-height: 56px;
+  position: relative;
 }
 
-:deep(.graphify-data-query-chat .chat-input-top-action-btn) {
-  min-height: 42px;
+:deep(.graphify-data-query-chat .chat-data-management-btn) {
+  position: absolute;
+  top: 50%;
+  right: clamp(16px, 3vw, 48px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   min-width: 124px;
+  min-height: 42px;
   padding: 0 18px;
+  transform: translateY(-50%);
   border: 1px solid #2d7fbd;
   border-radius: 10px;
   background: #2d7fbd;
@@ -331,15 +338,33 @@ onMounted(() => { void loadAgent() })
   font-size: 14px;
   font-weight: 600;
   box-shadow: 0 6px 16px rgb(39 111 169 / 24%);
-  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-:deep(.graphify-data-query-chat .chat-input-top-action-btn:hover) {
+:deep(.graphify-data-query-chat .chat-data-management-btn:hover) {
   border-color: #1f639b;
   background: #1f639b;
   color: #fff;
   box-shadow: 0 8px 20px rgb(39 111 169 / 30%);
-  transform: translateY(-1px);
+  transform: translateY(calc(-50% - 1px));
+}
+
+@media (max-width: 767px) {
+  :deep(.graphify-data-query-chat .chat-main-title) {
+    max-width: calc(100% - 132px);
+  }
+
+  :deep(.graphify-data-query-chat .chat-data-management-btn) {
+    right: 12px;
+    min-width: 42px;
+    width: 42px;
+    padding: 0;
+  }
+
+  :deep(.graphify-data-query-chat .chat-data-management-btn span) {
+    display: none;
+  }
 }
 
 /* 当前问数入口的快捷卡片收窄一些，减少横向空白，同时保留三列可读布局。 */
