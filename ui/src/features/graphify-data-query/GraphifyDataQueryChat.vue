@@ -321,22 +321,23 @@ onMounted(() => { void loadAgent() })
 
 :deep(.graphify-data-query-chat .chat-input-top-action-btn) {
   min-height: 42px;
-  padding: 0 17px;
-  border: 1px solid #5d9ed1;
-  border-radius: 12px;
-  background: #e9f4ff;
-  color: #1f659e;
+  min-width: 124px;
+  padding: 0 18px;
+  border: 1px solid #2d7fbd;
+  border-radius: 10px;
+  background: #2d7fbd;
+  color: #fff;
   font-size: 14px;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgb(39 111 169 / 12%);
+  box-shadow: 0 6px 16px rgb(39 111 169 / 24%);
   transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 :deep(.graphify-data-query-chat .chat-input-top-action-btn:hover) {
-  border-color: #2d7fbd;
-  background: #d8ecfc;
-  color: #155482;
-  box-shadow: 0 6px 16px rgb(39 111 169 / 18%);
+  border-color: #1f639b;
+  background: #1f639b;
+  color: #fff;
+  box-shadow: 0 8px 20px rgb(39 111 169 / 30%);
   transform: translateY(-1px);
 }
 

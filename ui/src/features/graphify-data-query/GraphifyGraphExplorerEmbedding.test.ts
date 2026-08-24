@@ -44,5 +44,5 @@ test('Graph Explorer action is forwarded through shared chat components and rend
 test('Graph Explorer action is prominent and right-aligned above the input', () => {
   assert.match(input, /DatabaseOutlined/)
   assert.match(route, /:deep\(\.graphify-data-query-chat \.chat-input-top-actions\)\s*\{[\s\S]*?justify-content:\s*flex-end/)
-  assert.match(route, /:deep\(\.graphify-data-query-chat \.chat-input-top-action-btn\)\s*\{[\s\S]*?min-height:\s*42px[\s\S]*?background:\s*#e9f4ff[\s\S]*?font-weight:\s*600/)
+  assert.match(route, /:deep\(\.graphify-data-query-chat \.chat-input-top-action-btn\)\s*\{[\s\S]*?min-height:\s*42px[\s\S]*?min-width:\s*124px[\s\S]*?background:\s*#2d7fbd[\s\S]*?color:\s*#fff[\s\S]*?font-weight:\s*600/)
 })
