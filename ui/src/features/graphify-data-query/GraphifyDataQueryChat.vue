@@ -1,18 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import Chat from '@/views/Chat/index.vue'
 import * as agentApi from '@/api/agent'
-import { MedicineBoxOutlined } from '@ant-design/icons-vue'
 import GraphifyAssistantMessage from './GraphifyAssistantMessage.vue'
 import GraphExplorerModal from './GraphExplorerModal.vue'
-import { parseGraphifyEvidence, parseNeo4jReadCypherGraph } from './evidenceAdapter'
-import { buildSessionEvidence } from './sessionEvidence'
+import { parseGraphifyEvidence, parseGraphifyGraphReference, parseNeo4jReadCypherGraph } from './evidenceAdapter'
+import { buildSessionEvidence, hydrateGraphReferences } from './sessionEvidence'
 import type { ChatMessageVO, ChatMessagePresentation, ChatMessagePresentationInput, RunActivity } from '@/types'
 import type { TurnEvidence } from './turnEvidence'
 
 const GRAPHIFY_DATA_QUERY_AGENT_CODE = 'default-graphify-data-query'
-
-type GraphifyChatSubmission = { displayText: string; runtimeText: string; titleText: string; fileIds: string[] }
 
 const agentId = ref('')
 const loading = ref(true)
@@ -21,16 +18,11 @@ const graphExplorerOpen = ref(false)
 
 /** 助手消息 id → 该轮语义依据（重构自会话消息 + 本地缓存，普通 chat 内联展示用）。 */
 const evidenceByMessageId = ref<Record<string, TurnEvidence>>({})
-/** 聊天是否已有内容（用于决定是否展示空状态快捷问题）。 */
-const hasMessages = ref(false)
-const chatRef = ref<{
-  submitExternalSubmission: (submission: GraphifyChatSubmission) => Promise<boolean>
-} | null>(null)
-const quickSending = ref(false)
 
-/** 持久化查询结果及官方 Neo4j 投影，刷新后仍可按回答恢复真实图谱。 */
+/** 持久化查询结果及真实 Neo4j 证据投影，刷新后仍可按回答恢复图谱。 */
 function persistableGraphifyToolResult({ toolName, content }: { toolName: string; content: string }): string | null {
-  if (parseGraphifyEvidence('', content)) return content
+  if (parseGraphifyEvidence('', content)) return JSON.stringify({ name: toolName, result: content })
+  if (toolName === 'evidence_subgraph' && parseGraphifyGraphReference(content)) return JSON.stringify({ name: toolName, result: content })
   if (toolName === 'read-cypher' && parseNeo4jReadCypherGraph(content)) {
     return JSON.stringify({ name: toolName, result: content })
   }
@@ -39,6 +31,7 @@ function persistableGraphifyToolResult({ toolName, content }: { toolName: string
 
 /** 查询流程活动（业务标签，替代原始工具调用条），供 AgentRunActivity 以参考样式呈现。 */
 const queryFlowActivities = ref<RunActivity[]>([])
+const completedRunActivities = ref<RunActivity[]>([])
 /** 最终正文已开始时，以回答阶段为准，避免迟到的工具开始事件回退进度。 */
 const answerCompositionStarted = ref(false)
 
@@ -47,7 +40,7 @@ const QUERY_FLOW_STEPS = [
   { id: 'semantic', name: '语义解析' },
   { id: 'preflight', name: '查询预检' },
   { id: 'query', name: '执行查询' },
-  { id: 'evidence', name: '查询知识图谱' },
+  { id: 'evidence', name: '查询数据管理' },
   { id: 'answer', name: '整理回答' },
 ] as const
 
@@ -64,13 +57,35 @@ const QUERY_FLOW_LABEL: Record<string, string> = {
   query: '执行查询',
   run_template_query: '执行查询',
   wren_query: '执行查询',
-  'read-cypher': '查询知识图谱',
+  evidence_subgraph: '查询数据管理',
+  // 兼容历史会话；新请求统一走 evidence_subgraph，避免智能体直接拼 Cypher。
+  'read-cypher': '查询数据管理',
 }
 
 function handleToolCallActivity(t: { toolName: string; status: 'running' | 'completed' | 'failed'; content?: string }) {
   const label = QUERY_FLOW_LABEL[t.toolName]
   if (!label) return
   if (t.toolName === 'read-cypher' && t.status === 'completed' && !parseNeo4jReadCypherGraph(t.content ?? '')) return
+  if (t.toolName === 'evidence_subgraph' && t.status === 'completed') {
+    const envelope = parseGraphifyEvidence('', t.content ?? '')
+    const nodeKinds = new Set(['product', 'registration', 'organization', 'base', 'concept', 'attribute', 'catalog_record', 'source_file', 'import_batch'])
+    const actualNodes = envelope?.evidence.nodes.filter((node) => nodeKinds.has(node.kind)) ?? []
+    const actualIds = new Set(actualNodes.map((node) => node.id))
+    const hasGraphEdges = envelope?.evidence.edges.some((edge) => actualIds.has(edge.source) && actualIds.has(edge.target)) ?? false
+    // An empty/unsupported evidence projection is a completed optional step,
+    // not a still-running one. Keep the run card truthful instead of leaving
+    // the whole answer stuck at “等待查询数据管理” forever; the answer-level
+    // graph button remains hidden because GraphifyAssistantMessage still
+    // requires real Neo4j nodes and edges.
+    if (!actualNodes.length || !hasGraphEdges) {
+      const step = queryFlowActivities.value.find((activity) => activity.name === label)
+      if (step) {
+        step.status = 'completed'
+        step.elapsed = Date.now() - step.startTime
+      }
+      return
+    }
+  }
   // 流式事件可能乱序抵达。最终正文已出现后，不允许旧工具的“开始”事件把进度重新标回处理中。
   if (answerCompositionStarted.value && t.status === 'running') return
   if (t.status === 'failed') {
@@ -110,12 +125,14 @@ function completeAnswerComposition() {
     answer.status = 'completed'
     answer.elapsed = Date.now() - answer.startTime
   }
+  completedRunActivities.value = queryFlowActivities.value.map((activity) => ({ ...activity }))
 }
 
 /** 每轮运行开始时预置业务步骤，结束时收口回答整理状态。 */
 function handleRunStateChanged(isRunning: boolean) {
   if (isRunning) {
     queryFlowActivities.value = createQueryFlowActivities()
+    completedRunActivities.value = []
     answerCompositionStarted.value = false
   } else {
     completeAnswerComposition()
@@ -127,76 +144,14 @@ function adaptQueryFlowActivities(_activities: readonly RunActivity[]): RunActiv
   return queryFlowActivities.value
 }
 
-function onSessionMessagesChanged({ messages }: { sessionId: string | null; messages: readonly ChatMessageVO[] }) {
-  evidenceByMessageId.value = buildSessionEvidence(messages)
-  hasMessages.value = messages.some((m) => m.role === 'user' || m.role === 'assistant')
+let hydrationGeneration = 0
+async function onSessionMessagesChanged({ messages }: { sessionId: string | null; messages: readonly ChatMessageVO[] }) {
+  const generation = ++hydrationGeneration
+  const restored = buildSessionEvidence(messages)
+  evidenceByMessageId.value = restored
+  const hydrated = await hydrateGraphReferences(restored)
+  if (generation === hydrationGeneration) evidenceByMessageId.value = hydrated
 }
-
-// 空状态快捷问题池：覆盖真实药品、耗材和医保服务目录的随机问题池。
-const QUICK_QUESTIONS: readonly string[] = [
-  '查询“复方氯己定含漱液”的生产企业和规格',
-  '查询“聚维酮碘含漱液”的生产企业和规格',
-  '查询“西吡氯铵含漱液”的支付类别、最高价格和价格口径',
-  '查询“氯己定苯佐卡因含片”的规格和生产企业',
-  '查询“西地碘含片”的支付类别、最高价格和价格口径',
-  '查询“复方氢氧化铝片”的生产企业和规格',
-  '查询生产企业为“杭州民生药业股份有限公司”的药品名称和规格',
-  '查询甲类药品的名称、生产企业、最高价格和价格口径',
-  '查询乙类药品的名称、规格和生产企业',
-  '查询药品目录的最高价格和价格口径',
-  '查询“覆膜气管支架”的分类、材质和生产企业',
-  '查询“一次性使用支气管定位支架”的材质、生产企业和支付类别',
-  '查询“镍钛记忆合金自扩张式医用内支架(气道支架)”的分类和生产企业',
-  '查询“气管支架”的材质、生产企业和支付类别',
-  '查询呼吸介入材料的目录名称、材质和生产企业',
-  '查询非血管介入治疗类材料的二级分类和支付类别',
-  '查询材质为不锈钢的耗材名称、分类和生产企业',
-  '查询材质为合金的耗材名称、分类和生产企业',
-  '查询乙类耗材的名称、二级分类和生产企业',
-  '查询耗材目录的一级分类、二级分类和支付类别',
-  '查询“互联网首诊（普通医师）”的支付类别和省级一档最高限额',
-  '查询“互联网首诊(副主任医师)”的支付类别和省级一档最高限额',
-  '查询“互联网首诊(主任医师)”的支付类别和省级一档最高限额',
-  '查询不同医师级别的互联网首诊项目和最高限额',
-  '查询“门诊诊查费（普通门诊）”的支付类别和自付比例',
-  '查询政策号为“豫医保办〔2025〕51号”的医保服务项目',
-  '查询甲类医保服务项目的名称、自付比例和最高限额',
-  '查询丙类医保服务项目的名称、自付比例和最高限额',
-  '查询名称含“诊查”的医保服务项目和支付类别',
-  '查询医保服务项目的自付比例和省级一档最高限额',
-]
-/** 每次进入空状态随机取 8 条、乱序。 */
-const quickQuestions = ref<string[]>([])
-
-function shuffle<T>(list: readonly T[]): T[] {
-  const arr = [...list]
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[arr[i], arr[j]] = [arr[j]!, arr[i]!]
-  }
-  return arr
-}
-
-function initializeQuickQuestions() {
-  quickQuestions.value = shuffle(QUICK_QUESTIONS).slice(0, 8)
-}
-
-async function sendQuickQuestion(question: string) {
-  if (quickSending.value || !chatRef.value) return
-  quickSending.value = true
-  try {
-    await chatRef.value.submitExternalSubmission({
-      displayText: question,
-      runtimeText: question,
-      titleText: question,
-      fileIds: [],
-    })
-  } finally {
-    quickSending.value = false
-  }
-}
-
-const showQuickQuestions = computed(() => Boolean(agentId.value) && !hasMessages.value)
 
 /** 助手消息完整渲染（数据即正文 Markdown 表格/详情，不剔除任何内容）。 */
 function messageDisplayAdapter(input: { role: string; content: string }): string {
@@ -216,7 +171,7 @@ function assistantBody(content: string): string {
 }
 
 /**
- * 每条助手消息绑定自己的证据；只有同轮官方 Neo4j `read-cypher` 返回 nodes + edges 才提供查看图谱。
+ * 每条助手消息绑定自己的证据；只有同轮 evidence_subgraph 返回真实 Neo4j nodes + edges 才提供查看数据管理。
  */
 function messagePresentationAdapter(input: ChatMessagePresentationInput): ChatMessagePresentation {
   if (input.role !== 'assistant') return { kind: 'markdown', content: input.content }
@@ -257,20 +212,16 @@ async function loadAgent() {
 }
 
 onMounted(() => { void loadAgent() })
-
-// 进入空状态时刷新随机快捷问题（每次不同）。
-watch(showQuickQuestions, (show) => {
-  if (show) initializeQuickQuestions()
-})
 </script>
 
 <template>
   <section v-if="agentId" class="graphify-data-query-chat-shell">
     <Chat
-      ref="chatRef"
       class="graphify-data-query-chat"
       :chat-agent-id="agentId"
       :show-account="true"
+      :force-diy-config="true"
+      :show-graph-explorer="true"
       :message-display-adapter="messageDisplayAdapter"
       :message-presentation-adapter="messagePresentationAdapter"
       :on-session-messages-changed="onSessionMessagesChanged"
@@ -278,30 +229,15 @@ watch(showQuickQuestions, (show) => {
       :on-assistant-text-activity="beginAnswerComposition"
       :on-run-state-changed="handleRunStateChanged"
       :run-activity-adapter="adaptQueryFlowActivities"
+      :completed-run-activities="completedRunActivities"
       run-activity-placement="after-latest-user"
       :force-run-activity="true"
+      :retain-finished-run-activity="true"
       :hide-tool-messages="true"
       :tool-result-persistence-adapter="persistableGraphifyToolResult"
       @graph-explorer="graphExplorerOpen = true"
     />
-
     <GraphExplorerModal v-model:open="graphExplorerOpen" />
-
-    <!-- 空状态快捷问题：业务引导与自适应换行的胶囊问题。 -->
-    <div v-if="showQuickQuestions" class="graphify-quick-pills" aria-label="快捷问题">
-      <div class="graphify-quick-intro">
-        <MedicineBoxOutlined class="graphify-quick-intro-icon" aria-hidden="true" />
-        <h2>从业务问题开始</h2>
-        <p>选择一个快捷问题，快速查看结构化表格数据。</p>
-      </div>
-      <div class="graphify-quick-pills-list">
-        <button v-for="(question, i) in quickQuestions" :key="`${i}-${question}`" type="button"
-          class="graphify-quick-pill" :disabled="quickSending" @click="sendQuickQuestion(question)">
-          {{ question }}
-        </button>
-      </div>
-    </div>
-
   </section>
   <main v-else class="graphify-route-state" aria-live="polite">
     <ASpin v-if="loading" tip="正在加载医保问数助手…" />
@@ -336,128 +272,44 @@ watch(showQuickQuestions, (show) => {
 }
 
 .graphify-data-query-chat-shell {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  height: 100vh;
+  min-height: 100vh;
+
+  @media (max-width: 767px) {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+}
+
+:deep(.graphify-data-query-chat) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* 空状态保留上方快捷问题，同时把数据管理入口和输入框推到窗口底部。 */
+:deep(.graphify-data-query-chat .chat-welcome-container) {
+  flex: 1 1 auto;
+  min-height: 0;
   height: 100%;
 }
 
-/* 此路由已有业务引导，隐藏 Chat 通用欢迎文案，并将输入区停靠在底部。 */
 :deep(.graphify-data-query-chat .chat-welcome) {
-  padding: 0 32px;
-  justify-content: flex-end;
-}
-
-:deep(.graphify-data-query-chat .chat-welcome-title),
-:deep(.graphify-data-query-chat .chat-welcome-desc) {
-  display: none;
+  height: 100%;
+  min-height: 100%;
+  justify-content: flex-start;
 }
 
 :deep(.graphify-data-query-chat .chat-welcome-input) {
-  margin-top: 0;
-  margin-bottom: clamp(32px, 5vh, 72px);
+  margin-top: auto;
+  margin-bottom: clamp(24px, 4vh, 48px);
 }
 
-/* 空状态快捷问题：居中业务引导与自适应换行的圆角胶囊。 */
-.graphify-quick-pills {
-  position: absolute;
-  z-index: 20;
-  top: clamp(96px, 13vh, 156px);
-  left: calc(50% + 130px);
-  transform: translateX(-50%);
-  width: min(1000px, calc(100% - 64px));
-  pointer-events: none;
-}
-
-.graphify-quick-intro {
-  display: grid;
-  justify-items: center;
-  gap: 12px;
-  margin-bottom: 40px;
-  text-align: center;
-}
-
-.graphify-quick-intro-icon {
-  color: #5d7991;
-  font-size: 24px;
-}
-
-.graphify-quick-intro h2,
-.graphify-quick-intro p {
-  margin: 0;
-}
-
-.graphify-quick-intro h2 {
-  color: #30343c;
-  font-size: 28px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.graphify-quick-intro p {
-  color: #71879b;
-  font-size: 17px;
-  line-height: 1.6;
-}
-
-.graphify-quick-pills-list {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 18px 14px;
-}
-
-.graphify-quick-pill {
-  flex: 0 0 auto;
-  max-width: 100%;
-  padding: 9px 18px;
-  border: 1px solid #bdd9ee;
-  border-radius: 999px;
-  background: rgb(247 251 255 / 94%);
-  color: #2f6fa8;
-  font-size: 15px;
-  line-height: 1.5;
-  text-align: center;
-  cursor: pointer;
-  box-shadow: 0 1px 4px rgb(31 58 58 / 6%);
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-  overflow-wrap: anywhere;
-  pointer-events: auto;
-}
-
-.graphify-quick-pill:hover:not(:disabled) {
-  border-color: #5f9ece;
-  background: #eaf4fb;
-  color: #1f5b8f;
-  box-shadow: 0 2px 10px rgb(31 58 58 / 12%);
-}
-
-.graphify-quick-pill:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-@media (max-width: 900px) {
-  :deep(.graphify-data-query-chat .chat-welcome) {
-    padding: 0 16px;
-  }
-
-  .graphify-quick-pills {
-    left: 50%;
-    width: min(760px, calc(100% - 32px));
-  }
-
-  .graphify-quick-intro {
-    margin-bottom: 28px;
-  }
-
-  .graphify-quick-intro h2 {
-    font-size: 24px;
-  }
-
-  .graphify-quick-intro p {
-    font-size: 15px;
-  }
-
+/* DIY 欢迎页有更高优先级的默认间距，必须在该层明确覆盖，才能落到红框区域。 */
+:deep(.graphify-data-query-chat .chat-welcome.is-diy-welcome .chat-welcome-input) {
+  margin-top: auto;
 }
 
 </style>
