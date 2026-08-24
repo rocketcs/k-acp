@@ -47,6 +47,13 @@ test('graphify route keeps the shared welcome layout visible for DIY cards and i
   assert.match(chatMain, /:diy-config="diyConfig"/)
 })
 
+test('graphify route keeps DIY question cards compact and readable', () => {
+  assert.match(component, /:deep\(\.graphify-data-query-chat \.diy-welcome-content\)\s*\{[\s\S]*?width:\s*min\(100%,\s*1120px\)/)
+  assert.match(component, /:deep\(\.graphify-data-query-chat \.diy-question-card\)\s*\{[\s\S]*?max-width:\s*360px[\s\S]*?min-height:\s*clamp\(96px,\s*11vh,\s*112px\)/)
+  assert.match(component, /:deep\(\.graphify-data-query-chat \.diy-question-icon\)\s*\{[\s\S]*?width:\s*48px[\s\S]*?height:\s*48px/)
+  assert.match(component, /@media\s*\(max-width:\s*767px\)\s*\{[\s\S]*?:deep\(\.graphify-data-query-chat \.diy-question-card\)\s*\{[\s\S]*?flex-basis:\s*100%/)
+})
+
 test('each answer owns a Neo4j graph action instead of a global recent-query action', () => {
   assert.doesNotMatch(component, /最近查询图谱/)
   assert.doesNotMatch(component, /GraphifyGraphView/)

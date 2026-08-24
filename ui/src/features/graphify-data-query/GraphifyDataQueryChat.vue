@@ -312,4 +312,52 @@ onMounted(() => { void loadAgent() })
   margin-top: auto;
 }
 
+/* 当前问数入口的快捷卡片收窄一些，减少横向空白，同时保留三列可读布局。 */
+:deep(.graphify-data-query-chat .diy-welcome-content) {
+  width: min(100%, 1120px);
+}
+
+:deep(.graphify-data-query-chat .diy-question-grid) {
+  gap: clamp(12px, 1.2vw, 16px);
+}
+
+:deep(.graphify-data-query-chat .diy-question-card) {
+  flex: 1 1 clamp(260px, 30%, 360px);
+  min-width: min(100%, 260px);
+  max-width: 360px;
+  min-height: clamp(96px, 11vh, 112px);
+  gap: clamp(10px, 1.2vw, 14px);
+  padding: clamp(14px, 1.6vw, 18px) clamp(16px, 1.8vw, 20px);
+  border-radius: 18px;
+}
+
+:deep(.graphify-data-query-chat .diy-question-icon) {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  font-size: 24px;
+}
+
+:deep(.graphify-data-query-chat .diy-question-copy strong) {
+  font-size: 16px;
+}
+
+:deep(.graphify-data-query-chat .diy-question-copy small) {
+  font-size: 13px;
+}
+
+@media (max-width: 767px) {
+  :deep(.graphify-data-query-chat .diy-welcome-content) {
+    width: 100%;
+  }
+
+  :deep(.graphify-data-query-chat .diy-question-card) {
+    flex: 1 1 100%;
+    flex-basis: 100%;
+    min-width: 100%;
+    max-width: 100%;
+    min-height: 96px;
+  }
+}
+
 </style>
