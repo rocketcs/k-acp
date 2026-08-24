@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { CheckOutlined, LoadingOutlined } from '@ant-design/icons-vue'
 import type { RunActivity } from '@/types'
-import { aggregateRunActivities } from '@/utils/chat/runActivity'
+import { aggregateRunActivities, getRunElapsedMs } from '@/utils/chat/runActivity'
 
 const props = defineProps<{
-  activities: RunActivity[]
+  activities: readonly RunActivity[]
   startedAt?: number | null
+  isRunning?: boolean
 }>()
 
 defineEmits<{
@@ -17,7 +18,8 @@ const expanded = ref(true)
 const now = ref(Date.now())
 let timer: ReturnType<typeof setInterval> | null = null
 
-const aggregatedActivities = computed(() => aggregateRunActivities(props.activities))
+const isRunning = computed(() => props.isRunning !== false)
+const aggregatedActivities = computed(() => aggregateRunActivities([...props.activities]))
 const activeActivity = computed(() =>
   [...aggregatedActivities.value].reverse().find((activity) => activity.status === 'running'),
 )
@@ -28,12 +30,15 @@ const failedCount = computed(() =>
   aggregatedActivities.value.filter((activity) => activity.status === 'failed').length,
 )
 const elapsed = computed(() => {
-  const startedAt = props.startedAt || now.value
-  const seconds = Math.max(0, Math.floor((now.value - startedAt) / 1000))
+  const elapsedMs = getRunElapsedMs(props.activities, props.startedAt, now.value, isRunning.value)
+  const seconds = Math.floor(elapsedMs / 1000)
   const minutes = Math.floor(seconds / 60)
   return minutes > 0 ? `${minutes} 分 ${seconds % 60} 秒` : `${seconds} 秒`
 })
-const headline = computed(() => activeActivity.value ? `正在${activeActivity.value.label}` : '正在启动工作流')
+const headline = computed(() => {
+  if (!isRunning.value) return '处理完成'
+  return activeActivity.value ? `正在${activeActivity.value.label}` : '正在启动工作流'
+})
 const visibleActivities = computed(() => expanded.value ? aggregatedActivities.value : [])
 
 function activityLabel(activity: ReturnType<typeof aggregateRunActivities>[number]) {
@@ -43,25 +48,47 @@ function activityLabel(activity: ReturnType<typeof aggregateRunActivities>[numbe
   return `正在${activity.label}`
 }
 
-onMounted(() => {
+function stopTimer() {
+  if (!timer) return
+  clearInterval(timer)
+  timer = null
+}
+
+function startTimer() {
+  stopTimer()
   timer = setInterval(() => { now.value = Date.now() }, 1000)
+}
+
+watch(isRunning, (running) => {
+  if (running) startTimer()
+  else stopTimer()
+})
+
+onMounted(() => {
+  if (isRunning.value) startTimer()
 })
 
 onBeforeUnmount(() => {
-  if (timer) clearInterval(timer)
+  stopTimer()
 })
 </script>
 
 <template>
-  <section class="agent-run-activity" aria-live="polite" aria-label="智能体正在处理请求">
+  <section
+    class="agent-run-activity"
+    :class="{ 'is-finished': !isRunning }"
+    aria-live="polite"
+    :aria-label="isRunning ? '智能体正在处理请求' : '智能体处理完成'"
+  >
     <div class="agent-run-activity__summary">
-      <span class="agent-run-activity__pulse" aria-hidden="true"></span>
+      <span v-if="isRunning" class="agent-run-activity__pulse" aria-hidden="true"></span>
+      <CheckOutlined v-else class="agent-run-activity__complete-icon" aria-hidden="true" />
       <strong>{{ headline }}</strong>
       <span v-if="aggregatedActivities.length" class="agent-run-activity__metric">已完成 {{ completedCount }}/{{ aggregatedActivities.length }} 步</span>
       <span v-if="failedCount" class="agent-run-activity__metric is-warning">{{ failedCount }} 步待重试</span>
-      <time>已等待 {{ elapsed }}</time>
+      <time>{{ isRunning ? '已等待' : '耗时' }} {{ elapsed }}</time>
     </div>
-    <button type="button" class="agent-run-activity__abort" @click="$emit('abort')">停止处理</button>
+    <button v-if="isRunning" type="button" class="agent-run-activity__abort" @click="$emit('abort')">停止处理</button>
     <button
       v-if="aggregatedActivities.length"
       type="button"
@@ -129,6 +156,15 @@ onBeforeUnmount(() => {
   background: #5d9af8;
   animation: run-activity-pulse 1.5s ease-in-out infinite;
 }
+
+.agent-run-activity__complete-icon { color: #5d7d6b; }
+
+.agent-run-activity.is-finished {
+  border-color: #d9eadf;
+  background: #fbfefc;
+}
+
+.agent-run-activity.is-finished .agent-run-activity__summary strong { color: #5d7d6b; }
 
 .agent-run-activity__metric {
   padding-left: 10px;

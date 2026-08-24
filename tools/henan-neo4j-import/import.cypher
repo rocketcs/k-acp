@@ -3,6 +3,7 @@
 CREATE CONSTRAINT import_batch_id IF NOT EXISTS FOR (n:ImportBatch) REQUIRE n.batch_id IS UNIQUE;
 CREATE CONSTRAINT source_file_id IF NOT EXISTS FOR (n:SourceFile) REQUIRE n.source_id IS UNIQUE;
 CREATE CONSTRAINT catalog_record_id IF NOT EXISTS FOR (n:CatalogRecord) REQUIRE n.record_id IS UNIQUE;
+CREATE CONSTRAINT catalog_attribute_value_id IF NOT EXISTS FOR (n:CatalogAttributeValue) REQUIRE n.attribute_id IS UNIQUE;
 CREATE CONSTRAINT mapping_concept_namespace_code IF NOT EXISTS FOR (n:MappingConcept) REQUIRE (n.namespace, n.code) IS UNIQUE;
 CREATE CONSTRAINT observed_label_key IF NOT EXISTS FOR (n:ObservedLabel) REQUIRE n.observed_label_id IS UNIQUE;
 CREATE CONSTRAINT service_category_id IF NOT EXISTS FOR (n:ServiceCategory) REQUIRE n.service_category_id IS UNIQUE;
@@ -22,6 +23,8 @@ LOAD CSV WITH HEADERS FROM 'file:///source_files.csv' AS row
 CALL { WITH row MATCH (b:ImportBatch {batch_id:row.batch_id}) MERGE (f:SourceFile {source_id:row.source_id}) ON CREATE SET f.file_name=row.file_name,f.sheet_name=row.sheet_name,f.file_sha256=row.file_sha256,f.created_at=datetime() MERGE (b)-[:CONTAINS_SOURCE]->(f) } IN TRANSACTIONS OF 1000 ROWS;
 LOAD CSV WITH HEADERS FROM 'file:///catalog_records.csv' AS row
 CALL { WITH row MATCH (f:SourceFile {source_id:row.source_id}) MERGE (r:CatalogRecord {record_id:row.record_id}) ON CREATE SET r.source_id=row.source_id,r.source_row=toInteger(row.source_row),r.raw_row_hash=row.raw_row_hash,r.raw_payload_base64=row.raw_payload_base64,r.raw_payload_encoding=row.raw_payload_encoding,r.record_kind=row.record_kind,r.created_at=datetime() MERGE (f)-[:CONTAINS_RECORD]->(r) } IN TRANSACTIONS OF 5000 ROWS;
+LOAD CSV WITH HEADERS FROM 'file:///catalog_attribute_values.csv' AS row
+CALL { WITH row MATCH (r:CatalogRecord {record_id:row.record_id}) MERGE (a:CatalogAttributeValue {attribute_id:row.attribute_id}) ON CREATE SET a.record_id=row.record_id,a.domain=row.domain,a.field=row.field,a.field_label=row.field_label,a.value=row.value,a.created_at=datetime() SET a.domain=row.domain,a.field=row.field,a.field_label=row.field_label,a.value=row.value MERGE (r)-[:HAS_ATTRIBUTE {field:row.field,field_label:row.field_label}]->(a) } IN TRANSACTIONS OF 5000 ROWS;
 LOAD CSV WITH HEADERS FROM 'file:///consumable_categories.csv' AS row
 CALL { WITH row OPTIONAL MATCH (p:ConsumableCategory {category_path_id:row.parent_path_id}) MERGE (c:ConsumableCategory {category_path_id:row.category_path_id}) ON CREATE SET c.created_at=datetime() SET c.level=toInteger(row.level),c.code=row.code,c.name=row.name,c.path_kind=row.path_kind FOREACH (_ IN CASE WHEN p IS NULL THEN [] ELSE [1] END | MERGE (p)-[:PARENT_OF]->(c)) } IN TRANSACTIONS OF 5000 ROWS;
 LOAD CSV WITH HEADERS FROM 'file:///mapping_concepts.csv' AS row

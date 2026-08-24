@@ -70,6 +70,7 @@ test('restores a directly persisted executed result for the following assistant 
     message({ id: 3, role: 'assistant', content: '以下是结果' }),
   ])
   assert.equal(map['3']?.evidence?.question, 'persisted-query')
+  assert.equal(map['3']?.neo4jGraph, undefined)
 })
 
 test('each assistant message only receives its own preceding tool result', () => {
@@ -129,6 +130,73 @@ test('replaces the query fallback graph with official Neo4j read-cypher nodes fo
       label: '生产企业',
       kind: 'business',
     }],
+  })
+})
+
+test('uses only real Neo4j nodes from evidence_subgraph for the answer graph', () => {
+  const query = JSON.parse(executedEnvelope('聚维酮碘含漱液'))
+  query.evidence.nodes = [{ id: 'model:medical_catalog', label: '医保目录', kind: 'model' }]
+  const graph = JSON.parse(executedEnvelope('聚维酮碘含漱液'))
+  graph.evidence.nodes = [
+    { id: 'model:medical_catalog', label: '医保目录', kind: 'model' },
+    { id: 'product:聚维酮碘含漱液', label: '聚维酮碘含漱液', kind: 'product' },
+    { id: 'catalog-record:1', label: '原始目录记录', kind: 'catalog_record' },
+    { id: 'catalog-attribute:1', label: '规格：80ml', kind: 'attribute' },
+  ]
+  graph.evidence.edges = [
+    { id: 'semantic', source: 'model:medical_catalog', target: 'product:聚维酮碘含漱液', label: '语义字段', kind: 'semantic' },
+    { id: 'evidence', source: 'product:聚维酮碘含漱液', target: 'catalog-record:1', label: '原始目录记录', kind: 'provenance' },
+    { id: 'attribute', source: 'catalog-record:1', target: 'catalog-attribute:1', label: '目录字段', kind: 'attribute' },
+  ]
+
+  const map = buildSessionEvidence([
+    toolMessage(1, JSON.stringify(query)),
+    namedToolMessage(2, 'evidence_subgraph', JSON.stringify(graph)),
+    message({ id: 3, role: 'assistant', content: '以下是结果' }),
+  ])
+
+  assert.deepEqual(map['3']?.neo4jGraph?.nodes.map((node) => node.id), [
+    'product:聚维酮碘含漱液', 'catalog-record:1', 'catalog-attribute:1',
+  ])
+  assert.deepEqual(map['3']?.neo4jGraph?.edges.map((edge) => edge.id), ['evidence', 'attribute'])
+})
+
+test('keeps a compact graph reference alongside query evidence for async hydration', () => {
+  const summary = JSON.stringify({
+    status: 'executed', trace_id: 't-ref', dataset_id: 'medical_catalog', graph_ref: 't-ref',
+    node_count: 12, edge_count: 14, source_record_count: 2,
+  })
+  const map = buildSessionEvidence([
+    toolMessage(1, executedEnvelope('异步图谱')),
+    namedToolMessage(2, 'evidence_subgraph', summary),
+    message({ id: 3, role: 'assistant', content: '以下是结果' }),
+  ])
+  assert.equal(map['3']?.evidence?.question, '异步图谱')
+  assert.equal(map['3']?.graphRef?.graph_ref, 't-ref')
+})
+
+test('restores a legacy bare evidence_subgraph envelope as an answer graph', () => {
+  const graph = JSON.parse(executedEnvelope('广东企业目录项'))
+  graph.evidence.nodes = [
+    { id: 'model:medical_catalog', label: '医保目录', kind: 'model' },
+    { id: 'product:1', label: '盐酸氨溴索口服溶液', kind: 'product' },
+    { id: 'catalog-record:1', label: '原始目录记录', kind: 'catalog_record' },
+    { id: 'attribute:1', label: '规格：100ml', kind: 'attribute' },
+  ]
+  graph.evidence.edges = [
+    { id: 'provenance', source: 'product:1', target: 'catalog-record:1', label: '原始记录', kind: 'provenance' },
+    { id: 'attribute', source: 'catalog-record:1', target: 'attribute:1', label: '目录字段', kind: 'attribute' },
+  ]
+
+  const map = buildSessionEvidence([
+    message({ id: 1, role: 'user', content: '查询广东企业目录项' }),
+    message({ id: 2, role: 'tool', content: JSON.stringify(graph) }),
+    message({ id: 3, role: 'assistant', content: '以下是结果' }),
+  ])
+
+  assert.deepEqual(map['3']?.neo4jGraph, {
+    nodes: graph.evidence.nodes.slice(1),
+    edges: graph.evidence.edges,
   })
 })
 

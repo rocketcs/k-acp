@@ -81,6 +81,7 @@ defineExpose({ requestAttachmentPicker })
       v-if="showRunActivity"
       :activities="runActivities || []"
       :started-at="runStartedAt"
+      :is-running="true"
       @abort="$emit('abort')"
     />
     <AgentRunWaiting

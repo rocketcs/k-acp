@@ -8,6 +8,7 @@ const NODE_HEADINGS: Record<string, string> = {
   organization: '生产企业',
   base: '基础分类',
   concept: '映射概念',
+  attribute: '目录字段',
   record: '查询记录',
   source: '来源记录',
   catalog_record: '原始目录记录',

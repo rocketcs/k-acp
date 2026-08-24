@@ -1,7 +1,7 @@
 import type { Neo4jReadCypherGraph } from './evidenceAdapter.ts'
-import type { GraphifyEvidenceEnvelope, GraphifyToolOutcome } from './types'
+import type { GraphifyEvidenceEnvelope, GraphifyGraphReference, GraphifyToolOutcome } from './types'
 
-export type TurnEvidence = { evidence?: GraphifyEvidenceEnvelope; outcome?: GraphifyToolOutcome; neo4jGraph?: Neo4jReadCypherGraph }
+export type TurnEvidence = { evidence?: GraphifyEvidenceEnvelope; outcome?: GraphifyToolOutcome; neo4jGraph?: Neo4jReadCypherGraph; graphRef?: GraphifyGraphReference }
 
 function replaceWithOfficialNeo4jGraph(evidence: GraphifyEvidenceEnvelope, graph: Neo4jReadCypherGraph): GraphifyEvidenceEnvelope {
   return {
@@ -21,12 +21,15 @@ export function mergeTurnEvidence(existing: TurnEvidence | undefined, incoming: 
     return {
       evidence: neo4jGraph ? replaceWithOfficialNeo4jGraph(incoming.evidence, neo4jGraph) : incoming.evidence,
       ...(neo4jGraph ? { neo4jGraph } : {}),
+      ...(incoming.graphRef ?? existing?.graphRef ? { graphRef: incoming.graphRef ?? existing?.graphRef } : {}),
     }
   }
   if (incoming.neo4jGraph && existing?.evidence) {
-    return { evidence: replaceWithOfficialNeo4jGraph(existing.evidence, incoming.neo4jGraph), neo4jGraph: incoming.neo4jGraph }
+    return { evidence: replaceWithOfficialNeo4jGraph(existing.evidence, incoming.neo4jGraph), neo4jGraph: incoming.neo4jGraph, ...(existing.graphRef ? { graphRef: existing.graphRef } : {}) }
   }
-  if (incoming.neo4jGraph) return { neo4jGraph: incoming.neo4jGraph }
-  if (existing?.evidence) return existing
-  return incoming.outcome ? { outcome: incoming.outcome } : existing ?? {}
+  if (incoming.neo4jGraph) return { neo4jGraph: incoming.neo4jGraph, ...(incoming.graphRef ? { graphRef: incoming.graphRef } : {}) }
+  if (existing?.evidence) return incoming.graphRef
+    ? { ...existing, graphRef: incoming.graphRef }
+    : existing
+  return incoming.outcome || incoming.graphRef ? { ...(incoming.outcome ? { outcome: incoming.outcome } : {}), ...(incoming.graphRef ? { graphRef: incoming.graphRef } : {}) } : existing ?? {}
 }

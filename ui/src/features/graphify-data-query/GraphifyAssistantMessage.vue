@@ -3,7 +3,9 @@ import { computed, ref } from 'vue'
 import { ShareAltOutlined } from '@ant-design/icons-vue'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer.vue'
 import GraphifyGraphView from './GraphifyGraphView.vue'
+import { buildGraphView, hasRenderableGraph } from './graphViewAdapter'
 import { buildResultColumns } from './resultTable'
+import { recoverLegacyNeo4jGraph } from './sessionEvidence'
 import { splitAssistantContent } from './tablePlacement'
 import type { GraphifyEvidenceEnvelope, GraphifyToolOutcome } from './types'
 import type { Neo4jReadCypherGraph } from './evidenceAdapter'
@@ -17,7 +19,7 @@ const props = defineProps<{
   isStreaming: boolean
   evidence?: GraphifyEvidenceEnvelope
   outcome?: GraphifyToolOutcome
-  /** 仅由官方只读 Neo4j `read-cypher` 结果生成，绝不以 Wren 查询结果兜底。 */
+  /** 仅由只读 Neo4j evidence_subgraph 结果生成，绝不以 Wren 查询结果兜底。 */
   neo4jGraph?: Neo4jReadCypherGraph
 }>()
 
@@ -30,8 +32,19 @@ const hasRows = computed(() => Boolean(props.evidence?.result.rows.length))
 const shouldRenderResultTable = computed(() => Boolean(contentParts.value.hasPlaceholder && props.evidence && hasRows.value))
 const shouldShowEmptyResult = computed(() => Boolean(contentParts.value.hasPlaceholder && props.evidence && !hasRows.value && !props.isStreaming))
 const graphViewOpen = ref(false)
-/** 必须同时存在官方 Neo4j nodes 与 edges，才显示该回答的图谱按钮。 */
-const hasNeo4jGraph = computed(() => Boolean(props.neo4jGraph?.nodes.length && props.neo4jGraph?.edges.length))
+/** 会话重放偶发丢失 neo4jGraph 投影时，直接由同一份官方证据信封恢复；普通查询信封不会通过严格校验。 */
+const resolvedNeo4jGraph = computed(() => props.neo4jGraph ?? (props.evidence ? recoverLegacyNeo4jGraph(props.evidence) : null))
+/** 图谱弹窗只接收真实 Neo4j 节点和关系，不混入 Wren 语义/查询执行节点。 */
+const graphEvidence = computed<GraphifyEvidenceEnvelope | undefined>(() => {
+  const graph = resolvedNeo4jGraph.value
+  if (!props.evidence || !graph) return undefined
+  return { ...props.evidence, evidence: { ...props.evidence.evidence, nodes: graph.nodes, edges: graph.edges } }
+})
+const displayedGraphStats = computed(() => graphEvidence.value
+  ? buildGraphView(graphEvidence.value, { viewMode: 'full', showFields: false }).stats
+  : { nodeCount: 0, edgeCount: 0 })
+/** Must have a non-empty rendered projection, not merely raw Neo4j rows. */
+const hasNeo4jGraph = computed(() => Boolean(graphEvidence.value && hasRenderableGraph(graphEvidence.value)))
 </script>
 
 <template>
@@ -79,15 +92,15 @@ const hasNeo4jGraph = computed(() => Boolean(props.neo4jGraph?.nodes.length && p
 
     <!-- 每条回答只展示自身官方 Neo4j 子图；没有真实 nodes + edges 时不出现按钮。 -->
     <div v-if="hasNeo4jGraph" class="graphify-answer-graph-action">
-      <button type="button" class="graphify-answer-graph-button" title="查看知识图谱" aria-label="查看知识图谱"
+      <button type="button" class="graphify-answer-graph-button" title="查看数据管理" aria-label="查看数据管理"
         @click="graphViewOpen = true">
         <ShareAltOutlined />
-        <span>查看知识图谱</span>
-        <small>{{ neo4jGraph?.nodes.length }} 节点 · {{ neo4jGraph?.edges.length }} 关系</small>
+        <span>查看数据管理</span>
+        <small>{{ displayedGraphStats.nodeCount }} 节点 · {{ displayedGraphStats.edgeCount }} 关系（两级）</small>
       </button>
     </div>
 
-    <GraphifyGraphView :open="graphViewOpen" :evidence="evidence" @close="graphViewOpen = false" />
+    <GraphifyGraphView :open="graphViewOpen" :evidence="graphEvidence" @close="graphViewOpen = false" />
   </div>
 </template>
 

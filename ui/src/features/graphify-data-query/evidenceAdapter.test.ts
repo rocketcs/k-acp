@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { displayGraphifyLabel, displayGraphifyNodeLabel, parseGraphifyEvidence, parseGraphifyToolOutcome, parseNeo4jReadCypherGraph } from './evidenceAdapter.ts'
+import { displayGraphifyLabel, displayGraphifyNodeLabel, parseGraphifyEvidence, parseGraphifyGraphReference, parseGraphifyToolOutcome, parseNeo4jReadCypherGraph } from './evidenceAdapter.ts'
 
 const evidence = {
   status: 'executed', trace_id: 'trace-1', dataset_id: 'medical_catalog', question: '覆膜气管支架',
@@ -40,6 +40,16 @@ test('accepts a blocked preflight outcome without treating it as evidence', () =
     status: 'blocked', trace_id: 'trace-blocked', findings: [{ message: 'Only SELECT statements are allowed.' }],
   }))
   assert.deepEqual(result, { status: 'blocked', trace_id: 'trace-blocked', reason: 'Only SELECT statements are allowed.' })
+})
+
+test('parses the compact evidence graph reference returned to the model', () => {
+  assert.deepEqual(parseGraphifyGraphReference(JSON.stringify({
+    status: 'executed', trace_id: 'trace-1', dataset_id: 'medical_catalog', graph_ref: 'trace-1',
+    node_count: 4406, edge_count: 4727, source_record_count: 272,
+  })), {
+    status: 'executed', trace_id: 'trace-1', dataset_id: 'medical_catalog', graph_ref: 'trace-1',
+    node_count: 4406, edge_count: 4727, source_record_count: 272,
+  })
 })
 
 test('projects official Neo4j read-cypher relationship rows into bounded graph nodes and edges', () => {
@@ -87,6 +97,26 @@ test('projects official Neo4j organizations that expose normalized_name', () => 
       target: 'neo4j:4:organization:real',
       label: '生产企业',
       kind: 'business',
+    }],
+  })
+})
+
+test('projects real record-scoped catalog attributes with their field name and value', () => {
+  const graph = parseNeo4jReadCypherGraph(JSON.stringify([{
+    source_id: '4:record:1', source_labels: ['CatalogRecord'], source_properties: { source_row: 7 },
+    relation_type: 'HAS_ATTRIBUTE',
+    target_id: '4:attribute:1', target_labels: ['CatalogAttributeValue'],
+    target_properties: { field_label: '医保支付类别', value: '甲类' },
+  }]))
+
+  assert.deepEqual(graph, {
+    nodes: [
+      { id: 'neo4j:4:record:1', label: '原始目录记录', kind: 'catalog_record' },
+      { id: 'neo4j:4:attribute:1', label: '医保支付类别：甲类', kind: 'attribute' },
+    ],
+    edges: [{
+      id: 'neo4j:4:record:1:HAS_ATTRIBUTE:neo4j:4:attribute:1',
+      source: 'neo4j:4:record:1', target: 'neo4j:4:attribute:1', label: '记录字段', kind: 'provenance',
     }],
   })
 })

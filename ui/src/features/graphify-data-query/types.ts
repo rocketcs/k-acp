@@ -1,7 +1,7 @@
 export type GraphifyEvidenceNode = {
   id: string
   label: string
-  kind: 'model' | 'record' | 'entity' | 'source' | 'product' | 'registration' | 'organization' | 'base' | 'concept' | 'catalog_record' | 'source_file' | 'import_batch'
+  kind: 'model' | 'record' | 'entity' | 'source' | 'product' | 'registration' | 'organization' | 'base' | 'concept' | 'attribute' | 'catalog_record' | 'source_file' | 'import_batch'
   /** 可选目录域（DRUG/CONSUMABLE/SERVICE/DIAGNOSIS），结果驱动图谱用于区分产品标题。 */
   domain?: string
 }
@@ -11,7 +11,7 @@ export type GraphifyEvidenceEdge = {
   source: string
   target: string
   label: string
-  kind: 'query' | 'semantic' | 'provenance' | 'business'
+  kind: 'query' | 'semantic' | 'provenance' | 'business' | 'attribute'
 }
 
 export type GraphifyProductDetail = {
@@ -58,4 +58,15 @@ export type GraphifyToolOutcome = {
   status: 'blocked' | 'unavailable'
   trace_id?: string
   reason?: string
+}
+
+/** 轻量 MCP 图谱引用；完整 ECharts 数据由 Graph Explorer 按 trace_id 提供。 */
+export type GraphifyGraphReference = {
+  status: 'executed'
+  trace_id: string
+  dataset_id: 'medical_catalog'
+  graph_ref: string
+  node_count: number
+  edge_count: number
+  source_record_count?: number
 }

@@ -1,4 +1,4 @@
-import type { GraphifyEvidenceEdge, GraphifyEvidenceEnvelope, GraphifyEvidenceNode, GraphifyToolOutcome } from './types'
+import type { GraphifyEvidenceEdge, GraphifyEvidenceEnvelope, GraphifyEvidenceNode, GraphifyGraphReference, GraphifyToolOutcome } from './types'
 
 export type Neo4jReadCypherGraph = {
   nodes: GraphifyEvidenceNode[]
@@ -71,6 +71,7 @@ const DISPLAY_LABELS: Record<string, string> = {
   organization: '生产企业',
   base: '基础分类编码',
   concept: '映射概念',
+  attribute: '目录字段',
   catalog_record: '原始目录记录',
   source_file: '来源工作簿',
   import_batch: '导入批次',
@@ -98,18 +99,17 @@ const DISPLAY_LABELS: Record<string, string> = {
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const isStrings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string')
 
-const MAX_NEO4J_NODES = 80
-const MAX_NEO4J_EDGES = 120
-
 const NEO4J_KIND_BY_LABEL: Record<string, GraphifyEvidenceNode['kind']> = {
   DrugProduct: 'product',
   ConsumableProduct: 'product',
-  ServiceProduct: 'product',
-  DiagnosisProduct: 'product',
+  ServiceItem: 'product',
+  DiagnosisItem: 'product',
+  DrugGeneric: 'concept',
   RegistrationIdentifier: 'registration',
   Organization: 'organization',
   ConsumableBase: 'base',
   MappingConcept: 'concept',
+  CatalogAttributeValue: 'attribute',
   CatalogRecord: 'catalog_record',
   SourceFile: 'source_file',
   ImportBatch: 'import_batch',
@@ -118,18 +118,20 @@ const NEO4J_KIND_BY_LABEL: Record<string, GraphifyEvidenceNode['kind']> = {
 const NEO4J_DOMAIN_BY_LABEL: Record<string, string> = {
   DrugProduct: 'DRUG',
   ConsumableProduct: 'CONSUMABLE',
-  ServiceProduct: 'SERVICE',
-  DiagnosisProduct: 'DIAGNOSIS',
+  ServiceItem: 'SERVICE',
+  DiagnosisItem: 'DIAGNOSIS',
 }
 
 const NEO4J_RELATIONS: Record<string, Pick<GraphifyEvidenceEdge, 'label' | 'kind'>> = {
   MANUFACTURED_BY: { label: '生产企业', kind: 'business' },
+  HAS_GENERIC: { label: '通用名', kind: 'business' },
   REGISTERED_AS: { label: '注册备案', kind: 'business' },
   PRODUCT_OF: { label: '对应基础耗材', kind: 'business' },
   ASSERTED_MAPS_TO_CONCEPT: { label: '目录映射', kind: 'semantic' },
   EVIDENCE_FOR: { label: '原始目录记录', kind: 'provenance' },
   CONTAINS_RECORD: { label: '来源工作簿', kind: 'provenance' },
   CONTAINS_SOURCE: { label: '导入批次', kind: 'provenance' },
+  HAS_ATTRIBUTE: { label: '记录字段', kind: 'provenance' },
 }
 
 function neo4jNodeKind(labels: string[]): GraphifyEvidenceNode['kind'] | null {
@@ -149,6 +151,8 @@ function neo4jNodeLabel(kind: GraphifyEvidenceNode['kind'], properties: Record<s
           ? ['name', 'base_name', 'base_code']
           : kind === 'concept'
             ? ['name', 'concept_name', 'code']
+            : kind === 'attribute'
+              ? []
             : kind === 'catalog_record'
               ? ['catalog_name', 'name', 'source_record_id']
               : kind === 'source_file'
@@ -158,6 +162,12 @@ function neo4jNodeLabel(kind: GraphifyEvidenceNode['kind'], properties: Record<s
                   : ['name']
   for (const key of candidates) {
     const value = properties[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  if (kind === 'attribute') {
+    const field = properties.field_label
+    const value = properties.value
+    if (typeof field === 'string' && field.trim() && typeof value === 'string' && value.trim()) return `${field.trim()}：${value.trim()}`
     if (typeof value === 'string' && value.trim()) return value.trim()
   }
   return kind === 'catalog_record' ? '原始目录记录'
@@ -193,9 +203,8 @@ export function parseNeo4jReadCypherGraph(content: string): Neo4jReadCypherGraph
       const source = neo4jNode(row.source_id, row.source_labels, row.source_properties)
       const target = neo4jNode(row.target_id, row.target_labels, row.target_properties)
       if (!source || !target || source.id === target.id) continue
-      if (nodes.size < MAX_NEO4J_NODES || nodes.has(source.id)) nodes.set(source.id, source)
-      if (nodes.size < MAX_NEO4J_NODES || nodes.has(target.id)) nodes.set(target.id, target)
-      if (!nodes.has(source.id) || !nodes.has(target.id) || edges.size >= MAX_NEO4J_EDGES) continue
+      nodes.set(source.id, source)
+      nodes.set(target.id, target)
       const relation = NEO4J_RELATIONS[row.relation_type] ?? { label: '相关', kind: 'semantic' as const }
       const id = `${source.id}:${row.relation_type}:${target.id}`
       edges.set(id, { id, source: source.id, target: target.id, ...relation })
@@ -220,13 +229,13 @@ export function displayGraphifyNodeLabel(node: GraphifyEvidenceNode): string {
 
 function validNode(value: unknown): value is GraphifyEvidenceNode {
   return isRecord(value) && typeof value.id === 'string' && typeof value.label === 'string'
-    && ['model', 'record', 'entity', 'source', 'product', 'registration', 'organization', 'base', 'concept', 'catalog_record', 'source_file', 'import_batch'].includes(String(value.kind))
+    && ['model', 'record', 'entity', 'source', 'product', 'registration', 'organization', 'base', 'concept', 'attribute', 'catalog_record', 'source_file', 'import_batch'].includes(String(value.kind))
 }
 
 function validEdge(value: unknown): value is GraphifyEvidenceEdge {
   return isRecord(value) && typeof value.id === 'string' && typeof value.source === 'string'
     && typeof value.target === 'string' && typeof value.label === 'string'
-    && ['query', 'semantic', 'provenance', 'business'].includes(String(value.kind))
+    && ['query', 'semantic', 'provenance', 'business', 'attribute'].includes(String(value.kind))
 }
 
 export function parseGraphifyEvidence(toolName: string, content: string): GraphifyEvidenceEnvelope | null {
@@ -276,6 +285,25 @@ export function parseGraphifyToolOutcome(toolName: string, content: string): Gra
       status: value.status as GraphifyToolOutcome['status'],
       trace_id: typeof value.trace_id === 'string' ? value.trace_id : undefined,
       reason: typeof value.reason === 'string' ? value.reason : typeof finding?.message === 'string' ? finding.message : undefined,
+    }
+  } catch { return null }
+}
+
+/** Parse the compact evidence_subgraph response without loading graph nodes into chat history. */
+export function parseGraphifyGraphReference(content: string): GraphifyGraphReference | null {
+  try {
+    const value: unknown = JSON.parse(content)
+    if (!isRecord(value) || value.status !== 'executed' || value.dataset_id !== 'medical_catalog'
+      || typeof value.trace_id !== 'string' || typeof value.graph_ref !== 'string'
+      || !Number.isFinite(value.node_count) || !Number.isFinite(value.edge_count)) return null
+    return {
+      status: 'executed',
+      trace_id: value.trace_id,
+      dataset_id: 'medical_catalog',
+      graph_ref: value.graph_ref,
+      node_count: Number(value.node_count),
+      edge_count: Number(value.edge_count),
+      ...(Number.isFinite(value.source_record_count) ? { source_record_count: Number(value.source_record_count) } : {}),
     }
   } catch { return null }
 }

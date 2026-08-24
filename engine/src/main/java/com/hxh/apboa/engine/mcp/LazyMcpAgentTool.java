@@ -17,6 +17,7 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * 基于缓存工具目录注册的懒加载 MCP 工具。
@@ -29,17 +30,20 @@ public class LazyMcpAgentTool implements AgentTool {
     private final McpSchema.Tool toolSchema;
     private final Supplier<Mono<McpClientWrapper>> initializedClientSupplier;
     private final McpRuntimeDegradeService mcpRuntimeDegradeService;
+    private final Runnable invalidateClient;
     private final Map<String, Object> parameters;
     private final Map<String, Object> outputSchema;
 
     public LazyMcpAgentTool(RuntimeDegradeContext degradeContext,
                             McpSchema.Tool toolSchema,
                             Supplier<Mono<McpClientWrapper>> initializedClientSupplier,
-                            McpRuntimeDegradeService mcpRuntimeDegradeService) {
+                            McpRuntimeDegradeService mcpRuntimeDegradeService,
+                            Runnable invalidateClient) {
         this.degradeContext = degradeContext;
         this.toolSchema = toolSchema;
         this.initializedClientSupplier = initializedClientSupplier;
         this.mcpRuntimeDegradeService = mcpRuntimeDegradeService;
+        this.invalidateClient = invalidateClient;
         this.parameters = McpTool.convertMcpSchemaToParameters(toolSchema.inputSchema(), Set.of());
         this.outputSchema = toolSchema.outputSchema() != null
                 ? new HashMap<>(toolSchema.outputSchema())
@@ -82,8 +86,27 @@ public class LazyMcpAgentTool implements AgentTool {
             // 设置租户上下文
             TenantUtils.setCurrentTenant(tenantId, tenantCode);
 
-            return initializedClientSupplier.get()
-                    .flatMap(client -> client.callTool(getName(), param.getInput()))
+            return Mono.defer(() -> initializedClientSupplier.get()
+                            .flatMap(client -> client.callTool(getName(), param.getInput())))
+                    // Streamable-HTTP sessions can be invalidated by the server while the
+                    // cached client remains alive. Drop that client and retry once so a
+                    // transient MCP session loss does not strand the whole graph step.
+                    .doOnError(error -> {
+                        if (isTransportFailure(error)) {
+                            try {
+                                invalidateClient.run();
+                            } catch (Exception invalidateError) {
+                                log.debug("Failed to invalidate stale MCP client '{}': {}",
+                                        degradeContext.serverName(), invalidateError.getMessage());
+                            }
+                        }
+                    })
+                    .retryWhen(Retry.max(1)
+                            .filter(LazyMcpAgentTool::isTransportFailure)
+                            .onRetryExhaustedThrow((spec, signal) -> signal.failure())
+                            .doBeforeRetry(signal -> log.info(
+                                    "Retrying MCP tool '{}' after transport failure from '{}'",
+                                    getName(), degradeContext.serverName())))
                     .doOnSuccess(result -> {
                         mcpRuntimeDegradeService.recordSuccess(
                                 degradeContext.serverId(),
@@ -107,6 +130,28 @@ public class LazyMcpAgentTool implements AgentTool {
                     })
                     .doFinally(signalType -> TenantUtils.clear());
         });
+    }
+
+    private static boolean isTransportFailure(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            String className = current.getClass().getName().toLowerCase();
+            String message = current.getMessage() == null ? "" : current.getMessage().toLowerCase();
+            if (className.contains("transport")
+                    || className.contains("sessionnotfound")
+                    || className.contains("connection")
+                    || message.contains("session with server terminated")
+                    || message.contains("session not found")
+                    || message.contains("connection reset")
+                    || message.contains("connection refused")
+                    || message.contains("transport")
+                    || message.contains("channel is closed")
+                    || message.contains("timeout")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private String unavailableMessage(Throwable e) {

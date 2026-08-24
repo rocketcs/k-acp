@@ -78,18 +78,18 @@ onBeforeUnmount(() => {
       class="graph-explorer-modal"
       role="dialog"
       aria-modal="true"
-      aria-label="医保知识图谱"
+      aria-label="医保数据管理"
       tabindex="-1"
       @keydown.esc="close"
     >
       <header class="graph-explorer-modal-header">
         <div class="graph-explorer-modal-title">
-          <span>医保知识图谱</span>
+          <span>医保数据管理</span>
           <small>完整页面</small>
         </div>
         <div class="graph-explorer-modal-actions">
           <a :href="graphExplorerUrl" target="_blank" rel="noopener noreferrer">新窗口打开</a>
-          <button type="button" aria-label="关闭知识图谱" title="关闭知识图谱" @click="close">
+          <button type="button" aria-label="关闭数据管理" title="关闭数据管理" @click="close">
             <CloseOutlined />
           </button>
         </div>
@@ -97,17 +97,17 @@ onBeforeUnmount(() => {
 
       <div class="graph-explorer-modal-body">
         <div v-if="!iframeLoaded && !iframeTimedOut" class="graph-explorer-modal-loading" role="status">
-          正在加载知识图谱…
+          正在加载数据管理…
         </div>
         <div v-if="iframeTimedOut" class="graph-explorer-modal-error" role="alert">
-          <p>知识图谱页面加载时间较长，请检查 8770 服务是否正常运行。</p>
-          <a :href="graphExplorerUrl" target="_blank" rel="noopener noreferrer">新窗口打开知识图谱</a>
+          <p>数据管理页面加载时间较长，请检查 8770 服务是否正常运行。</p>
+          <a :href="graphExplorerUrl" target="_blank" rel="noopener noreferrer">新窗口打开数据管理</a>
         </div>
         <iframe
           v-show="!iframeTimedOut"
           class="graph-explorer-modal-frame"
           :src="graphExplorerUrl"
-          title="医保知识图谱"
+          title="医保数据管理"
           allow="fullscreen"
           @load="handleIframeLoad"
         />

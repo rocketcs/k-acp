@@ -48,6 +48,32 @@ export function getActivityLabel(name: string): string {
   }[name] ?? name
 }
 
+/**
+ * 计算运行卡片耗时。
+ *
+ * 已结束的运行必须使用最后一个有耗时步骤的结束时间，不能继续用当前时间，
+ * 否则被保留展示的完成卡片会看起来仍在运行。
+ */
+export function getRunElapsedMs(
+  activities: readonly RunActivity[],
+  startedAt: number | null | undefined,
+  now: number,
+  isRunning: boolean,
+): number {
+  const fallbackStartedAt = activities.reduce(
+    (earliest, activity) => Math.min(earliest, activity.startTime),
+    now,
+  )
+  const effectiveStartedAt = startedAt ?? fallbackStartedAt
+  if (isRunning) return Math.max(0, now - effectiveStartedAt)
+
+  const lastKnownEnd = activities.reduce((latest, activity) => {
+    if (activity.elapsed == null) return latest
+    return Math.max(latest, activity.startTime + Math.max(0, activity.elapsed))
+  }, effectiveStartedAt)
+  return Math.max(0, lastKnownEnd - effectiveStartedAt)
+}
+
 /** 合并同一工具的重复调用，保留首次出现顺序和本轮最新状态。 */
 export function aggregateRunActivities(activities: RunActivity[]): AggregatedRunActivity[] {
   const grouped = new Map<string, {

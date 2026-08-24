@@ -80,15 +80,21 @@ const props = withDefaults(defineProps<{
   onRunStateChanged?: (isRunning: boolean) => void
   /** 特定路由可将工具活动转换为面向业务的步骤名称。 */
   runActivityAdapter?: (activities: readonly RunActivity[]) => RunActivity[]
+  /** 特定路由可在运行结束后继续保留最后一张进度卡。 */
+  completedRunActivities?: readonly RunActivity[]
   /** 运行状态默认出现在消息末尾；特定路由可要求紧跟最新用户消息。 */
   runActivityPlacement?: 'tail' | 'after-latest-user'
   /** 特定路由即使未按通用 DIY 路由命名，也始终显示运行状态卡。 */
   forceRunActivity?: boolean
+  /** 仅特定路由开启：运行完成后保留最后一张进度卡在原位置。 */
+  retainFinishedRunActivity?: boolean
+  /** 非 /chat/diy 路由也按 agentId 加载并展示已发布的 DIY 欢迎页配置。 */
+  forceDiyConfig?: boolean
   /** 特定路由可覆盖 DIY 欢迎页标题。 */
   welcomeHeadlineOverride?: string
   /** 强制开启工具执行过程展示（用于需要保留 MCP 工具结果的受治理数据查询类 agent）。 */
   forceToolProcessActive?: boolean
-  /** 仅特定路由在输入框上方显示完整知识图谱入口。 */
+  /** 仅特定路由在输入框上方显示完整数据管理入口。 */
   showGraphExplorer?: boolean
 }>(), {
   showAccount: true,
@@ -105,6 +111,7 @@ const userInfo = computed(() => accountStore.userInfo)
 
 const agentId = computed(() => (props.chatAgentId || route.params.agentId) as string || '')
 const isDiyRoute = computed(() => route.name === RouteNames.CHAT_DIY)
+const shouldLoadDiyConfig = computed(() => isDiyRoute.value || props.forceDiyConfig === true)
 const diyConfig = ref<DiyPageConfig | null>(null)
 const displayDiyConfig = computed(() => {
   const config = diyConfig.value
@@ -293,6 +300,11 @@ watch(isRunning, (isRunning) => {
 
 const presentationRunActivities = computed(() =>
   props.runActivityAdapter ? props.runActivityAdapter(runActivities.value) : runActivities.value,
+)
+const presentationCompletedRunActivities = computed(() =>
+  props.runActivityAdapter && props.completedRunActivities
+    ? props.runActivityAdapter([...props.completedRunActivities])
+    : props.completedRunActivities ?? [],
 )
 
 // 构建展示消息
@@ -532,17 +544,27 @@ const handleInteractionSubmit = async (payload: InteractionSubmitPayload) => {
     assistantMsg.content = updatedContent
   }
 
-  // // 2. 保存用户提交消息到 DB（与 handleSend 保持一致，先 await 再 sendMessage）
-  // try {
-  //   const res = await chatSessionApi.appendMessage(sid, { role: 'user', content: userText })
-  //   if (res.data?.data) messagesList.value.push(res.data.data as ChatMessageVO)
-  // } catch (err) {
-  //   console.warn('[UIP] 保存用户提交消息失败', err)
-  // }
-
-  // 3. 发送给 Agent 继续对话
+  // 2. 追问提交是当前会话中的新一轮用户消息：先持久化并加入展示列表，
+  //    再启动 Agent，确保流程卡片能锚定在这条消息后面（与首次发送一致）。
   const userText = buildUserTextFromPayload(payload)
-  await sendMessage(userText, [{ id: 'uip', role: 'user', content: userText }] as ChatMessageVO[])
+  let persistedUserMessage: ChatMessageVO | null = null
+  try {
+    const res = await chatSessionApi.appendMessage(sid, { role: 'user', content: userText })
+    if (res.data?.data) {
+      persistedUserMessage = res.data.data as ChatMessageVO
+      messagesList.value.push(persistedUserMessage)
+    }
+  } catch (err) {
+    console.warn('[UIP] 保存用户提交消息失败', err)
+  }
+
+  // 3. 发送给 Agent 继续对话。持久化失败时不启动新一轮，避免出现
+  //    流程已运行但对话记录缺失、流程卡片无法定位的状态。
+  if (!persistedUserMessage) return
+  await sendMessage(
+    userText,
+    [createRuntimeUserMessage(persistedUserMessage, userText)],
+  )
 }
 
 // 处理 UIP 卡片渲染失败重试
@@ -780,7 +802,7 @@ onMounted(async () => {
 })
 
 watch(
-  [isDiyRoute, agentId],
+  [shouldLoadDiyConfig, agentId],
   async ([enabled, currentAgentId]) => {
     diyConfig.value = null
     if (!enabled || !currentAgentId) return
@@ -867,8 +889,10 @@ defineExpose({ submitExternalSubmission, requestAttachmentPicker, abortRun })
       :messages="displayMessages"
       :tool-calls="toolCallsInProgress"
       :run-activities="presentationRunActivities"
+      :completed-run-activities="presentationCompletedRunActivities"
       :run-activity-placement="runActivityPlacement"
       :force-run-activity="forceRunActivity"
+      :retain-finished-run-activity="retainFinishedRunActivity"
       :is-diy-chat="isDiyRoute"
       :has-visible-answer="hasVisibleAnswer"
       :run-started-at="runStartedAt"

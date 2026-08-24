@@ -276,7 +276,7 @@ CREATE TABLE `chat_message` (
   `id` int NOT NULL AUTO_INCREMENT COMMENT '消息ID',
   `session_id` bigint NOT NULL COMMENT '会话ID',
   `role` varchar(20) NOT NULL COMMENT '消息角色',
-  `content` text NOT NULL COMMENT '消息内容',
+  `content` mediumtext NOT NULL COMMENT '消息内容',
   `parent_id` int DEFAULT NULL COMMENT '父消息ID',
   `path` text COMMENT '消息路径，格式如：/1/2/3/',
   `depth` int DEFAULT NULL COMMENT '消息深度，从0开始，根消息深度为0',

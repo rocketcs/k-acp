@@ -51,7 +51,7 @@ description: 医保目录问数智能体的「问题语义解析 + 结果/图谱
    - 按耗材分类 → `WHERE category_level_1/2/3=<分类名>`
 5. **预检与执行要求**：任何手写 SQL 必须先用 `query_preflight`（或旧版 `wren_query_preflight`）校验；只有返回 `allowed` / `warning` 才允许 `query`。耗材查询必须带 `catalog_domain = 'CONSUMABLE'`；查询 `max_price_text` 必须同时带 `price_semantics`。
    - **`FROM` 只能写 `medical_catalog` 这唯一模型**，禁止 `medical_catalog.service`、`medical_catalog.catalog_item`、`medical_catalog.<任意后缀>` 等写法（非已发布模型，预检会 `blocked` 导致查询失败）。目录域一律用 `WHERE catalog_domain='DRUG'/'CONSUMABLE'/'SERVICE'/'DIAGNOSIS'` 过滤，不要改 `FROM`。
-6. **无法落点**：当用户措辞无法确定映射到某个已发布字段，或一个词对应多个列且影响口径时，进入「澄清规则」，输出 `needs_clarification` 并用 UIP choice/form 追问卡，不得臆造列名强行查询。
+6. **无法落点**：当用户措辞无法确定映射到某个已发布字段，或一个词对应多个列且影响口径时，进入「澄清规则」，输出 `needs_clarification` 并用文字追问，不得臆造列名强行查询。
 
 ## 澄清规则（问题不明确时，先结构化澄清再查询）
 
@@ -64,26 +64,19 @@ description: 医保目录问数智能体的「问题语义解析 + 结果/图谱
 3. **维度/筛选缺失但有歧义**：区域、时间等没说，且默认值会显著影响结果。
 4. **口径/来源有多种解释**：含税 vs 不含税、在册 vs 在用、某分类归属有歧义。
 
-### 澄清载体（UIP 追问卡，而非纯文本一句“请问……”）
+### 澄清载体（普通文字追问）
 
-- 能枚举的歧义（区域、时间、支付类别、粒度）→ **`choice` 选择题**：给出候选 + `allowCustom` 允许自定义输入。
-- 需补多个字段（如“帮我看下这个药”→ 名称？企业？类别？）→ **`form` 表单**补填。
-- 决策口径确认（不可逆/影响大的口径）→ **`confirm` + HITL 确认**。
+- 只输出一段可直接回复的中文文字，不输出 UIP、JSON、代码围栏、编号卡片或按钮。
+- 能枚举的歧义（区域、时间、支付类别、粒度）→ 在一句问题中给出 2~4 个候选，并提示用户直接输入候选名称或自定义内容。
+- 需补多个字段（如“帮我看下这个药”→ 名称？企业？类别？）→ 用简洁的文字说明需要补充的字段；用户可以在下一条消息一次回复。
+- 决策口径确认（不可逆/影响大的口径）→ 用“请确认是否按……口径查询？”的文字提问。
 
 要求：
 
 - 每次追问只聚焦 **1~3 个最关键的不确定点**，不一次抛一堆；历史选择可复用，减少反复追问。
 - 澄清后再进入查询流程；`status = needs_clarification` 时不执行查询。
 - 若用户坚持让系统自行判定 → 以**最合理默认口径**执行，并在答案中**明确披露该口径假设**。
-- 追问卡示例（`choice`）：
-  ```json
-  {"role":"assistant","content":"为了给出准确结果，我需要确认时间口径。","version":"2.0",
-   "interaction":{"id":"ask-time-region","type":"choice","multiple":false,"allowCustom":true,
-     "question":"你想按哪个时间口径统计「销售额」？",
-     "options":[{"value":"H1","label":"上半年（1-6月）"},
-                {"value":"2026H1","label":"2026 上半年"},
-                {"value":"Q2","label":"二季度"}]}}
-  ```
+- 文字追问示例：`为了准确查询，请告诉我你想按哪种方式查询药品：药品名称、医保支付类别、生产企业，还是批准文号？也可以直接补充具体关键词。`
 
 ## 工具协议（执行顺序）
 
@@ -92,21 +85,77 @@ MCP 数据集协议按以下顺序推进，`trace_id` 从 `semantic_context` 返
 1. `list_datasets` / `describe_dataset(dataset_id)`：仅在数据集或字段范围不明确时调用。
 2. `semantic_context(dataset_id, question)`：每个自然语言问数请求先调用；保存返回的 `trace_id` 供后续使用。
 3. 直接编排 MDL SQL 查询（不使用任何预定义查询模板）：先 `query_preflight(dataset_id, question, sql, trace_id)`，仅当结果 `allowed` 或 `warning` 才调用 `query(dataset_id, sql, limit, trace_id)` 取得实际数据。该步骤是唯一的 PostgreSQL 事实查询，不得由图谱补充或修改表格行。**所有可能返回目录项的查询都必须在内部投影 `catalog_code`、`registration_no` 与 `source_record_id`，即使最终面向用户的表格不展示这些证据列；不得为了精简展示列而省略它们。**
-4. 仅在 `query` 返回至少一条记录后，调用官方只读 Neo4j MCP 的 `read-cypher`。从 **本轮 Wren 结果行** 提取去重后的 `catalog_code`（最多 6 个）作为 `catalog_codes`，提取 `registration_no`（最多 6 个）作为 `registration_numbers`；不得从用户问题猜测或自行补造这些参数。`read-cypher` 是有数据回答的必经步骤：只有它真实返回非空关系行后，才能将该轮标记为“查询知识图谱已完成”；若参数缺失、工具失败或空命中，只完成表格回答且绝不声称已查询图谱。0 行时不调用图谱工具，也不展示知识图谱。
-   - `read-cypher` 只能执行下列固定的、单语句、参数化 Cypher 投影；只替换参数数组，禁止拼接用户输入、禁止使用 `CREATE`/`MERGE`/`SET`/`DELETE`/`CALL`、禁止调用 `get-schema`：
+   - **返回条数上限**：当问题明确写有“最多返回 N 条”时，这一要求是实际执行约束，不是展示文案。将 N 解析为正整数并在 `query` 调用中使用 **`limit = N`**；不得改用工具默认值、不得再额外扩大返回条数。DIY 快捷问题只提供 **10、20、50、100** 四档，必须原样传递对应数字。用户自然语言指定其他正整数时，也按其指定值执行；缺少该要求时才使用现有工具默认值。
+4. 仅在 `query` 返回至少一条记录后，调用 `evidence_subgraph(dataset_id, trace_id)`。`evidence_subgraph` 是有数据回答的必经步骤：服务端只从**本轮 Wren 已完成结果**中提取有界的目录标识，再以受控只读 Cypher 查询 Neo4j；智能体不得自行摘取参数、不得调用裸 `read-cypher` 或 `get-schema`。只有 `evidence_subgraph` 真实返回非空的 Neo4j `nodes + edges` 后，才能将该轮标记为“查询知识图谱已完成”；0 行、工具失败或空命中时只完成表格回答，绝不展示图谱入口。
+   - `evidence_subgraph` 在服务端执行下列固定的、单语句、参数化 Cypher 投影；参数只能来自同一 `trace_id` 的 Wren 结果，禁止拼接用户输入、禁止使用 `CREATE`/`MERGE`/`SET`/`DELETE`/`CALL`：
      ```cypher
      MATCH (product)
      WHERE (product:ConsumableProduct AND (product.base_code IN $catalog_codes OR product.registration_no IN $registration_numbers))
         OR (product:DrugProduct AND product.drug_code IN $catalog_codes)
+        OR (product:ServiceItem AND product.province_code IN $catalog_codes)
+        OR (product:DiagnosisItem AND product.code IN $catalog_codes)
+     WITH product LIMIT 6
+     MATCH (record:CatalogRecord)-[evidence:EVIDENCE_FOR]->(product)
+     WITH product, record, evidence LIMIT 24
+     RETURN elementId(product) AS source_id, labels(product) AS source_labels, properties(product) AS source_properties,
+            type(evidence) AS relation_type,
+            elementId(record) AS target_id, labels(record) AS target_labels, properties(record) AS target_properties
+     UNION
+     MATCH (product)
+     WHERE (product:ConsumableProduct AND (product.base_code IN $catalog_codes OR product.registration_no IN $registration_numbers))
+        OR (product:DrugProduct AND product.drug_code IN $catalog_codes)
+        OR (product:ServiceItem AND product.province_code IN $catalog_codes)
+        OR (product:DiagnosisItem AND product.code IN $catalog_codes)
+     WITH product LIMIT 6
+     MATCH (record:CatalogRecord)-[:EVIDENCE_FOR]->(product)
+     WITH record LIMIT 24
+     MATCH (record)-[attribute:HAS_ATTRIBUTE]->(value:CatalogAttributeValue)
+     WITH record, attribute, value LIMIT 120
+     RETURN elementId(record) AS source_id, labels(record) AS source_labels, properties(record) AS source_properties,
+            type(attribute) AS relation_type,
+            elementId(value) AS target_id, labels(value) AS target_labels, properties(value) AS target_properties
+     UNION
+     MATCH (product)
+     WHERE (product:ConsumableProduct AND (product.base_code IN $catalog_codes OR product.registration_no IN $registration_numbers))
+        OR (product:DrugProduct AND product.drug_code IN $catalog_codes)
+        OR (product:ServiceItem AND product.province_code IN $catalog_codes)
+        OR (product:DiagnosisItem AND product.code IN $catalog_codes)
+     WITH product LIMIT 6
+     MATCH (record:CatalogRecord)-[:EVIDENCE_FOR]->(product)
+     WITH record LIMIT 24
+     MATCH (source:SourceFile)-[contains:CONTAINS_RECORD]->(record)
+     RETURN elementId(record) AS source_id, labels(record) AS source_labels, properties(record) AS source_properties,
+            type(contains) AS relation_type,
+            elementId(source) AS target_id, labels(source) AS target_labels, properties(source) AS target_properties
+     UNION
+     MATCH (product)
+     WHERE (product:ConsumableProduct AND (product.base_code IN $catalog_codes OR product.registration_no IN $registration_numbers))
+        OR (product:DrugProduct AND product.drug_code IN $catalog_codes)
+        OR (product:ServiceItem AND product.province_code IN $catalog_codes)
+        OR (product:DiagnosisItem AND product.code IN $catalog_codes)
+     WITH product LIMIT 6
+     MATCH (record:CatalogRecord)-[:EVIDENCE_FOR]->(product)
+     MATCH (source:SourceFile)-[:CONTAINS_RECORD]->(record)
+     WITH source LIMIT 12
+     MATCH (batch:ImportBatch)-[contains:CONTAINS_SOURCE]->(source)
+     RETURN elementId(source) AS source_id, labels(source) AS source_labels, properties(source) AS source_properties,
+            type(contains) AS relation_type,
+            elementId(batch) AS target_id, labels(batch) AS target_labels, properties(batch) AS target_properties
+     UNION
+     MATCH (product)
+     WHERE (product:ConsumableProduct AND (product.base_code IN $catalog_codes OR product.registration_no IN $registration_numbers))
+        OR (product:DrugProduct AND product.drug_code IN $catalog_codes)
+        OR (product:ServiceItem AND product.province_code IN $catalog_codes)
+        OR (product:DiagnosisItem AND product.code IN $catalog_codes)
      WITH product LIMIT 6
      MATCH (product)-[relationship]-(related)
-     WHERE type(relationship) IN ['MANUFACTURED_BY', 'REGISTERED_AS', 'PRODUCT_OF', 'ASSERTED_MAPS_TO_CONCEPT']
+     WHERE type(relationship) IN ['MANUFACTURED_BY', 'REGISTERED_AS', 'PRODUCT_OF', 'ASSERTED_MAPS_TO_CONCEPT', 'HAS_GENERIC']
      RETURN elementId(product) AS source_id, labels(product) AS source_labels, properties(product) AS source_properties,
             type(relationship) AS relation_type,
             elementId(related) AS target_id, labels(related) AS target_labels, properties(related) AS target_properties
-     LIMIT 72
+     LIMIT 120
      ```
-   - 若需要来源路径，再用同样的结果锚点执行一个固定投影：`CatalogRecord-[:EVIDENCE_FOR]-product`、`SourceFile-[:CONTAINS_RECORD]-CatalogRecord`、`ImportBatch-[:CONTAINS_SOURCE]-SourceFile`，保持相同的 `source_id/source_labels/source_properties/relation_type/target_id/target_labels/target_properties` 返回列，最多 48 行。前端将这些真实关系行转换为 `nodes + edges` 后展示；Neo4j 命中为空或工具失败时不显示图谱入口。
+   - 该投影已将目录项→原始记录、原始记录→真实字段值、目录项→既有业务关系合并为一条只读查询；字段节点必须来自 `CatalogAttributeValue`，不得根据 PostgreSQL 结果行生成或补造。前端仅展示服务端返回的真实 Neo4j `nodes + edges`；Neo4j 命中为空或工具失败时不显示图谱入口。
    - 该步骤只提供来源文件、原始行、映射关系与审核依据，绝不修改 PostgreSQL 表格数据，也不得把 Neo4j 属性补写成表格事实。
 5. 兼容路径：仅当通用数据集工具不可用时，才使用旧版 `wren_graph_context(question)` → `wren_query_preflight(question, sql)` → `wren_query(sql, limit)`。`wren_query` 是唯一的旧版事实执行入口。
 6. 不要调用不存在的 `wren_context_instructions`、`wren_memory_recall`；不要假定 `wren_models` 返回字段清单——字段存在性以语义上下文、预检与已发布模型为准；`raw` 与桥接层不是业务查询来源，禁止读取。
@@ -150,10 +199,10 @@ MCP 数据集协议按以下顺序推进，`trace_id` 从 `semantic_context` 返
 「语义依据」面板包含**两条互补信息**，不要混淆，也**不得把图谱当作数据库事实**：
 
 1. **执行链路（`execution_path`）**——回答"这条查询是怎么一步步执行的"，通常分几个阶段：
-   `Agent 语义分析`（识别意图/命中的语义词与字段）→ `Wren 语义层（MDL）`（命中业务模型 `medical_catalog`、查询字段数）→ `PostgreSQL 数据源`（读取物理视图，如 `medical_catalog_consumables`/`medical_catalog_drugs`）→ `Neo4j 证据子图`（官方只读 `read-cypher` 仅针对已命中记录投影来源、映射和审核依据）→ `查询结果`（行数、来源记录数、是否截断）。
+   `Agent 语义分析`（识别意图/命中的语义词与字段）→ `Wren 语义层（MDL）`（命中业务模型 `medical_catalog`、查询字段数）→ `PostgreSQL 数据源`（读取物理视图，如 `medical_catalog_consumables`/`medical_catalog_drugs`）→ `Neo4j 证据子图`（`evidence_subgraph` 仅针对已命中记录投影来源、映射和审核依据）→ `查询结果`（行数、来源记录数、是否截断）。
    用户想看"查询思路"时，优先依托 `execution_path` 讲链路，而不是罗列结果节点。
 
-2. **结果子图（`evidence.nodes`/`edges`）**——回答"结果产品的来龙去脉"，按本轮 Wren 结果行的 `catalog_code` / `registration_no` 通过官方只读 Neo4j `read-cypher` 投影出的关联子图。常见节点类型：
+2. **结果子图（`evidence.nodes`/`edges`）**——回答"结果产品的来龙去脉"，按本轮 Wren 结果行的 `catalog_code` / `registration_no` 通过只读 `evidence_subgraph` 投影出的关联子图。常见节点类型：
    `product`（产品）、`organization`（生产企业）、`catalog_record`（原始目录记录）、`source_file`（来源工作簿）、`import_batch`（导入批次）、`registration`（注册备案/批准文号）、`base`（基础耗材）、`concept`（映射概念）；边类型 `business`（业务关系）、`provenance`（来源追溯）、`semantic`（语义关系）、`query`（查询返回）。
 
 原则：
@@ -211,7 +260,7 @@ MCP 数据集协议按以下顺序推进，`trace_id` 从 `semantic_context` 返
 }
 ```
 
-- `status = resolved` 且已给出 `published_columns`（必须都来自白名单）时，智能体按此执行；`evidence_columns` 必须是 `published_columns` 的子集。`status = needs_clarification` 时，按「澄清规则」输出 UIP choice/form 追问卡，不执行查询。
+- `status = resolved` 且已给出 `published_columns`（必须都来自白名单）时，智能体按此执行；`evidence_columns` 必须是 `published_columns` 的子集。`status = needs_clarification` 时，按「澄清规则」输出普通文字追问，不执行查询。
 
 ## 反面与正面样例
 

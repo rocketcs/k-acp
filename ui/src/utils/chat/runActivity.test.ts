@@ -2,12 +2,30 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   aggregateRunActivities,
+  getRunElapsedMs,
   shouldShowLegacyToolCall,
   shouldShowChatInput,
   shouldShowChoiceCustomInput,
   shouldShowRunActivity,
   shouldShowRunWaiting,
 } from './runActivity.ts'
+
+test('已完成的运行卡片冻结在最后一个步骤完成时刻', () => {
+  const activities = [
+    { id: 'semantic', name: '语义解析', status: 'completed' as const, startTime: 1_000, elapsed: 900 },
+    { id: 'answer', name: '整理回答', status: 'completed' as const, startTime: 1_000, elapsed: 5_500 },
+  ]
+
+  assert.equal(getRunElapsedMs(activities, 1_000, 100_000, false), 5_500)
+})
+
+test('运行中的运行卡片继续使用当前时间计算耗时', () => {
+  const activities = [
+    { id: 'query', name: '执行查询', status: 'running' as const, startTime: 1_000 },
+  ]
+
+  assert.equal(getRunElapsedMs(activities, 1_000, 3_500, true), 2_500)
+})
 
 test('执行卡仅在尚未开始输出正文时显示', () => {
   assert.equal(shouldShowRunActivity(true, true, false), true)

@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { ElementDefinition } from 'cytoscape'
 import type { GraphifyEvidenceEnvelope } from './types'
-import { evidenceGraphCounts, evidenceGraphModel } from './evidenceGraphModel.ts'
+import { evidenceGraphCounts, evidenceGraphModel, type GraphElementDefinition } from './evidenceGraphModel.ts'
 
 const envelope: GraphifyEvidenceEnvelope = {
   status: 'executed', trace_id: 't1', dataset_id: 'medical_catalog', question: 'q',
@@ -28,7 +27,7 @@ const envelope: GraphifyEvidenceEnvelope = {
   },
 }
 
-const ids = (elements: ElementDefinition[]) => elements.filter((e) => e.data?.kind && !e.data?.source).map((e) => String(e.data!.id)).sort()
+const ids = (elements: GraphElementDefinition[]) => elements.filter((e) => e.data?.kind && !e.data?.source).map((e) => String(e.data!.id)).sort()
 
 test('focused view: business + provenance only, no model/record/query', () => {
   const elements = evidenceGraphModel(envelope, { viewMode: 'focused', showFields: false })
@@ -70,6 +69,24 @@ test('core entity node label is the business name, not a query-action heading', 
   assert.equal(String(product?.data?.label).includes('查询'), false)
   const registration = elements.find((e) => e.data?.id === 'registration')
   assert.equal(String(registration?.data?.label).includes('\n'), true, 'relation-type entities keep heading + value')
+})
+
+test('long node labels receive a smaller per-node font size to remain inside the node', () => {
+  const longLabelEnvelope: GraphifyEvidenceEnvelope = {
+    ...envelope,
+    evidence: {
+      ...envelope.evidence,
+      nodes: envelope.evidence.nodes.map((node) => node.id === 'registration'
+        ? { ...node, label: '杭州民生药业股份有限公司' }
+        : node),
+    },
+  }
+  const elements = evidenceGraphModel(longLabelEnvelope, { viewMode: 'focused', showFields: false })
+  const registration = elements.find((element) => element.data?.id === 'registration')
+  const product = elements.find((element) => element.data?.id === 'product')
+
+  assert.ok(Number(registration?.data?.fontSize) < Number(product?.data?.fontSize))
+  assert.ok(Number(registration?.data?.fontSize) >= 8, 'long labels keep a readable minimum size')
 })
 
 test('nodes carry positions from dagre', () => {
@@ -150,6 +167,68 @@ test('isolated nodes are excluded from summary counts', () => {
   // totalCount 为全部非查询过程业务节点（含被隐藏的孤立节点），驱动「点击展开」提示
   // 基础 envelope 中非 record/source 节点：model/product/registration/catalog_record/field + orphan = 6
   assert.equal(totalCount, 6)
+})
+
+test('limits the graph to query roots and two relationship levels', () => {
+  const deep: GraphifyEvidenceEnvelope = {
+    ...envelope,
+    evidence: {
+      nodes: [
+        { id: 'model', label: '医保目录', kind: 'model' },
+        { id: 'root', label: '氯雷他定', kind: 'product' },
+        { id: 'level-1', label: '收费类别', kind: 'concept' },
+        { id: 'level-2', label: '甲类', kind: 'attribute' },
+        { id: 'level-3', label: '更深层节点', kind: 'attribute' },
+      ],
+      edges: [
+        { id: 'query', source: 'model', target: 'root', label: '查询返回', kind: 'query' },
+        { id: 'one', source: 'root', target: 'level-1', label: '分类', kind: 'business' },
+        { id: 'two', source: 'level-1', target: 'level-2', label: '取值', kind: 'attribute' },
+        { id: 'three', source: 'level-2', target: 'level-3', label: '下级', kind: 'attribute' },
+      ],
+      source_record_ids: [],
+    },
+  }
+  const selected = evidenceGraphModel(deep, { viewMode: 'focused', showFields: false, maxDepth: 2 })
+  const ids = selected.filter((element) => element.data?.source === undefined).map((element) => element.data?.id)
+  assert.deepEqual(ids.sort(), ['level-1', 'level-2', 'root'])
+  assert.equal(selected.some((element) => element.data?.id === 'level-3'), false)
+})
+
+test('caps the rendered projection at maxNodes while keeping the nearest business nodes', () => {
+  const broad: GraphifyEvidenceEnvelope = {
+    ...envelope,
+    evidence: {
+      nodes: [
+        { id: 'root', label: '氯雷他定', kind: 'product' },
+        ...Array.from({ length: 120 }, (_, index) => ({
+          id: `category-${index}`,
+          label: `收费类别-${index}`,
+          kind: 'concept' as const,
+        })),
+      ],
+      edges: Array.from({ length: 120 }, (_, index) => ({
+        id: `edge-${index}`,
+        source: 'root',
+        target: `category-${index}`,
+        label: '收费类别',
+        kind: 'business' as const,
+      })),
+      source_record_ids: [],
+    },
+  }
+
+  const elements = evidenceGraphModel(broad, {
+    viewMode: 'focused',
+    showFields: false,
+    maxDepth: 2,
+    maxNodes: 100,
+  })
+  const nodes = elements.filter((element) => element.data?.source === undefined)
+  assert.equal(nodes.length, 100)
+  assert.ok(nodes.some((node) => node.data?.id === 'root'))
+  assert.equal(nodes.some((node) => node.data?.id === 'category-98'), true)
+  assert.equal(nodes.some((node) => node.data?.id === 'category-99'), false)
 })
 
 test('a node reachable only through a dropped query edge becomes isolated and hides', () => {

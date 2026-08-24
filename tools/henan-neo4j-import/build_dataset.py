@@ -42,6 +42,25 @@ TOKEN_SPLIT = re.compile(r'[,，;；\n]+')
 TOKEN_CODE = re.compile(r'^([A-Za-z0-9]+)')
 PIPELINE_VERSION = 'henan-neo4j-import-v1.0.0'
 
+# 原始工作簿列名 → 统一目录字段。未列出的非空列仍原样写入图谱，保证后续
+# 新问题可以追溯到真实字段；这些别名只让常用字段在图中有稳定的语义名称。
+ATTRIBUTE_FIELDS = {
+    '药品编码': 'catalog_code', '耗材代码': 'catalog_code', '河南省项目编码': 'catalog_code', '项目编码': 'catalog_code',
+    '通用名称': 'catalog_name', '单件产品名称': 'catalog_name', '河南省项目名称': 'catalog_name', '项目名称': 'catalog_name',
+    '药厂名称': 'manufacturer', '生产企业': 'manufacturer', '耗材企业': 'consumable_enterprise',
+    '注册备案号': 'registration_no', '批准文号': 'approval_number', '规格': 'specification', '型号': 'model',
+    '医保支付类别': 'payment_category', '支付类别': 'payment_category',
+    '开始时间': 'valid_from', '终止时间': 'valid_to', '最高价格': 'max_price_text', '最高限额': 'max_limit_text',
+    '材质': 'material', '特征': 'feature', '政策号': 'policy_no', '计价单位': 'unit',
+}
+
+ATTRIBUTE_DOMAIN = {
+    'drug': 'DRUG', 'consumable': 'CONSUMABLE', 'consumable_change': 'CONSUMABLE',
+    'basic_material': 'CONSUMABLE', 'consumable_sku': 'CONSUMABLE',
+    'service': 'SERVICE', 'service_added': 'SERVICE', 'service_stopped': 'SERVICE',
+    'diagnosis': 'DIAGNOSIS', 'diagnosis_supplement': 'DIAGNOSIS',
+}
+
 def sha(value: str) -> str: return hashlib.sha256(value.encode('utf-8')).hexdigest()
 def clean(value):
     if value is None: return ''
@@ -100,10 +119,31 @@ class Dataset:
             raw = json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
             record_id = sha(source_id + '|' + str(excel_row) + '|' + sha(raw))
             self.add('catalog_records', {'record_id': record_id, 'source_id': source_id, 'source_row': excel_row, 'raw_row_hash': sha(raw), 'raw_payload_base64': base64.b64encode(raw.encode('utf-8')).decode('ascii'), 'raw_payload_encoding': 'base64:utf-8-json', 'record_kind': kind})
+            self.attributes(record, record_id, kind)
             if kind != 'lookup': self.business_rows += 1
             accepted += 1
             self.domain(record, record_id, source_id, path.name, sheet, excel_row, kind)
         wb.close(); self.metrics['sheets'][f'{file_key}/{sheet}'] = {'accepted_rows': accepted, 'source_id': source_id, 'start_row': start}
+
+    def attributes(self, record, record_id, kind):
+        """Emit one real, record-scoped graph node per non-empty source field."""
+        domain = ATTRIBUTE_DOMAIN.get(kind)
+        if not domain:
+            return
+        emitted = set()
+        for field_label, raw_value in record.items():
+            value = clean(raw_value)
+            if not value:
+                continue
+            field = ATTRIBUTE_FIELDS.get(field_label, field_label)
+            key = (field, value)
+            if key in emitted:
+                continue
+            emitted.add(key)
+            self.add('catalog_attribute_values', {
+                'attribute_id': ident(record_id, field, value), 'record_id': record_id,
+                'domain': domain, 'field': field, 'field_label': field_label, 'value': value,
+            })
 
     def category(self, r):
         parts = [('L1', r.get('一级分类','')), ('L2', r.get('二级分类','')), ('L3', r.get('三级分类','')), ('G', r.get('医保通用名分类','')), ('M', r.get('材质','')), ('F', r.get('特征',''))]

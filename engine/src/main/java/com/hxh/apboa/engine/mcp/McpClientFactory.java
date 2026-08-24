@@ -138,7 +138,8 @@ public class McpClientFactory {
                         degradeContext,
                         toolSchema,
                         () -> getInitializedClient(mcpServer.getId()),
-                        mcpRuntimeDegradeService));
+                        mcpRuntimeDegradeService,
+                        () -> invalidateClient(mcpServer.getId())));
             });
         }
         return result;
@@ -198,7 +199,8 @@ public class McpClientFactory {
                         degradeContext,
                         toolSchema,
                         () -> getInitializedClient(mcpServer.getId()),
-                        mcpRuntimeDegradeService));
+                        mcpRuntimeDegradeService,
+                        () -> invalidateClient(mcpServer.getId())));
             });
         }
         return result;
@@ -225,6 +227,14 @@ public class McpClientFactory {
         });
 
         return context.initializedClient;
+    }
+
+    /**
+     * Invalidate a cached client after a transport/session failure. The next
+     * lazy tool invocation will create and initialize a fresh MCP session.
+     */
+    public void invalidateClient(Long mcpServerId) {
+        closeStaleContext(mcpServerId);
     }
 
     private SharedMcpClientContext createContext(McpServer mcpServer, String contextKey) {

@@ -19,10 +19,12 @@ const props = defineProps<{
   agentHasResult?: boolean
   toolCalls: Array<{ id: string; name: string; args: string; result?: string; elapsed?: number, needConfirm?: boolean }>
   runActivities: RunActivity[]
+  completedRunActivities?: readonly RunActivity[]
   isDiyChat: boolean
   runActivityPlacement?: 'tail' | 'after-latest-user'
   showRunActivity: boolean
   showRunWaiting: boolean
+  retainFinishedRunActivity?: boolean
   runStartedAt: number | null
 }>()
 
@@ -82,6 +84,7 @@ const latestUserGroupIndex = computed(() => {
 })
 
 const expandedMap = ref<Record<string, boolean>>({})
+const retainedActivities = computed(() => props.completedRunActivities ?? [])
 
 function isExpanded(key: string): boolean {
   return expandedMap.value[key] ?? false
@@ -153,12 +156,19 @@ function firstMessage(group: MessageGroup): DisplayMessage {
           v-if="showRunActivity"
           :activities="runActivities"
           :started-at="runStartedAt"
+          :is-running="true"
           @abort="$emit('abort')"
         />
         <AgentRunWaiting
           v-else-if="showRunWaiting"
           :started-at="runStartedAt"
           @abort="$emit('abort')"
+        />
+        <AgentRunActivity
+          v-else-if="retainFinishedRunActivity && retainedActivities.length"
+          :activities="retainedActivities"
+          :started-at="runStartedAt"
+          :is-running="false"
         />
       </template>
     </template>
@@ -181,6 +191,7 @@ function firstMessage(group: MessageGroup): DisplayMessage {
         v-if="showRunActivity"
         :activities="runActivities"
         :started-at="runStartedAt"
+        :is-running="true"
         @abort="$emit('abort')"
       />
       <AgentRunWaiting

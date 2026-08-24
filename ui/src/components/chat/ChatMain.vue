@@ -27,8 +27,10 @@ const props = defineProps<{
   messages: DisplayMessage[]
   toolCalls: any[]
   runActivities: RunActivity[]
+  completedRunActivities?: readonly RunActivity[]
   runActivityPlacement?: 'tail' | 'after-latest-user'
   forceRunActivity?: boolean
+  retainFinishedRunActivity?: boolean
   isDiyChat: boolean
   hasVisibleAnswer: boolean
   runStartedAt: number | null
@@ -372,9 +374,11 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
             :messages="props.messages"
             :tool-calls="toolCalls"
             :run-activities="runActivities"
+            :completed-run-activities="completedRunActivities"
             :is-diy-chat="isDiyChat"
             :run-activity-placement="runActivityPlacement"
             :show-run-activity="showRunActivity"
+            :retain-finished-run-activity="retainFinishedRunActivity"
             :show-run-waiting="showRunWaiting"
             :run-started-at="runStartedAt"
             @abort="$emit('abort')"
