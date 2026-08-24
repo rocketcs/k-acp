@@ -221,6 +221,7 @@ onMounted(() => { void loadAgent() })
       :chat-agent-id="agentId"
       :show-account="true"
       :force-diy-config="true"
+      welcome-headline-override="你想查询什么信息？"
       :show-graph-explorer="true"
       :message-display-adapter="messageDisplayAdapter"
       :message-presentation-adapter="messagePresentationAdapter"

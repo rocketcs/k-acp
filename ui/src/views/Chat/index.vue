@@ -84,6 +84,8 @@ const props = withDefaults(defineProps<{
   runActivityPlacement?: 'tail' | 'after-latest-user'
   /** 特定路由即使未按通用 DIY 路由命名，也始终显示运行状态卡。 */
   forceRunActivity?: boolean
+  /** 特定路由可覆盖 DIY 欢迎页标题。 */
+  welcomeHeadlineOverride?: string
   /** 强制开启工具执行过程展示（用于需要保留 MCP 工具结果的受治理数据查询类 agent）。 */
   forceToolProcessActive?: boolean
   /** 仅特定路由在输入框上方显示完整知识图谱入口。 */
@@ -104,6 +106,16 @@ const userInfo = computed(() => accountStore.userInfo)
 const agentId = computed(() => (props.chatAgentId || route.params.agentId) as string || '')
 const isDiyRoute = computed(() => route.name === RouteNames.CHAT_DIY)
 const diyConfig = ref<DiyPageConfig | null>(null)
+const displayDiyConfig = computed(() => {
+  const config = diyConfig.value
+  const headlineOverride = props.welcomeHeadlineOverride?.trim()
+
+  if (!config || !headlineOverride || config.headline === headlineOverride) {
+    return config
+  }
+
+  return { ...config, headline: headlineOverride }
+})
 
 // 智能体详情
 const { agentDetail, allowFileType } = useAgentDetail(agentId)
@@ -883,7 +895,7 @@ defineExpose({ submitExternalSubmission, requestAttachmentPicker, abortRun })
       :has-more-history="hasMoreHistory"
       :history-loading="historyLoading"
       :current-plan="currentPlan"
-      :diy-config="diyConfig"
+      :diy-config="displayDiyConfig"
       :show-graph-explorer="showGraphExplorer"
       @update:input-value="inputText = $event"
       @update:uploaded-files="uploadedFiles = $event"

@@ -55,6 +55,14 @@ test('graphify route keeps DIY question cards compact and readable', () => {
   assert.match(component, /@media\s*\(max-width:\s*767px\)\s*\{[\s\S]*?:deep\(\.graphify-data-query-chat \.diy-question-card\)\s*\{[\s\S]*?flex-basis:\s*100%/)
 })
 
+test('graphify route greets the user with a query prompt instead of the agent name', () => {
+  assert.match(component, /welcome-headline-override="你想查询什么信息？"/)
+  assert.match(chat, /welcomeHeadlineOverride\?: string/)
+  assert.match(chat, /const displayDiyConfig = computed\(\(\) => \{/)
+  assert.match(chat, /headline: headlineOverride/)
+  assert.match(chat, /:diy-config="displayDiyConfig"/)
+})
+
 test('each answer owns a Neo4j graph action instead of a global recent-query action', () => {
   assert.doesNotMatch(component, /最近查询图谱/)
   assert.doesNotMatch(component, /GraphifyGraphView/)
