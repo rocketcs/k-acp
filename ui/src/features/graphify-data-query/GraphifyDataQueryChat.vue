@@ -312,6 +312,34 @@ onMounted(() => { void loadAgent() })
   margin-top: auto;
 }
 
+/* 数据管理是本页面的主入口：贴近输入区但右对齐，避免与问数卡片争夺视觉焦点。 */
+:deep(.graphify-data-query-chat .chat-input-top-actions) {
+  justify-content: flex-end;
+  min-height: 42px;
+  margin-bottom: 10px;
+}
+
+:deep(.graphify-data-query-chat .chat-input-top-action-btn) {
+  min-height: 42px;
+  padding: 0 17px;
+  border: 1px solid #5d9ed1;
+  border-radius: 12px;
+  background: #e9f4ff;
+  color: #1f659e;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgb(39 111 169 / 12%);
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+:deep(.graphify-data-query-chat .chat-input-top-action-btn:hover) {
+  border-color: #2d7fbd;
+  background: #d8ecfc;
+  color: #155482;
+  box-shadow: 0 6px 16px rgb(39 111 169 / 18%);
+  transform: translateY(-1px);
+}
+
 /* 当前问数入口的快捷卡片收窄一些，减少横向空白，同时保留三列可读布局。 */
 :deep(.graphify-data-query-chat .diy-welcome-content) {
   width: min(100%, 1120px);

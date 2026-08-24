@@ -6,7 +6,7 @@
  * @component
  */
 import { computed, onMounted, ref } from 'vue'
-import { MessageOutlined, ShareAltOutlined } from '@ant-design/icons-vue'
+import { DatabaseOutlined, MessageOutlined } from '@ant-design/icons-vue'
 import ChatInputAttachments from './ChatInputAttachments.vue'
 import ChatInputEditor from './ChatInputEditor.vue'
 import ChatInputToolbar from './ChatInputToolbar.vue'
@@ -36,7 +36,7 @@ const props = withDefaults(
     sessionId?: string | null
     mentionAllowed?: boolean
     needInit?: boolean
-    /** 仅特定助手在输入框上方显示完整知识图谱入口。 */
+    /** 仅特定助手在输入框上方显示完整数据管理入口。 */
     showGraphExplorer?: boolean
   }>(),
   {
@@ -162,11 +162,11 @@ defineExpose({ requestAttachmentPicker })
 <template>
   <div class="chat-input-container">
   <div v-if="showGraphExplorer" class="chat-input-top-actions">
-    <ATooltip placement="top" title="打开完整知识图谱">
-      <button type="button" class="chat-input-top-action-btn" title="打开知识图谱"
+    <ATooltip placement="top" title="打开完整数据管理">
+      <button type="button" class="chat-input-top-action-btn" title="打开数据管理"
         @click="emit('graphExplorer')">
-        <ShareAltOutlined />
-        <span>知识图谱</span>
+        <DatabaseOutlined />
+        <span>数据管理</span>
       </button>
     </ATooltip>
   </div>

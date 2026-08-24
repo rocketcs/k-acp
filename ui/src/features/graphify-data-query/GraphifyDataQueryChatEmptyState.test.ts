@@ -34,7 +34,8 @@ test('graphify route enables published DIY config loading on the shared chat vie
 
 test('graphify route keeps the shared welcome layout visible for DIY cards and input', () => {
   assert.doesNotMatch(component, /:deep\(\.graphify-data-query-chat \.chat-welcome-title\)[\s\S]*?display:\s*none/)
-  assert.doesNotMatch(component, /:deep\(\.graphify-data-query-chat \.chat-welcome\)\s*\{[\s\S]*?justify-content:\s*flex-end/)
+  const chatWelcomeStyle = component.match(/:deep\(\.graphify-data-query-chat \.chat-welcome\)\s*\{[\s\S]*?\n\}/)?.[0] ?? ''
+  assert.doesNotMatch(chatWelcomeStyle, /justify-content:\s*flex-end/)
   assert.match(component, /:deep\(\.graphify-data-query-chat \.chat-welcome-input\)\s*\{[\s\S]*?margin-top:\s*auto/)
   assert.match(component, /:deep\(\.graphify-data-query-chat \.chat-welcome\.is-diy-welcome \.chat-welcome-input\)\s*\{[\s\S]*?margin-top:\s*auto/)
   assert.match(component, /:deep\(\.graphify-data-query-chat \.chat-welcome-input\)\s*\{[\s\S]*?margin-bottom:/)
