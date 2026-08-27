@@ -102,6 +102,24 @@
             <artifactId>tika-parsers-standard-package</artifactId>
             <version>2.9.2</version>
         </dependency>
+        <!-- 文档导出：Word/Excel -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.4.1</version>
+        </dependency>
+        <!-- POI 5.4.x 需要包含 BoundedInputStream.Builder 的 commons-io 版本 -->
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.18.0</version>
+        </dependency>
+        <!-- 文档导出：PDF -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.5</version>
+        </dependency>
         <!--qdrant-->
         <dependency>
             <groupId>io.qdrant</groupId>

@@ -103,6 +103,8 @@ RUN set -eux; \
         python3 \
         python3-pip \
         python3-venv \
+        fonts-noto-cjk \
+        fonts-droid-fallback \
         curl \
         ca-certificates \
     && ln -sf /usr/bin/python3 /usr/bin/python \

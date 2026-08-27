@@ -46,6 +46,11 @@ spring:
       time-between-eviction-runs-millis: 60000
       min-evictable-idle-time-millis: 300000
 
+# 文档导出配置（PDF 中文字体）
+document-export:
+  # PDFBox 需要 TrueType（glyf）字体；NotoSansCJK-Regular.ttc 是 CFF/OTF 字体，不能用于嵌入。
+  pdf-font-path: ${DOCUMENT_EXPORT_PDF_FONT_PATH:/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf}
+
 jwt:
   secret: ${JWT_SECRET:ZJr8c2xF0y5b7yM+1H9v9cGZq6nZ5e0k5r3Cw7H8vJQ=}
 
