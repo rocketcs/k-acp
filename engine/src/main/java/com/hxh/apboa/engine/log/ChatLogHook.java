@@ -3,6 +3,7 @@ package com.hxh.apboa.engine.log;
 import com.hxh.apboa.common.entity.ChatMessage;
 import com.hxh.apboa.common.util.AgentMetadataStore;
 import com.hxh.apboa.common.util.JsonUtils;
+import com.hxh.apboa.engine.util.DownloadLinkMarkdownNormalizer;
 import io.agentscope.core.agent.AgentBase;
 import io.agentscope.core.hook.*;
 import io.agentscope.core.message.*;
@@ -156,7 +157,7 @@ public class ChatLogHook implements Hook {
         if (text.isEmpty()) {
             return null;
         }
-        return text;
+        return DownloadLinkMarkdownNormalizer.normalize(text);
     }
 
     // 获取思考内容

@@ -16,6 +16,7 @@
 package io.agentscope.core.agui.adapter;
 
 import com.hxh.apboa.engine.hook.builtins.IConfirmationHook;
+import com.hxh.apboa.engine.util.DownloadLinkMarkdownNormalizer;
 import io.agentscope.core.agent.Agent;
 import io.agentscope.core.agent.Event;
 import io.agentscope.core.agent.EventType;
@@ -155,7 +156,7 @@ public class AguiAgentAdapter {
             // Handle reasoning events - convert to text messages and tool calls
             for (ContentBlock block : msg.getContent()) {
                 if (block instanceof TextBlock textBlock) {
-                    String text = textBlock.getText();
+                    String text = DownloadLinkMarkdownNormalizer.normalize(textBlock.getText());
                     if (text != null && !text.isEmpty()) {
                         // Apboa 如果当前已有活跃的文本消息，复用其 messageId，避免产生多个 TEXT_MESSAGE_START
                         String messageId;
