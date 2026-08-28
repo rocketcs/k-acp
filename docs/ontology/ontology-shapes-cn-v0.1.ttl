@@ -1,0 +1,37 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix 本体: <urn:kacp:mock:> .
+
+本体:仓库形状 a sh:NodeShape ;
+    sh:targetClass 本体:仓库 ;
+    sh:property [ sh:path 本体:标识 ; sh:minCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path 本体:名称 ; sh:minCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path 本体:仓库等级编码 ; sh:datatype xsd:integer ; sh:in ( 1 2 3 4 ) ] ;
+    sh:property [ sh:path 本体:位于区域 ; sh:maxCount 1 ] .
+
+本体:库存记录形状 a sh:NodeShape ;
+    sh:targetClass 本体:库存记录 ;
+    sh:property [ sh:path 本体:标识 ; sh:minCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path 本体:对应仓库 ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path 本体:对应物资 ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path 本体:数量 ; sh:minCount 1 ; sh:datatype xsd:decimal ; sh:minInclusive 0 ] ;
+    sh:property [ sh:path 本体:单价 ; sh:datatype xsd:decimal ; sh:minInclusive 0 ] ;
+    sh:property [ sh:path 本体:金额 ; sh:datatype xsd:decimal ; sh:minInclusive 0 ] ;
+    sh:property [ sh:path 本体:用途 ; sh:in ( "项目物资" "储备物资" "闲置物资" "报废物资" "战略储备物资" "常规储备物资" ) ] ;
+    sh:property [ sh:path 本体:库龄 ; sh:in ( "1年以内" "3-5年" "5-10年" "10年以上" ) ] .
+
+本体:物资形状 a sh:NodeShape ;
+    sh:targetClass 本体:物资 ;
+    sh:property [ sh:path 本体:标识 ; sh:minCount 1 ; sh:nodeKind sh:IRI ] .
+
+本体:供应商形状 a sh:NodeShape ;
+    sh:targetClass 本体:供应商 ;
+    sh:property [ sh:path 本体:标识 ; sh:minCount 1 ; sh:nodeKind sh:IRI ] .
+
+本体:项目形状 a sh:NodeShape ;
+    sh:targetClass 本体:项目 ;
+    sh:property [ sh:path 本体:标识 ; sh:minCount 1 ; sh:nodeKind sh:IRI ] .
+
+本体:区域形状 a sh:NodeShape ;
+    sh:targetClass 本体:区域 ;
+    sh:property [ sh:path 本体:省份编码 ; sh:minCount 1 ; sh:datatype xsd:string ] .
