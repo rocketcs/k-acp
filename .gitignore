@@ -64,3 +64,15 @@ agent_context.json
 __pycache__/
 tmp/
 .gstack/
+
+# 本地个人运行配置（仓库只提交 .sample.yml）
+application-dev.yml
+
+# 本地生成产物与临时文件
+tmp_*
+/data/
+/outputs/
+/output/imagegen/
+/output/finance-reimbursement-graph/
+/frontend-update-hook
+.pi/

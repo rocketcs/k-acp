@@ -11,8 +11,10 @@ WORKDIR /build
 # 接收构建参数（由 docker-compose.yml 的 args 传入，值来自 .env）
 ARG VITE_APP_BASE_API=/web
 ARG VITE_APP_CONTEXT_PATH=/web
+ARG VITE_GRAPH_EXPLORER_URL=http://kg.demo.pine.kingsware.cn:6800
 ENV VITE_APP_BASE_API=${VITE_APP_BASE_API}
 ENV VITE_APP_CONTEXT_PATH=${VITE_APP_CONTEXT_PATH}
+ENV VITE_GRAPH_EXPLORER_URL=${VITE_GRAPH_EXPLORER_URL}
 ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com \
     npm_config_registry=https://registry.npmmirror.com \
     NODE_OPTIONS=--max-old-space-size=4096

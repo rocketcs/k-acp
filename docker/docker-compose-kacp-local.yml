@@ -26,6 +26,10 @@ services:
       LANGFUSE_INGESTION_VERSION: ${LANGFUSE_INGESTION_VERSION:-4}
       # 高召回检索包含计划、受控搜索和批量原文解析，60 秒会在完成前中断。
       APBOA_TOOL_EXECUTION_TIMEOUT_SECONDS: "240"
+      # 财务制度自定义 Tool 的只读 Neo4j 连接；数据库通过 k-acp-local 网络中的 neo4j-finance 别名访问。
+      FINANCE_NEO4J_HTTP_URL: ${FINANCE_NEO4J_HTTP_URL:-http://neo4j-finance:7474}
+      FINANCE_NEO4J_USER: ${FINANCE_NEO4J_USER:-neo4j}
+      FINANCE_NEO4J_PASSWORD: ${FINANCE_NEO4J_PASSWORD}
     ports:
       - "23061:3061"
     volumes:

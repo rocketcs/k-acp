@@ -100,7 +100,7 @@ export async function hydrateGraphReferences(
 
 async function fetchEvidenceEnvelope(graphRef: string): Promise<GraphifyEvidenceEnvelope | null> {
   try {
-    const base = import.meta.env.VITE_GRAPH_EXPLORER_URL || 'http://127.0.0.1:8770'
+    const base = import.meta.env.VITE_GRAPH_EXPLORER_URL || 'http://kg.demo.pine.kingsware.cn:6800'
     const response = await fetch(`${base.replace(/\/$/, '')}/api/evidence/${encodeURIComponent(graphRef)}`)
     if (!response.ok) return null
     const payload = await response.json()

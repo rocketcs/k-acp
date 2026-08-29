@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MessageOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons-vue'
+import { MessageOutlined, MenuFoldOutlined, MenuUnfoldOutlined, PoweroffOutlined } from '@ant-design/icons-vue'
 import SessionList from './SessionList.vue'
 import type { ChatSessionVO } from '@/types'
 import { resolveAgentAvatar } from '@/utils/agentAvatar'
@@ -24,6 +24,7 @@ const emit = defineEmits<{
   (e: 'selectSession', session: ChatSessionVO): void
   (e: 'sessionMenu', key: string, session: ChatSessionVO): void
   (e: 'loadMore'): void
+  (e: 'logout'): void
 }>()
 
 /**
@@ -129,6 +130,16 @@ const handleNewSession = () => {
         {{ (userNickname || 'U').charAt(0).toUpperCase() }}
       </div>
       <span class="chat-sidebar-user-name" :title="userNickname || '用户'">{{ userNickname || '用户' }}</span>
+      <button
+        v-show="!collapsed"
+        type="button"
+        class="chat-sidebar-logout"
+        title="退出登录"
+        aria-label="退出登录"
+        @click="$emit('logout')"
+      >
+        <PoweroffOutlined />
+      </button>
     </div>
   </aside>
 </template>

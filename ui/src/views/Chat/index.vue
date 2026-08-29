@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { RouteNames } from '@/router'
 import { Modal, message } from 'ant-design-vue'
 import { useAccountStore, useChatStore } from '@/stores'
@@ -29,6 +29,7 @@ import { buildOutputInstruction } from '@/utils/diy/questionTemplate'
 import { prependChatAttachmentContent, splitChatAttachmentContent } from '@/utils/chat/messageContent'
 import { createRuntimeUserMessage } from '@/utils/chat/runtimeMessages'
 import { shouldDisplayChatMessage } from '@/utils/chat/messageVisibility'
+import { RoutePaths } from '@/router/constants'
 
 type ChatSubmissionInput = {
   text: string
@@ -105,9 +106,23 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ (e: 'graphExplorer'): void }>()
 
 const route = useRoute()
+const router = useRouter()
 const accountStore = useAccountStore()
 const chatStore = useChatStore()
 const userInfo = computed(() => accountStore.userInfo)
+
+/** 退出登录：与主页侧栏保持一致的确认与跳转行为。 */
+const handleLogout = () => {
+  Modal.confirm({
+    title: '确认',
+    icon: null,
+    content: '确认退出当前系统,是否继续?',
+    onOk: async () => {
+      await accountStore.logout()
+      await router.push(RoutePaths.LOGIN)
+    }
+  })
+}
 
 const agentId = computed(() => (props.chatAgentId || route.params.agentId) as string || '')
 const isDiyRoute = computed(() => route.name === RouteNames.CHAT_DIY)
@@ -869,6 +884,7 @@ defineExpose({ submitExternalSubmission, requestAttachmentPicker, abortRun })
       @select-session="handleSelectSession"
       @session-menu="handleSessionMenu"
       @load-more="loadMoreSessions"
+      @logout="handleLogout"
     />
 
     <RenameModal

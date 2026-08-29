@@ -293,6 +293,7 @@ services:
         NGINX_IMAGE: docker.m.daocloud.io/library/nginx:alpine
         VITE_APP_BASE_API: ${VITE_APP_BASE_API}
         VITE_APP_CONTEXT_PATH: ${VITE_APP_CONTEXT_PATH}
+        VITE_GRAPH_EXPLORER_URL: ${VITE_GRAPH_EXPLORER_URL:-http://kg.demo.pine.kingsware.cn:6800}
     container_name: apboa-frontend
     restart: unless-stopped
     healthcheck:

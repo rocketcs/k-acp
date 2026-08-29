@@ -1,3 +1,9 @@
+## 开发环境（必读）
+
+- 项目有两套运行模式：**本地开发模式（默认）**与 Docker 全栈模式。日常开发不要用 Docker 跑应用服务。
+- 本地/测试环境的启动、构建、更新流程和端口配置，必须先读 [DEVELOPMENT.md](DEVELOPMENT.md)，尤其是：后端启动必须带 `-Dhttp.proxyHost= -Dhttps.proxyHost= -DsocksProxyHost=`（本机 macOS 系统代理会注入所有 JVM，导致 pgvector 连接失败）。
+- `kacp` 命令已移除；中间件（MySQL/Redis/pgvector，端口 23306/26379/25433）由 compose 项目 `k-acp-local` 管理，任何时候不得 down 掉。
+
 ## 智能体功能与本地代码
 
 - 智能体功能如非必要，不得修改本地代码。

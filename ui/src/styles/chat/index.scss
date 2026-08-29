@@ -343,6 +343,32 @@ $small-mobile-breakpoint: 375px;
   transition: opacity $chat-transition;
 }
 
+.chat-sidebar-logout {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: #ff4d4f;
+    background-color: #ffe3e2;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $chat-primary;
+    outline-offset: 1px;
+  }
+}
+
 .chat-sidebar-doc-btn {
   flex-shrink: 0;
   width: 28px;

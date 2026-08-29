@@ -35,7 +35,7 @@ export type EChartsGraphPresentation = {
 
 /**
  * Keep the assistant graph in lockstep with the local Graph Explorer at
- * http://127.0.0.1:8770/. The explorer deliberately uses one stable force
+ * http://kg.demo.pine.kingsware.cn:6800/. The explorer deliberately uses one stable force
  * profile for every bounded graph so the same evidence has the same visual
  * density and relation visibility in both surfaces.
  */
