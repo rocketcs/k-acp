@@ -74,5 +74,5 @@ tmp_*
 /outputs/
 /output/imagegen/
 /output/finance-reimbursement-graph/
-/frontend-update-hook
+.frontend-update-hook
 .pi/
