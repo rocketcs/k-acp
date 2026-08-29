@@ -1,0 +1,1710 @@
+{
+  "title": "国网湖南省电力有限公司长沙供电公司物资仓库",
+  "subtitle": "中文关系子图 · 前 24 条库存记录",
+  "source": "图谱查询结果 · 本地模拟数据",
+  "stats": {
+    "nodeCount": 68,
+    "edgeCount": 80,
+    "amount": 4929149322.88
+  },
+  "nodes": [
+    {
+      "id": "urn:kacp:mock:material:MAT0001",
+      "label": "电力变压器",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "台",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 200.0,
+        "型号": "SZ11-200/110",
+        "电压等级千伏": 110.0,
+        "名称": "电力变压器",
+        "是否模拟": 1,
+        "制造商": "许继电气",
+        "类别": "变压器",
+        "基准价": 2494757.79
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0001",
+        "来源标识": "urn:kacp:mock:source:SRC005"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0003",
+      "label": "干式变压器",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "台",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 180000.0,
+        "型号": "SCB10-180000/10",
+        "电压等级千伏": 10.0,
+        "名称": "干式变压器",
+        "是否模拟": 1,
+        "制造商": "特变电工",
+        "类别": "变压器",
+        "基准价": 3606423.57
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0003",
+        "来源标识": "urn:kacp:mock:source:SRC004"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0010",
+      "label": "油浸式配电变压器",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "台",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 2000.0,
+        "型号": "S13-M-2000/10",
+        "电压等级千伏": 110.0,
+        "名称": "油浸式配电变压器",
+        "是否模拟": 1,
+        "制造商": "金风科技电气股份有限公司",
+        "类别": "变压器",
+        "基准价": 2811324.36
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0010",
+        "来源标识": "urn:kacp:mock:source:SRC006"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0011",
+      "label": "干式变压器",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "台",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 20000.0,
+        "型号": "SCB10-20000/10",
+        "电压等级千伏": 35.0,
+        "名称": "干式变压器",
+        "是否模拟": 1,
+        "制造商": "西门子能源",
+        "类别": "变压器",
+        "基准价": 2394189.78
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0011",
+        "来源标识": "urn:kacp:mock:source:SRC009"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0012",
+      "label": "有载调压变压器",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "台",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 63000.0,
+        "型号": "SZ20-63000/35",
+        "电压等级千伏": 10.0,
+        "名称": "有载调压变压器",
+        "是否模拟": 1,
+        "制造商": "南瑞继保电气股份有限公司",
+        "类别": "变压器",
+        "基准价": 1312779.68
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0012",
+        "来源标识": "urn:kacp:mock:source:SRC009"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0015",
+      "label": "干式变压器",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "台",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 10000.0,
+        "型号": "SCB10-10000/10",
+        "电压等级千伏": 10.0,
+        "名称": "干式变压器",
+        "是否模拟": 1,
+        "制造商": "南瑞继保电气股份有限公司",
+        "类别": "变压器",
+        "基准价": 2903969.98
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0015",
+        "来源标识": "urn:kacp:mock:source:SRC005"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0177",
+      "label": "液冷储能系统",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "套",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 0.0,
+        "型号": "ESS-1MWh-LC",
+        "电压等级千伏": 35.0,
+        "名称": "液冷储能系统",
+        "是否模拟": 1,
+        "制造商": "伊顿电气",
+        "类别": "储能设备",
+        "基准价": 1544781.01
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0177",
+        "来源标识": "urn:kacp:mock:source:SRC002"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0179",
+      "label": "工商业储能柜",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "套",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 0.0,
+        "型号": "ESS-215kWh-CI",
+        "电压等级千伏": 35.0,
+        "名称": "工商业储能柜",
+        "是否模拟": 1,
+        "制造商": "正泰电气",
+        "类别": "储能设备",
+        "基准价": 1355887.89
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0179",
+        "来源标识": "urn:kacp:mock:source:SRC005"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0180",
+      "label": "集装箱储能系统",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "套",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 0.0,
+        "型号": "ESS-3.44MWh-CT",
+        "电压等级千伏": 10.0,
+        "名称": "集装箱储能系统",
+        "是否模拟": 1,
+        "制造商": "国电南瑞",
+        "类别": "储能设备",
+        "基准价": 2999387.0
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0180",
+        "来源标识": "urn:kacp:mock:source:SRC006"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0181",
+      "label": "液冷储能系统",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "套",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 0.0,
+        "型号": "ESS-1MWh-LC",
+        "电压等级千伏": 35.0,
+        "名称": "液冷储能系统",
+        "是否模拟": 1,
+        "制造商": "远景能源",
+        "类别": "储能设备",
+        "基准价": 1803899.73
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0181",
+        "来源标识": "urn:kacp:mock:source:SRC002"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0187",
+      "label": "工商业储能柜",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "套",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 0.0,
+        "型号": "ESS-215kWh-CI",
+        "电压等级千伏": 35.0,
+        "名称": "工商业储能柜",
+        "是否模拟": 1,
+        "制造商": "伊顿电气",
+        "类别": "储能设备",
+        "基准价": 2177542.48
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0187",
+        "来源标识": "urn:kacp:mock:source:SRC001"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0188",
+      "label": "集装箱储能系统",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "套",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 0.0,
+        "型号": "ESS-3.44MWh-CT",
+        "电压等级千伏": 10.0,
+        "名称": "集装箱储能系统",
+        "是否模拟": 1,
+        "制造商": "山东泰开",
+        "类别": "储能设备",
+        "基准价": 2079819.49
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0188",
+        "来源标识": "urn:kacp:mock:source:SRC005"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0189",
+      "label": "液冷储能系统",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "套",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 0.0,
+        "型号": "ESS-1MWh-LC",
+        "电压等级千伏": 35.0,
+        "名称": "液冷储能系统",
+        "是否模拟": 1,
+        "制造商": "特变电工科技股份有限公司",
+        "类别": "储能设备",
+        "基准价": 2268413.78
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0189",
+        "来源标识": "urn:kacp:mock:source:SRC004"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0190",
+      "label": "风冷储能系统",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "套",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 0.0,
+        "型号": "ESS-2MWh-AC",
+        "电压等级千伏": 10.0,
+        "名称": "风冷储能系统",
+        "是否模拟": 1,
+        "制造商": "平高集团电气股份有限公司",
+        "类别": "储能设备",
+        "基准价": 2386139.79
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0190",
+        "来源标识": "urn:kacp:mock:source:SRC006"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0192",
+      "label": "集装箱储能系统",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "套",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 0.0,
+        "型号": "ESS-3.44MWh-CT",
+        "电压等级千伏": 10.0,
+        "名称": "集装箱储能系统",
+        "是否模拟": 1,
+        "制造商": "许继电气电气股份有限公司",
+        "类别": "储能设备",
+        "基准价": 2159328.17
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0192",
+        "来源标识": "urn:kacp:mock:source:SRC006"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0218",
+      "label": "风电箱式变压器",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "套",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 630.0,
+        "型号": "WBX-3150/35",
+        "电压等级千伏": 35.0,
+        "名称": "风电箱式变压器",
+        "是否模拟": 1,
+        "制造商": "特变电工科技股份有限公司",
+        "类别": "风电设备",
+        "基准价": 1663561.41
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0218",
+        "来源标识": "urn:kacp:mock:source:SRC008"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:material:MAT0221",
+      "label": "风电变流器",
+      "kind": "物资",
+      "properties": {
+        "计量单位": "套",
+        "额定电流安": 0.0,
+        "额定容量千伏安": 630.0,
+        "型号": "WECC-2.5MW",
+        "电压等级千伏": 110.0,
+        "名称": "风电变流器",
+        "是否模拟": 1,
+        "制造商": "特变电工",
+        "类别": "风电设备",
+        "基准价": 2042168.18
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:material:MAT0221",
+        "来源标识": "urn:kacp:mock:source:SRC008"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:project:PRJ0007",
+      "label": "齐齐哈尔储能示范项目（第3标段）",
+      "kind": "项目",
+      "properties": {
+        "是否模拟": 1,
+        "名称": "齐齐哈尔储能示范项目（第3标段）"
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:project:PRJ0007"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:project:PRJ0010",
+      "label": "长春500千伏输变电工程（第1标段）",
+      "kind": "项目",
+      "properties": {
+        "是否模拟": 1,
+        "名称": "长春500千伏输变电工程（第1标段）"
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:project:PRJ0010"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:project:PRJ0026",
+      "label": "齐齐哈尔城网改造升级工程（第4标段）",
+      "kind": "项目",
+      "properties": {
+        "是否模拟": 1,
+        "名称": "齐齐哈尔城网改造升级工程（第4标段）"
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:project:PRJ0026"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:project:PRJ0029",
+      "label": "赣州储能示范项目（第3标段）",
+      "kind": "项目",
+      "properties": {
+        "是否模拟": 1,
+        "名称": "赣州储能示范项目（第3标段）"
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:project:PRJ0029"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:project:PRJ0111",
+      "label": "厦门储能示范项目（第4标段）",
+      "kind": "项目",
+      "properties": {
+        "是否模拟": 1,
+        "名称": "厦门储能示范项目（第4标段）"
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:project:PRJ0111"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:project:PRJ0128",
+      "label": "保定储能示范项目（第2标段）",
+      "kind": "项目",
+      "properties": {
+        "是否模拟": 1,
+        "名称": "保定储能示范项目（第2标段）"
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:project:PRJ0128"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:project:PRJ0129",
+      "label": "温州配电网自动化改造工程（第3标段）",
+      "kind": "项目",
+      "properties": {
+        "是否模拟": 1,
+        "名称": "温州配电网自动化改造工程（第3标段）"
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:project:PRJ0129"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:region:RG043",
+      "label": "湖南省",
+      "kind": "区域",
+      "properties": {
+        "省份编码": "B4301",
+        "名称": "湖南省",
+        "是否模拟": 1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:region:RG043"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00000213",
+      "label": "工商业储能柜·1.71亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 22224203.91,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "项目物资",
+        "电压等级千伏": 35.0,
+        "入库日期": "2026-07-29",
+        "单价": 1568398.3,
+        "是否模拟": 1,
+        "数量": 109.0,
+        "额定容量千伏安": 0.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1年以内",
+        "金额": 170955414.7
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00000213"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00000532",
+      "label": "有载调压变压器·1.53亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "台",
+        "税额": 19903155.1,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "闲置物资",
+        "电压等级千伏": 10.0,
+        "入库日期": "2023-08-11",
+        "单价": 1486419.35,
+        "是否模拟": 1,
+        "数量": 103.0,
+        "额定容量千伏安": 63000.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "3-5年",
+        "金额": 153101193.05
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00000532"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00001246",
+      "label": "干式变压器·2.14亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "台",
+        "税额": 27807787.64,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "项目物资",
+        "电压等级千伏": 35.0,
+        "入库日期": "2025-03-07",
+        "单价": 2037200.56,
+        "是否模拟": 1,
+        "数量": 105.0,
+        "额定容量千伏安": 20000.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1-3年",
+        "金额": 213906058.8
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00001246"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00001297",
+      "label": "风冷储能系统·2.24亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 29122502.7,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "常规储备物资",
+        "电压等级千伏": 10.0,
+        "入库日期": "2025-06-01",
+        "单价": 2333533.87,
+        "是否模拟": 1,
+        "数量": 96.0,
+        "额定容量千伏安": 0.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1-3年",
+        "金额": 224019251.52
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00001297"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00002885",
+      "label": "电力变压器·1.51亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "台",
+        "税额": 19670945.04,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "常规储备物资",
+        "电压等级千伏": 110.0,
+        "入库日期": "2025-10-28",
+        "单价": 2327922.49,
+        "是否模拟": 1,
+        "数量": 65.0,
+        "额定容量千伏安": 200.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1年以内",
+        "金额": 151314961.85
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00002885"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00003009",
+      "label": "干式变压器·2.35亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "台",
+        "税额": 30560063.74,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "战略储备物资",
+        "电压等级千伏": 10.0,
+        "入库日期": "2026-07-31",
+        "单价": 3508618.11,
+        "是否模拟": 1,
+        "数量": 67.0,
+        "额定容量千伏安": 180000.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1年以内",
+        "金额": 235077413.37
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00003009"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00003539",
+      "label": "集装箱储能系统·1.57亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 20407301.62,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "常规储备物资",
+        "电压等级千伏": 10.0,
+        "入库日期": "2025-11-07",
+        "单价": 2491734.02,
+        "是否模拟": 1,
+        "数量": 63.0,
+        "额定容量千伏安": 0.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1年以内",
+        "金额": 156979243.26
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00003539"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00005264",
+      "label": "集装箱储能系统·2.17亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 28177015.11,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "项目物资",
+        "电压等级千伏": 10.0,
+        "入库日期": "2026-07-19",
+        "单价": 2408291.89,
+        "是否模拟": 1,
+        "数量": 90.0,
+        "额定容量千伏安": 0.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1年以内",
+        "金额": 216746270.1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00005264"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00006771",
+      "label": "风电变流器·1.73亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 22467991.94,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "闲置物资",
+        "电压等级千伏": 110.0,
+        "入库日期": "2023-08-15",
+        "单价": 2160383.84,
+        "是否模拟": 1,
+        "数量": 80.0,
+        "额定容量千伏安": 630.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "3-5年",
+        "金额": 172830707.2
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00006771"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00007345",
+      "label": "液冷储能系统·1.66亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 21585338.91,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "项目物资",
+        "电压等级千伏": 35.0,
+        "入库日期": "2026-06-21",
+        "单价": 1581343.51,
+        "是否模拟": 1,
+        "数量": 105.0,
+        "额定容量千伏安": 0.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1年以内",
+        "金额": 166041068.55
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00007345"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00008473",
+      "label": "电力变压器·2.52亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "台",
+        "税额": 32801931.83,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "常规储备物资",
+        "电压等级千伏": 110.0,
+        "入库日期": "2023-11-23",
+        "单价": 2449733.52,
+        "是否模拟": 1,
+        "数量": 103.0,
+        "额定容量千伏安": 200.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1-3年",
+        "金额": 252322552.56
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00008473"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00010429",
+      "label": "液冷储能系统·1.92亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 24966774.43,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "报废物资",
+        "电压等级千伏": 35.0,
+        "入库日期": "2018-11-30",
+        "单价": 2909880.47,
+        "是否模拟": 1,
+        "数量": 66.0,
+        "额定容量千伏安": 0.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "5-10年",
+        "金额": 192052111.02
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00010429"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00012210",
+      "label": "风电变流器·1.70亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 22110975.02,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "报废物资",
+        "电压等级千伏": 110.0,
+        "入库日期": "2017-11-13",
+        "单价": 2126055.29,
+        "是否模拟": 1,
+        "数量": 80.0,
+        "额定容量千伏安": 630.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "5-10年",
+        "金额": 170084423.2
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00012210"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00013241",
+      "label": "风电箱式变压器·2.22亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 28885983.96,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "常规储备物资",
+        "电压等级千伏": 35.0,
+        "入库日期": "2023-12-06",
+        "单价": 1932172.84,
+        "是否模拟": 1,
+        "数量": 115.0,
+        "额定容量千伏安": 630.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1-3年",
+        "金额": 222199876.6
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00013241"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00013352",
+      "label": "工商业储能柜·2.65亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 34425736.63,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "战略储备物资",
+        "电压等级千伏": 35.0,
+        "入库日期": "2024-05-24",
+        "单价": 2407394.17,
+        "是否模拟": 1,
+        "数量": 110.0,
+        "额定容量千伏安": 0.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1-3年",
+        "金额": 264813358.7
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00013352"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00014205",
+      "label": "液冷储能系统·2.15亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 27970587.74,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "闲置物资",
+        "电压等级千伏": 35.0,
+        "入库日期": "2018-12-24",
+        "单价": 2288918.8,
+        "是否模拟": 1,
+        "数量": 94.0,
+        "额定容量千伏安": 0.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "5-10年",
+        "金额": 215158367.2
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00014205"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00015426",
+      "label": "干式变压器·1.51亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "台",
+        "税额": 19607705.4,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "常规储备物资",
+        "电压等级千伏": 10.0,
+        "入库日期": "2025-10-17",
+        "单价": 3142260.48,
+        "是否模拟": 1,
+        "数量": 48.0,
+        "额定容量千伏安": 10000.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1年以内",
+        "金额": 150828503.04
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00015426"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00015485",
+      "label": "风冷储能系统·2.50亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 32501782.61,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "项目物资",
+        "电压等级千伏": 10.0,
+        "入库日期": "2024-11-21",
+        "单价": 2193102.74,
+        "是否模拟": 1,
+        "数量": 114.0,
+        "额定容量千伏安": 0.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1-3年",
+        "金额": 250013712.36
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00015485"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00015830",
+      "label": "液冷储能系统·1.91亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 24819114.86,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "项目物资",
+        "电压等级千伏": 35.0,
+        "入库日期": "2026-05-30",
+        "单价": 1719966.38,
+        "是否模拟": 1,
+        "数量": 111.0,
+        "额定容量千伏安": 0.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1年以内",
+        "金额": 190916268.18
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00015830"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00016205",
+      "label": "干式变压器·2.35亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "台",
+        "税额": 30571389.28,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "项目物资",
+        "电压等级千伏": 10.0,
+        "入库日期": "2026-06-30",
+        "单价": 3094270.17,
+        "是否模拟": 1,
+        "数量": 76.0,
+        "额定容量千伏安": 180000.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1年以内",
+        "金额": 235164532.92
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00016205"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00016373",
+      "label": "电力变压器·2.56亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "台",
+        "税额": 33315675.88,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "常规储备物资",
+        "电压等级千伏": 110.0,
+        "入库日期": "2024-06-01",
+        "单价": 2512494.41,
+        "是否模拟": 1,
+        "数量": 102.0,
+        "额定容量千伏安": 200.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1-3年",
+        "金额": 256274429.82
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00016373"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00016679",
+      "label": "风冷储能系统·2.71亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 35187890.81,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "闲置物资",
+        "电压等级千伏": 10.0,
+        "入库日期": "2021-12-24",
+        "单价": 2734101.85,
+        "是否模拟": 1,
+        "数量": 99.0,
+        "额定容量千伏安": 0.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "3-5年",
+        "金额": 270676083.15
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00016679"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00017395",
+      "label": "油浸式配电变压器·2.49亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "台",
+        "税额": 32361914.71,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "常规储备物资",
+        "电压等级千伏": 110.0,
+        "入库日期": "2026-01-03",
+        "单价": 2735580.28,
+        "是否模拟": 1,
+        "数量": 91.0,
+        "额定容量千伏安": 2000.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "1年以内",
+        "金额": 248937805.48
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00017395"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:stock:INV00018928",
+      "label": "集装箱储能系统·1.49亿",
+      "kind": "库存记录",
+      "properties": {
+        "计量单位": "套",
+        "税额": 19335643.11,
+        "局编码": "B4301",
+        "额定电流安": 0.0,
+        "用途": "闲置物资",
+        "电压等级千伏": 10.0,
+        "入库日期": "2017-05-10",
+        "单价": 2704285.75,
+        "是否模拟": 1,
+        "数量": 55.0,
+        "额定容量千伏安": 0.0,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "库龄": "5-10年",
+        "金额": 148735716.25
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:stock:INV00018928"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP002",
+      "label": "南瑞继保电气股份有限公司",
+      "kind": "供应商",
+      "properties": {
+        "是否模拟": 1,
+        "名称": "南瑞继保电气股份有限公司"
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP002"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP003",
+      "label": "特变电工",
+      "kind": "供应商",
+      "properties": {
+        "名称": "特变电工",
+        "是否模拟": 1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP003"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP006",
+      "label": "正泰电气电气股份有限公司",
+      "kind": "供应商",
+      "properties": {
+        "是否模拟": 1,
+        "名称": "正泰电气电气股份有限公司"
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP006"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP008",
+      "label": "伊顿电气",
+      "kind": "供应商",
+      "properties": {
+        "名称": "伊顿电气",
+        "是否模拟": 1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP008"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP015",
+      "label": "金风科技电气股份有限公司",
+      "kind": "供应商",
+      "properties": {
+        "是否模拟": 1,
+        "名称": "金风科技电气股份有限公司"
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP015"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP018",
+      "label": "平高集团",
+      "kind": "供应商",
+      "properties": {
+        "名称": "平高集团",
+        "是否模拟": 1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP018"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP024",
+      "label": "宏力达电气股份有限公司",
+      "kind": "供应商",
+      "properties": {
+        "是否模拟": 1,
+        "名称": "宏力达电气股份有限公司"
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP024"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP026",
+      "label": "特锐德电气股份有限公司",
+      "kind": "供应商",
+      "properties": {
+        "是否模拟": 1,
+        "名称": "特锐德电气股份有限公司"
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP026"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP030",
+      "label": "南方电网供应链",
+      "kind": "供应商",
+      "properties": {
+        "名称": "南方电网供应链",
+        "是否模拟": 1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP030"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP032",
+      "label": "亨通光电",
+      "kind": "供应商",
+      "properties": {
+        "名称": "亨通光电",
+        "是否模拟": 1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP032"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP035",
+      "label": "万马股份",
+      "kind": "供应商",
+      "properties": {
+        "名称": "万马股份",
+        "是否模拟": 1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP035"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP037",
+      "label": "白云电器",
+      "kind": "供应商",
+      "properties": {
+        "名称": "白云电器",
+        "是否模拟": 1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP037"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP038",
+      "label": "森源电气",
+      "kind": "供应商",
+      "properties": {
+        "名称": "森源电气",
+        "是否模拟": 1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP038"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP043",
+      "label": "科陆电子",
+      "kind": "供应商",
+      "properties": {
+        "名称": "科陆电子",
+        "是否模拟": 1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP043"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP045",
+      "label": "英威腾",
+      "kind": "供应商",
+      "properties": {
+        "是否模拟": 1,
+        "名称": "英威腾"
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP045"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP052",
+      "label": "派能科技",
+      "kind": "供应商",
+      "properties": {
+        "名称": "派能科技",
+        "是否模拟": 1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP052"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP053",
+      "label": "南都电源",
+      "kind": "供应商",
+      "properties": {
+        "名称": "南都电源",
+        "是否模拟": 1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP053"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:supplier:SUP060",
+      "label": "德业股份",
+      "kind": "供应商",
+      "properties": {
+        "名称": "德业股份",
+        "是否模拟": 1
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:supplier:SUP060"
+      }
+    },
+    {
+      "id": "urn:kacp:mock:warehouse:WH0000044",
+      "label": "国网湖南省电力有限公司长沙供电公司物资仓库",
+      "kind": "仓库",
+      "properties": {
+        "储备金额": 7005822232.31,
+        "局编码": "B4301",
+        "项目金额": 2629300685.74,
+        "编码": "WH-B4301-0044",
+        "是否模拟": 1,
+        "名称": "国网湖南省电力有限公司长沙供电公司物资仓库",
+        "报废金额": 1267362961.9,
+        "闲置金额": 2122080774.2,
+        "等级名称": "周转仓",
+        "等级": 2,
+        "纬度": 44.3446,
+        "数据来源": "公开设备类别校准",
+        "省份编码": "B4301",
+        "经度": 107.4235,
+        "地址": "湖南省长沙市电力物资产业园30号",
+        "总金额": 13024566654.15
+      },
+      "trace": {
+        "标识": "urn:kacp:mock:warehouse:WH0000044"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "urn:kacp:mock:stock:INV00000213",
+      "target": "urn:kacp:mock:material:MAT0179",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00000213",
+      "target": "urn:kacp:mock:project:PRJ0128",
+      "label": "归属项目"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00000213",
+      "target": "urn:kacp:mock:supplier:SUP043",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00000532",
+      "target": "urn:kacp:mock:material:MAT0012",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00000532",
+      "target": "urn:kacp:mock:supplier:SUP026",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00001246",
+      "target": "urn:kacp:mock:material:MAT0011",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00001246",
+      "target": "urn:kacp:mock:project:PRJ0010",
+      "label": "归属项目"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00001246",
+      "target": "urn:kacp:mock:supplier:SUP002",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00001297",
+      "target": "urn:kacp:mock:material:MAT0190",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00001297",
+      "target": "urn:kacp:mock:supplier:SUP052",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00002885",
+      "target": "urn:kacp:mock:material:MAT0001",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00002885",
+      "target": "urn:kacp:mock:supplier:SUP030",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00003009",
+      "target": "urn:kacp:mock:material:MAT0003",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00003009",
+      "target": "urn:kacp:mock:supplier:SUP035",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00003539",
+      "target": "urn:kacp:mock:material:MAT0192",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00003539",
+      "target": "urn:kacp:mock:supplier:SUP053",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00005264",
+      "target": "urn:kacp:mock:material:MAT0188",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00005264",
+      "target": "urn:kacp:mock:project:PRJ0007",
+      "label": "归属项目"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00005264",
+      "target": "urn:kacp:mock:supplier:SUP032",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00006771",
+      "target": "urn:kacp:mock:material:MAT0221",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00006771",
+      "target": "urn:kacp:mock:supplier:SUP006",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00007345",
+      "target": "urn:kacp:mock:material:MAT0177",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00007345",
+      "target": "urn:kacp:mock:project:PRJ0026",
+      "label": "归属项目"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00007345",
+      "target": "urn:kacp:mock:supplier:SUP045",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00008473",
+      "target": "urn:kacp:mock:material:MAT0001",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00008473",
+      "target": "urn:kacp:mock:supplier:SUP003",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00010429",
+      "target": "urn:kacp:mock:material:MAT0189",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00010429",
+      "target": "urn:kacp:mock:supplier:SUP060",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00012210",
+      "target": "urn:kacp:mock:material:MAT0221",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00012210",
+      "target": "urn:kacp:mock:supplier:SUP037",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00013241",
+      "target": "urn:kacp:mock:material:MAT0218",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00013241",
+      "target": "urn:kacp:mock:supplier:SUP037",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00013352",
+      "target": "urn:kacp:mock:material:MAT0187",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00013352",
+      "target": "urn:kacp:mock:supplier:SUP015",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00014205",
+      "target": "urn:kacp:mock:material:MAT0181",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00014205",
+      "target": "urn:kacp:mock:supplier:SUP024",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00015426",
+      "target": "urn:kacp:mock:material:MAT0015",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00015426",
+      "target": "urn:kacp:mock:supplier:SUP024",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00015485",
+      "target": "urn:kacp:mock:material:MAT0190",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00015485",
+      "target": "urn:kacp:mock:project:PRJ0029",
+      "label": "归属项目"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00015485",
+      "target": "urn:kacp:mock:supplier:SUP030",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00015830",
+      "target": "urn:kacp:mock:material:MAT0181",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00015830",
+      "target": "urn:kacp:mock:project:PRJ0111",
+      "label": "归属项目"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00015830",
+      "target": "urn:kacp:mock:supplier:SUP018",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00016205",
+      "target": "urn:kacp:mock:material:MAT0003",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00016205",
+      "target": "urn:kacp:mock:project:PRJ0129",
+      "label": "归属项目"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00016205",
+      "target": "urn:kacp:mock:supplier:SUP038",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00016373",
+      "target": "urn:kacp:mock:material:MAT0001",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00016373",
+      "target": "urn:kacp:mock:supplier:SUP006",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00016679",
+      "target": "urn:kacp:mock:material:MAT0190",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00016679",
+      "target": "urn:kacp:mock:supplier:SUP053",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00017395",
+      "target": "urn:kacp:mock:material:MAT0010",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00017395",
+      "target": "urn:kacp:mock:supplier:SUP002",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00018928",
+      "target": "urn:kacp:mock:material:MAT0180",
+      "label": "对应物资"
+    },
+    {
+      "source": "urn:kacp:mock:stock:INV00018928",
+      "target": "urn:kacp:mock:supplier:SUP008",
+      "label": "由供应商提供"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:region:RG043",
+      "label": "位于区域"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00000213",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00000532",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00001246",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00001297",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00002885",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00003009",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00003539",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00005264",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00006771",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00007345",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00008473",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00010429",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00012210",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00013241",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00013352",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00014205",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00015426",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00015485",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00015830",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00016205",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00016373",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00016679",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00017395",
+      "label": "包含库存"
+    },
+    {
+      "source": "urn:kacp:mock:warehouse:WH0000044",
+      "target": "urn:kacp:mock:stock:INV00018928",
+      "label": "包含库存"
+    }
+  ]
+}

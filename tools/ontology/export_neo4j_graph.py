@@ -42,28 +42,59 @@ def node_id(node: Any) -> str | None:
     return str(value) if value is not None else None
 
 
-def node_label(node: Any, kind: str) -> str:
+TRACE_KEYS = {"标识", "来源标识"}
+
+
+def short_code(identifier: str | None) -> str:
+    """urn:kacp:mock:stock:INV000003795 -> INV000003795"""
+    if not identifier:
+        return ""
+    return identifier.rsplit(":", 1)[-1]
+
+
+def fmt_amount(value: Any) -> str:
+    number = float(value or 0)
+    if abs(number) >= 1e8:
+        return f"{number / 1e8:.2f}亿"
+    if abs(number) >= 1e4:
+        return f"{number / 1e4:.2f}万"
+    return f"{number:,.2f}"
+
+
+def display_label(node: Any, kind: str, material: Any = None) -> str:
+    """展示用中文标签，绝不输出 urn: 全串。"""
     if node is None:
         return ""
+    identifier = node_id(node)
     if kind == "库存记录":
-        return str(node.get("标识", ""))
-    return str(node.get("名称") or node.get("标识") or "")
+        material_name = str(material.get("名称") or "") if material is not None else ""
+        if material_name:
+            amount = fmt_amount(node.get("金额"))
+            return f"{material_name}·{amount}" if amount != "0.00" else material_name
+        return f"库存·{short_code(identifier)}"
+    return str(node.get("名称") or short_code(identifier))
 
 
-def add_node(nodes: dict[str, dict[str, Any]], node: Any, kind: str) -> None:
+def add_node(
+    nodes: dict[str, dict[str, Any]],
+    node: Any,
+    kind: str,
+    label: str | None = None,
+) -> None:
     identifier = node_id(node)
     if not identifier:
         return
     props = {str(key): value for key, value in dict(node).items() if value is not None}
-    nodes.setdefault(
-        identifier,
-        {
-            "id": identifier,
-            "label": node_label(node, kind),
-            "kind": kind,
-            "properties": props,
-        },
-    )
+    trace = {key: props.pop(key) for key in TRACE_KEYS if key in props}
+    entry: dict[str, Any] = {
+        "id": identifier,
+        "label": label if label is not None else display_label(node, kind),
+        "kind": kind,
+        "properties": props,
+    }
+    if trace:
+        entry["trace"] = trace
+    nodes.setdefault(identifier, entry)
 
 
 def add_edge(edges: set[tuple[str, str, str]], source: Any, target: Any, label: str) -> None:
@@ -94,7 +125,12 @@ def export_graph(args: argparse.Namespace) -> dict[str, Any]:
                 project = record["项目"]
                 region = record["区域"]
                 add_node(nodes, warehouse, "仓库")
-                add_node(nodes, inventory, "库存记录")
+                add_node(
+                    nodes,
+                    inventory,
+                    "库存记录",
+                    label=display_label(inventory, "库存记录", material),
+                )
                 add_node(nodes, material, "物资")
                 add_node(nodes, supplier, "供应商")
                 add_node(nodes, project, "项目")
@@ -118,7 +154,7 @@ def export_graph(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "title": nodes.get(args.warehouse_id, {}).get("label", "电力物资知识图谱"),
         "subtitle": f"中文关系子图 · 前 {len(inventory_ids)} 条库存记录",
-        "source": "Neo4j / DM8 MOCK_APP",
+        "source": "图谱查询结果 · 本地模拟数据",
         "stats": {
             "nodeCount": len(nodes),
             "edgeCount": len(ordered_edges),

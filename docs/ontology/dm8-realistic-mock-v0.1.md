@@ -1,10 +1,110 @@
 # DM8 真实感电力设备模拟数据重建记录
 
+> 当前版本：**v0.2**（2026-08-28）。v0.1 记录保留在文末，已被 v0.2 取代。
+
+## v0.2 目标
+
+修复 v0.1 被审计发现的字段间逻辑矛盾，使模拟数据具备可解释的业务逻辑；同时让金额分布拉开数量级、消除"未知"类模棱两可字段。所有记录仍为模拟数据，`IS_MOCK=1` 标记。
+
+## v0.1 缺陷 → v0.2 修复对照
+
+| # | v0.1 缺陷（实测） | v0.2 修复 | v0.2 验证结果 |
+|---|---|---|---|
+| 1 | `库龄` 与 `入库日期` 独立随机，17,435/20,000 笔（87%）矛盾；2026 年入库却标"10年以上" | 库龄由入库日期按天数强推导：1年以内(≤365天)/1-3年(366-1095)/3-5年(1096-1825)/5-10年(1826-3650)/10年以上(>3650)，基准日 2026-08-28 | 矛盾 **0 / 20,000** |
+| 2 | 库龄含"未知"档（4,061 笔） | 档位仅五档，无未知 | 含未知 **0** |
+| 3 | 报废物资可能是当年新入库 | 用途约束库龄：报废物资只允许 5-10年/10年以上；闲置物资 ≥3-5年；项目物资 ≤1-3年 | 报废违例 **0**（1,996 笔 / 503.5 亿，全部为老库存） |
+| 4 | 金额高度集中在 1-2 亿，非常接近 | 单价按 15 类设备真实数量级设定（避雷器 300 元 ~ 储能系统 300 万/台）；数量与单价反相关，单笔金额封顶约 3 亿 | 金额 **1,636 元 ~ 2.998 亿**（中位 440 万），跨约 18 万倍 |
+| 5 | 同一供应商供同一物资出现 38 种价格（价差 197%） | 供应商×物资 价格锚点（对数正态 σ=10%），组内波动 σ=2% | 最大组内价差 **10.1%** |
+| 6 | 仓库 IDLE/SCRAP/RESERVE/PROJECT/TOTAL_AMT 与明细无关 | 由 20,000 条明细按用途严格聚合回填 | 矛盾 **0 / 48** |
+| 7 | 税额随机 | 统一 13% 增值税 | 异常 **0** |
+| 8 | 数量×单价≠金额（四舍五入误差） | 先对单价取 2 位小数，再乘数量取整 | 异常 **0 / 20,000** |
+
+## v0.2 数据规模
+
+| 数据集 | 表名 | 行数 |
+|---|---|---:|
+| 公开资料来源追溯 | MOCK_DATA_PROVENANCE | 9 |
+| 设备主数据目录 | MOCK_EQUIPMENT_CATALOG | 240 |
+| 仓库主数据 | MM_SD_ZNCK_WAREHOUSE_INFO_M | 48 |
+| 库存事实数据 | MM_SD_ZNCK_WAREHOUSE_DISTR_M | 20,000 |
+| 库存金额汇总（省份×仓库等级×用途） | MM_SD_ZTFX_WAR_MONEY_K | 222 |
+| 项目主数据（新增，仅存 CSV 与 Neo4j） | — | 180 |
+| 供应商（60 家，存于明细与 Neo4j） | — | 60 |
+
+## 工具链（可复跑，种子固定 20260828）
+
+```bash
+# 1. 生成 CSV（自带 7 项一致性校验，任一不过则不应入库）
+python3 tools/ontology/build_mock_v0_2.py
+#    输出 data/dm8-mock-v0.2/*.csv
+
+# 2. 导入 DM8（自动备份 v0.1 到 *_V01_BAK → 重建表 → 批量插入 → 校验）
+javac -cp ~/.m2/repository/com/dameng/DmJdbcDriver18/8.1.3.140/DmJdbcDriver18-8.1.3.140.jar \
+  -d /tmp/dmload tools/ontology/LoadMockV02.java
+java -cp ~/.m2/repository/com/dameng/DmJdbcDriver18/8.1.3.140/DmJdbcDriver18-8.1.3.140.jar:/tmp/dmload LoadMockV02
+
+# 3. 重建 Neo4j 中文图谱（清空 → 重建 → 校验库龄/金额/孤立节点）
+python3 tools/ontology/rebuild_neo4j_v0_2.py
+
+# 4. 导出页面 JSON
+python3 tools/ontology/export_neo4j_graph.py \
+  --warehouse-id urn:kacp:mock:warehouse:WH0000044 --limit 24 \
+  --uri bolt://127.0.0.1:7689 --user neo4j --password 'MockGraph2026!' \
+  --output docs/ontology/query-wh0000044-cn.json
+```
+
+## v0.2 业务约束（造数规则，供审计对照）
+
+- **库龄**：只由 `入库日期` 推导，两者永不矛盾；无"未知"。
+- **用途 × 库龄**：报废(5-10年/10年以上)、闲置(3-5年/5-10年/10年以上)、常规储备/储备/战略储备(1年以内/1-3年/3-5年)、项目物资(≤1-3年)。
+- **价格**：15 类设备各有独立数量级；同供应商同物资价格围绕锚点波动 ≤~11%。
+- **金额**：`数量 × 单价 = 金额`（分位内严格成立）；`税额 = 金额 × 13%`；贵重物资数量自动减少，单笔 ≤ 3 亿。
+- **项目物资**：仅"项目物资"用途挂项目；其余用途项目字段为空。
+- **仓库汇总**：IDLE/SCRAP/RESERVE/PROJECT/TOTAL_AMT = 明细按用途聚合，严格相等。
+
+## Neo4j 图谱规模（v0.2）
+
+节点：仓库 48 / 库存记录 20,000 / 物资 240 / 供应商 60 / 项目 180 / 区域 19 / 资料来源 9。
+关系：包含库存 20,000 / 对应物资 20,000 / 由供应商提供 20,000 / 归属项目 4,035（仅项目物资）/ 位于区域 48 / 校准自 240。
+属性名保持 v0.1 中文命名；`入库日期` 为字符串（避免 Cypher Date 比较的静默失败）。
+
+## 连接信息
+
+- 容器：`dm8-mock`（JDBC `jdbc:dm://127.0.0.1:5236`，模式 `MOCK_APP`，密码 `MockApp2026`，管理员 `SYSDBA/SYSDBA2026`）
+- 容器：`k-acp-neo4j-mock`（`bolt://127.0.0.1:7689`，用户 `neo4j`，密码 `MockGraph2026!`）
+
+## 回滚
+
+- v0.2 导入前，v0.1 数据已自动备份到同库 `*_V01_BAK` 五张表。
+- 更早的 v0.1 库文件备份：`data/dm8-mock-backup-20260828/`。
+- 回滚 v0.1：将 `*_V01_BAK` 数据写回原表，或重跑 v0.1 导入脚本（如已丢失可从备份表恢复）。
+
+## 页面渲染（不变）
+
+固定渲染页面：`docs/ontology/dm8-graph-demo-cn.html`。每次查询只需导出新的 JSON，不需要修改 HTML：
+
+```bash
+python3 tools/ontology/export_neo4j_graph.py \
+  --warehouse-id urn:kacp:mock:warehouse:WH0000004 \
+  --limit 24 \
+  --uri bolt://127.0.0.1:7689 \
+  --user neo4j --password 'MockGraph2026!' \
+  --output docs/ontology/sample-graph-data-cn.json
+```
+
+然后打开 `docs/ontology/dm8-graph-demo-cn.html?data=sample-graph-data-cn.json`。
+
+页面支持：URL 参数 `?data=<JSON 地址>`、注入 `window.__GRAPH_DATA__`、调用 `window.renderGraph(data)`；含图谱/表格双视图（表格自适应数据类型）。
+
+---
+
+# 附：v0.1 重建记录（已被 v0.2 取代）
+
 重建时间：2026-08-28
 
 ## 目标
 
-在保留可查询性和本体字段兼容性的前提下，将原先过于规则化的演示数据替换为“公开设备类别与产品族校准的模拟数据”。这些记录不是生产事实，均使用 `IS_MOCK=1` 标记。
+在保留可查询性和本体字段兼容性的前提下，将原先过于规则化的演示数据替换为"公开设备类别与产品族校准的模拟数据"。这些记录不是生产事实，均使用 `IS_MOCK=1` 标记。
 
 ## 数据规模
 
@@ -26,38 +126,8 @@
 - 引入电压等级、额定容量、额定电流、计量单位、收货日期、库龄、用途、税额等业务字段。
 - 供应商名称采用公开电力装备企业或其模拟供货中心名称。
 - 仓库、项目、库存数量、价格和金额为随机种子固定的模拟值，并通过数量×单价一致性校验。
-
-## 连接信息
-
-- 容器：`dm8-mock`
-- JDBC：`jdbc:dm://127.0.0.1:5236`
-- 模式：`MOCK_APP`
-- 应用用户：`MOCK_APP`
-- 应用密码：`MockApp2026`
-- 管理员密码：`SYSDBA2026`
+- 已知缺陷（v0.2 已修复）：库龄与入库日期独立随机（87% 矛盾、含"未知"档）；金额集中且与设备类别无关；同供应商同物资价格差可达 197%；仓库用途汇总金额与明细无关；报废物资可能是新入库。
 
 ## 回滚
 
 重建前旧数据已保存在：`data/dm8-mock-backup-20260828/`。
-
-## 图谱渲染
-
-固定渲染页面：`docs/ontology/dm8-graph-demo-cn.html`。
-
-每次查询只需导出新的 JSON，不需要修改 HTML：
-
-```bash
-python3 tools/ontology/export_neo4j_graph.py \
-  --warehouse-id urn:kacp:mock:warehouse:WH0000004 \
-  --limit 24 \
-  --uri bolt://127.0.0.1:7689 \
-  --user neo4j \
-  --password 'MockGraph2026!' \
-  --output docs/ontology/sample-graph-data-cn.json
-```
-
-然后打开：
-
-`docs/ontology/dm8-graph-demo-cn.html?data=sample-graph-data-cn.json`
-
-页面也支持调用方直接注入 `window.__GRAPH_DATA__`，或调用 `window.renderGraph(data)`。
