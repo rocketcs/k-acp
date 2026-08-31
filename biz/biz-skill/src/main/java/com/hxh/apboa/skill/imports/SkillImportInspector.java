@@ -141,6 +141,9 @@ public final class SkillImportInspector {
             return Optional.empty();
         }
         String normalized = skillMdContent.replace("\r\n", "\n");
+        if (normalized.startsWith("\uFEFF")) {
+            normalized = normalized.substring(1);
+        }
         if (!normalized.startsWith("---")) {
             return Optional.empty();
         }

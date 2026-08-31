@@ -100,19 +100,52 @@ docker start k-acp-console k-acp-runtime k-acp-websocket k-acp-proxy k-acp-front
 # 然后停掉本地 JVM，避免端口/数据冲突
 ```
 
-## 三、测试环境更新
+## 三、测试环境更新（137）
 
-测试环境是 Docker 部署（`docker/.env.console` 指向测试中间件 IP）。更新流程：
+> 2026-08-31 起采用新工作流。测试环境 = `192.168.107.137`（SSH 用户 lzd，见 `env/test/.env`），
+> Docker 全栈部署，compose 项目 `k-acp-local`，源码目录 `/home/lzd/k-acp-2517034`。
+> 旧流程（`docker/start-console.sh update`，服务器 git pull on dev 分支）已在 137 弃用；
+> `package-x86.sh`/`upgrade-x86.sh` 发布包路线保留给生产。
+
+### 网络前提（重要）
+
+137 在公司内网隔离区：**只能走本机 Clash 代理（127.0.0.1:7897）的 HTTP CONNECT 访问其 TCP 端口**，
+直接 ping/直连均不通。已在本机 `~/.ssh/config` 配置别名 `kacp-test`（内含 ProxyCommand 与连接复用）。
+
+### 一键部署：scripts/deploy-test.sh
 
 ```bash
-# 前提：当前在 dev 分支，且已跟踪文件的工作区干净（脚本会校验并拒绝）
-cd docker
-bash start-console.sh update
-# 脚本行为：git pull --ff-only origin dev → 用 .env.console 构建镜像 →
-#           删旧应用容器（保留数据卷）→ 强制重建 apboa-console/apboa-websocket/apboa-frontend
+# 全量更新（rsync 本地工作区 → 服务器构建 → 重建 5 个应用容器 → 健康检查，约 10-15 分钟）
+scripts/deploy-test.sh
+
+# 快速迭代：只改了某个服务时（2-5 分钟）
+scripts/deploy-test.sh -s frontend              # 只更前端
+scripts/deploy-test.sh -s console,runtime       # 只更后端某几个
+scripts/deploy-test.sh --skip-sync              # 只用服务器现有代码重建镜像
+
+# 运维
+scripts/deploy-test.sh --status                 # 容器状态 + 健康检查 + 上次部署版本戳
+scripts/deploy-test.sh --rollback               # 一键回退到上次部署前的镜像
 ```
 
-执行节点（runtime/proxy）对应 `bash start-execute.sh build|rebuild`；发布包路线用 `docker/package-x86.sh` + `upgrade-x86.sh`（保留服务器数据，只换五个应用镜像）。
+安全边界（脚本内置）：
+
+- rsync 排除 `.git`/`node_modules`/`target`/`logs`/`docker/data`/`docker/logs`，
+  且**不覆盖服务器上的 `docker/.env.*`**（服务器 DATA_PATH 等配置与本地不同）
+- 只重建 5 个应用容器（`--no-deps --force-recreate`），中间件/Langfuse/数据卷/bind mount 一律不碰
+- 每次构建前自动把旧镜像打 `:rollback` 标签；部署完在服务器 `$REMOTE_DIR/.deploy-stamp` 记录版本
+- Flyway 迁移随 console 启动自动执行
+
+### 底层工具：scripts/remote-test.sh
+
+```bash
+scripts/remote-test.sh 'docker logs --tail 50 k-acp-console'   # 远程执行命令
+scripts/remote-test.sh --push <本地> <远程>                     # rsync 推送
+scripts/remote-test.sh --pull <远程> <本地>                     # rsync 拉取
+```
+
+注意：服务器有 SSH 连接频率限制，短时间多次新建连接会触发临时账号锁定（约 5 分钟自愈）。
+脚本已通过 ControlMaster 单连接复用规避；如手动操作请勿高频重连。
 
 **安全规则（来自 AGENTS.md，必须遵守）：**
 
