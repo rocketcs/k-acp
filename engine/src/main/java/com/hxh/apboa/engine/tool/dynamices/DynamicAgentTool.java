@@ -7,7 +7,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.hxh.apboa.engine.agui.AgentContext;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.message.ToolResultBlock;
-import io.agentscope.core.tool.AgentTool;
+import io.agentscope.core.permission.PermissionContextState;
+import io.agentscope.core.permission.PermissionDecision;
+import io.agentscope.core.tool.ToolBase;
 import io.agentscope.core.tool.ToolCallParam;
 import reactor.core.publisher.Mono;
 
@@ -18,35 +20,44 @@ import java.util.*;
  *
  * @author huxuehao
  **/
-public class DynamicAgentTool implements AgentTool {
+public class DynamicAgentTool extends ToolBase {
     private final ToolConfig toolConfig;
 
     public DynamicAgentTool(ToolConfig toolConfig) {
+        super(toolConfig.getToolId(),
+                toolConfig.getDescription(),
+                buildSchemaStatic(toolConfig),
+                false,   // readOnly
+                true,    // concurrencySafe
+                false,   // mcp
+                null,    // mcpName
+                false,   // externalTool
+                false);  // stateInjected
         this.toolConfig = toolConfig;
     }
 
+    /**
+     * HITL：need_confirm 工具返回 ASK，进入 v2 官方权限确认流
+     * （RequireUserConfirmEvent → 挂起 → ConfirmResult 恢复后重新执行原工具）。
+     */
     @Override
-    public String getName() {
-        return toolConfig.getToolId();
+    public Mono<PermissionDecision> checkPermissions(
+            Map<String, Object> toolInput, PermissionContextState context) {
+        if (com.hxh.apboa.engine.hook.builtins.IConfirmationHook.isNeedConfirm(getName())) {
+            return Mono.just(PermissionDecision.ask("该工具需要用户确认后执行"));
+        }
+        return Mono.just(PermissionDecision.passthrough(getName()));
     }
 
-    @Override
-    public String getDescription() {
-        return toolConfig.getDescription();
-    }
-
-    @Override
-    public Map<String, Object> getParameters() {
-        // 获取输入参数的 JSON Schema
-        JsonNode inputSchema = toolConfig.getInputSchema();
+    private static Map<String, Object> buildSchemaStatic(ToolConfig config) {
+        JsonNode inputSchema = config.getInputSchema();
         if (inputSchema == null || inputSchema.isNull()) {
-            return Map.of();
+            return Map.of("type", "object");
         }
 
         Map<String, Object> properties = new HashMap<>();
         List<String> required = new ArrayList<>();
 
-        // 构建 properties 和 required
         for (JsonNode jsonNode : inputSchema) {
             String name = JsonUtils.getStringValue(jsonNode, "name", true);
             String type = JsonUtils.getStringValue(jsonNode, "type", true);
@@ -54,29 +65,24 @@ public class DynamicAgentTool implements AgentTool {
             String defaultValue = JsonUtils.getStringValue(jsonNode, "defaultValue", false);
             boolean required_ = JsonUtils.getBooleanValue(jsonNode, "required", false);
 
-            properties.put(name, new HashMap<>(){{
-                put("type", type);
-
-                if (!FuncUtils.isEmpty(description)) {
-                    put("description", description);
-                } else {
-                    put("description", name);
-                }
-                if (!FuncUtils.isEmpty(defaultValue)) {
-                    put("defaultValue", defaultValue);
-                }
-            }});
+            Map<String, Object> prop = new HashMap<>();
+            prop.put("type", type);
+            prop.put("description", FuncUtils.isEmpty(description) ? name : description);
+            if (!FuncUtils.isEmpty(defaultValue)) {
+                prop.put("defaultValue", defaultValue);
+            }
+            properties.put(name, prop);
 
             if (required_) {
                 required.add(name);
             }
         }
 
-        return new HashMap<>() {{
-            put("type", "object");
-            put("properties", properties);
-            put("required", required);
-        }};
+        Map<String, Object> schema = new HashMap<>();
+        schema.put("type", "object");
+        schema.put("properties", properties);
+        schema.put("required", required);
+        return schema;
     }
 
     @Override

@@ -54,12 +54,14 @@
 
 这台机器开着 Clash 类代理（系统代理 127.0.0.1:7897），**macOS 会把系统代理注入所有 JVM 进程**（连 `java -version` 都带 `http.proxyHost`），而白名单里没有 `127.0.0.1`。后果：PostgreSQL JDBC 走 SOCKS 连本机 25433 报 `UnknownHostException: 127.0.0.1`（Netty/MySQL 驱动不受影响，所以只有 pgvector 炸）。
 
-**启动任何后端服务都必须带这三个参数清空代理：**
+**启动任何后端服务都必须带这六个参数清空代理（host 和 port 都要清！）：**
 
 ```bash
-java -Dhttp.proxyHost= -Dhttps.proxyHost= -DsocksProxyHost= -jar xxx.jar
-# IDEA 里：Run Configuration → VM options 填入同样三个参数
+java -Dhttp.proxyHost= -Dhttps.proxyHost= -DsocksProxyHost= -Dhttp.proxyPort= -Dhttps.proxyPort= -DsocksProxyPort= -jar xxx.jar
+# IDEA 里：Run Configuration → VM options 填入同样六个参数
 ```
+
+> ⚠️ 只清 host 不清 port 是不够的：macOS 注入后 JVM 里会留下 `proxyPort=7897`，AWS S3 SDK（biz-resource 的 `AmazonS3Template`）会误判为"已配置代理"，用空 host 构造代理路由，上传文件时报 `IllegalArgumentException: Host name may not be empty`。
 
 根治方案（可选）：把 `localhost`、`127.0.0.1` 加入 macOS 系统代理的「跳过代理」列表。
 
@@ -69,8 +71,8 @@ java -Dhttp.proxyHost= -Dhttps.proxyHost= -DsocksProxyHost= -jar xxx.jar
 # 1. 构建后端（增量，约 1-2 分钟）
 mvn -q -DskipTests -pl runner-console,runner-runtime,runner-websocket -am package
 
-# 2. 按顺序启动（带代理清理参数！）
-PROXY_FLAGS="-Dhttp.proxyHost= -Dhttps.proxyHost= -DsocksProxyHost="
+# 2. 按顺序启动（带代理清理参数！host 和 port 都要清，否则 S3 上传报 Host name may not be empty）
+PROXY_FLAGS="-Dhttp.proxyHost= -Dhttps.proxyHost= -DsocksProxyHost= -Dhttp.proxyPort= -Dhttps.proxyPort= -DsocksProxyPort="
 mkdir -p logs/local-dev
 nohup java $PROXY_FLAGS -jar runner-console/target/runner-console-1.0-SNAPSHOT.jar   > logs/local-dev/console.log   2>&1 &
 nohup java $PROXY_FLAGS -jar runner-runtime/target/runner-runtime-1.0-SNAPSHOT.jar   > logs/local-dev/runtime.log   2>&1 &
@@ -104,8 +106,7 @@ docker start k-acp-console k-acp-runtime k-acp-websocket k-acp-proxy k-acp-front
 
 > 2026-08-31 起采用新工作流。测试环境 = `192.168.107.137`（SSH 用户 lzd，见 `env/test/.env`），
 > Docker 全栈部署，compose 项目 `k-acp-local`，源码目录 `/home/lzd/k-acp-2517034`。
-> 旧流程（`docker/start-console.sh update`，服务器 git pull on dev 分支）已在 137 弃用；
-> `package-x86.sh`/`upgrade-x86.sh` 发布包路线保留给生产。
+> 旧流程（`docker/start-console.sh update`，服务器 git pull on dev 分支）已在 137 弃用。
 
 ### 网络前提（重要）
 
@@ -149,11 +150,11 @@ scripts/remote-test.sh --pull <远程> <本地>                     # rsync 拉�
 
 **安全规则（来自 AGENTS.md，必须遵守）：**
 
-- 访问测试/生产 SSH 或 MySQL 前，必须用 `./scripts/with-environment.sh <local|test|prod> --require <ssh|mysql> -- <命令>` 加载 `env/<环境>/.env`，禁止手抄密码
+- 访问测试/麒麟 SSH 或 MySQL 前，必须用 `./scripts/with-environment.sh <local|test|kylin> --require <ssh|mysql> -- <命令>` 加载 `env/<环境>/.env`，禁止手抄密码
 - 对测试/生产执行任何写入、迁移、删除、远程部署前，先明确报告目标环境与主机，等用户确认
 
 ## 四、历史背景（为什么配置长这样）
 
 - 2026-08-29 起本机日常开发改为「中间件 Docker + 应用本地 JVM」；当时停掉了 k-acp-console/runtime/websocket/proxy/frontend 五个容器（镜像保留）。中间件容器属于 compose 项目 `k-acp-local`，**任何时候都不要 down 掉中间件**，本地后端依赖它们。
-- 移除了 `docker/kacp`、`docker/manage-kacp-local.sh`、`docker/tests/kacp-test.sh`、`docker/QUICK-HELP.md`；保留了 `docker-compose-kacp-local.yml`、`.env.kacp`（中间件归它们管）、`package-x86.sh`/`upgrade-x86.sh`（发布打包）。
+- 移除了 `docker/kacp`、`docker/manage-kacp-local.sh`、`docker/tests/kacp-test.sh`、`docker/QUICK-HELP.md`；保留了 `docker-compose-kacp-local.yml`、`.env.kacp`（中间件归它们管）。
 - 可观测：Langfuse 是可选 overlay（`docker-compose-langfuse.yml`），本地 JVM 模式下 runtime 的 tracing 指向容器内地址时需要确认可达，不可达不影响核心功能。

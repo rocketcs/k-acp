@@ -807,16 +807,19 @@ $small-mobile-breakpoint: 375px;
 .chat-welcome.is-diy-welcome {
   justify-content: flex-start;
   width: 100%;
-  padding: clamp(24px, 7vh, 96px) clamp(16px, 3.5vw, 72px) clamp(24px, 5vh, 48px);
+  /* Keep the welcome content visually grouped on tall screens while leaving
+     enough room for the composer on short laptops. */
+  padding: clamp(28px, 4.5vh, 64px) clamp(16px, 3.5vw, 72px) clamp(24px, 4vh, 48px);
 
   .chat-welcome-title {
-    margin-bottom: clamp(20px, 4vh, 40px);
-    font-size: clamp(20px, 1.6vw, 28px);
+    margin-bottom: clamp(18px, 3vh, 32px);
+    font-size: clamp(22px, 1.6vw, 28px);
+    letter-spacing: -0.02em;
   }
 
   .chat-welcome-input {
-    max-width: 1280px;
-    margin-top: clamp(20px, 3.6vh, 36px);
+    max-width: 1100px;
+    margin-top: clamp(18px, 3vh, 32px);
   }
 
   &.has-diy-form {
@@ -846,6 +849,28 @@ $small-mobile-breakpoint: 375px;
 
     .chat-welcome-input {
       margin-top: 18px;
+    }
+  }
+}
+
+/* DIY 空会话的输入框固定在内容区底部，避免配置加载前后在页面中部跳动。 */
+.chat-welcome.is-diy-chat {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 100%;
+  justify-content: flex-start;
+
+  .chat-welcome-input {
+    margin-top: auto;
+    margin-bottom: 0;
+  }
+
+  /* 在 DIY 配置尚未加载时仍保持合理的上下留白。 */
+  &:not(.is-diy-welcome) {
+    padding: clamp(32px, 8vh, 96px) clamp(16px, 3.5vw, 72px) clamp(24px, 4vh, 48px);
+
+    @media (max-width: $mobile-breakpoint) {
+      padding: var(--spacing-xl) var(--spacing-md) var(--spacing-lg);
     }
   }
 }

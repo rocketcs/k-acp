@@ -5,11 +5,11 @@ import com.hxh.apboa.common.wrapper.ModelConfigWrapper;
 import com.hxh.apboa.engine.model.IChatModel;
 import com.hxh.apboa.engine.model.GenerateOptionsHelper;
 import com.hxh.apboa.engine.model.HttpTransportHelper;
-import io.agentscope.core.formatter.dashscope.DashScopeChatFormatter;
-import io.agentscope.core.formatter.dashscope.DashScopeMultiAgentFormatter;
-import io.agentscope.core.model.DashScopeChatModel;
-import io.agentscope.core.model.EndpointType;
 import io.agentscope.core.model.Model;
+import io.agentscope.extensions.model.dashscope.DashScopeChatModel;
+import io.agentscope.extensions.model.dashscope.EndpointType;
+import io.agentscope.extensions.model.dashscope.formatter.DashScopeChatFormatter;
+import io.agentscope.extensions.model.dashscope.formatter.DashScopeMultiAgentFormatter;
 import org.springframework.stereotype.Component;
 
 /**

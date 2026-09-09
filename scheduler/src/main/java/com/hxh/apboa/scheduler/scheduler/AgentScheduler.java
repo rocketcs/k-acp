@@ -9,15 +9,12 @@ import com.hxh.apboa.common.util.TenantUtils;
 import com.hxh.apboa.common.vo.AccountVO;
 import com.hxh.apboa.common.vo.ChatSessionVO;
 import com.hxh.apboa.common.wrapper.AgentJobWrapper;
-import com.hxh.apboa.engine.agent.AgentBuilderWrapper;
 import com.hxh.apboa.engine.agent.IAgentFactory;
 import com.hxh.apboa.engine.agui.AgentContext;
 import com.hxh.apboa.scheduler.consts.JobConst;
 import com.hxh.apboa.scheduler.core.job.QuartzJob;
-import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.Agent;
-import io.agentscope.core.message.Msg;
-import io.agentscope.core.tool.ToolExecutionContext;
+import io.agentscope.core.message.UserMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.quartz.JobExecutionContext;
@@ -65,14 +62,13 @@ public class AgentScheduler extends QuartzJob {
             agentContext.setUserInfo(userInfo);
             AgentContext.init(agentContext);
 
-            // 1. 获取智能体构建器
-            AgentBuilderWrapper agentBuilder = getAgentBuilder(agentId, tenantId);
-            if (agentBuilder == null) {
+            // 1. 构建智能体（HarnessAgentHelper 内部完成 toolExecutionContext 装配）
+            Agent agent = getAgent(agentId, tenantId);
+            if (agent == null) {
                 return false;
             }
 
-            // 3. 构建并执行智能体
-            Agent agent = buildAgent(agentBuilder);
+            // 2. 执行智能体
             executeAgent(agent, wrapper.getUserPrompt(), session.getId(), tenantId, tenantCode);
 
             log.info("Agent job executed successfully, agentId: {}, sessionId: {}", agentId, session.getId());
@@ -114,26 +110,14 @@ public class AgentScheduler extends QuartzJob {
     }
 
     /**
-     * 获取智能体构建器
+     * 获取智能体
      */
-    private AgentBuilderWrapper getAgentBuilder(String agentId, Long tenantId) {
+    private Agent getAgent(String agentId, Long tenantId) {
         try {
             IAgentFactory agentFactory = getBean(IAgentFactory.class);
-            AgentBuilderWrapper builder = agentFactory.getAgentBuilder(Long.valueOf(agentId), tenantId);
-
-            if (builder == null) {
-                log.warn("AgentBuilderWrapper is null for agentId: {}", agentId);
-                return null;
-            }
-
-            if (builder.getDefinition() == null) {
-                log.warn("AgentDefinition is null for agentId: {}", agentId);
-                return null;
-            }
-
-            return builder;
-        } catch (NumberFormatException e) {
-            log.error("Invalid agentId format: {}", agentId, e);
+            return agentFactory.getAgent(Long.valueOf(agentId), tenantId);
+        } catch (Exception e) {
+            log.error("Failed to build agent for agentId: {}", agentId, e);
             return null;
         }
     }
@@ -170,30 +154,7 @@ public class AgentScheduler extends QuartzJob {
                 .orElse("新会话");
     }
 
-    /**
-     * 构建智能体
-     */
-    private Agent buildAgent(AgentBuilderWrapper builder) {
-        if (builder.getDefinition().getAgentType() == AgentType.A2A) {
-            return builder.getA2aAgentBuilder().build();
-        }
-
-        // ReActAgent构建
-        ReActAgent.Builder reactBuilder = builder.getReactAgentBuilder();
-
-        // 创建并注册执行上下文
-        AgentContext context = AgentContext.get();
-        context.setAgentDefinition(builder.getDefinition());
-
-        ToolExecutionContext toolContext = ToolExecutionContext.builder()
-                .register(context)
-                .build();
-        reactBuilder.toolExecutionContext(toolContext);
-
-        return reactBuilder.build();
-    }
-
-    /**
+/**
      * 执行智能体
      */
     private void executeAgent(Agent agent, String userPrompt, Long sessionId, Long tenantId, String tenantCode) {
@@ -208,7 +169,7 @@ public class AgentScheduler extends QuartzJob {
             AgentMetadataStore.put(agentId, "cleanUpOnOwn", true);
 
             // 执行调用
-            agent.call(Msg.builder().textContent(userPrompt).build())
+            agent.call(UserMessage.builder().textContent(userPrompt).build())
                     .block();
         } finally {
             // 4. 记录关联关系

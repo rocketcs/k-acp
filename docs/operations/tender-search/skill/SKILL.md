@@ -12,11 +12,11 @@ description: 使用 K-ACP 中受限的认证 profile 查询和分析全网招标
 | 工具 | 用途 | 必填参数 |
 |---|---|---|
 | `http_request` | 调用标讯 API | `url`、`method`、`headers_json`、`body`、`auth_profile`、`timeout_seconds` |
-| `wenbiao_agent_key_pool` | 查询或轮换**已授权**的密钥 | `action`；轮换时还需 `provider_status` |
+| `wenbiao_agent_key_pool` | 查询或原子轮换**已授权**的密钥 | `action`；轮换时需 `request_id`、`failed_key_id`、`failed_generation`、`provider_code`；导入仅由管理员受控入口执行 |
 | `resolve_tender_source_urls_v2` | 解析/验证展示项目的原始公告链接；若运行环境只绑定 `resolve_tender_source_urls` 或 `resolve_tender_source_url`，按实际绑定工具名调用同一能力 | `items` |
 | `get_current_datetime` | 解释“最近一个月”等相对时间 | 无 |
 
-认证固定使用 `auth_profile: "wenbiao_agent"`。profile 在服务器端注入 `X-API-Key` 和 `X-Client`，不得在提示词、工具参数、日志或回答中出现完整密钥。
+认证固定使用 `auth_profile: "wenbiao_agent"`。该 profile 是固定的 Broker 入口，不包含真实 key；Broker 按请求开始时读取的 `(active_key_id, generation)` 快照注入供应商请求。不得在提示词、工具参数、日志或回答中出现完整密钥。
 
 禁止调用任何注册、登录、设备指纹或自动获取密钥的接口；也不要读取或要求 `ZLBX_API_KEY`、`~/.zlbx/config.json`、`auto-register.md` 或用户目录中的密钥文件。
 
@@ -92,7 +92,7 @@ description: 使用 K-ACP 中受限的认证 profile 查询和分析全网招标
 - `INSUFFICIENT_BALANCE`
 - `QUOTA_EXCEEDED`
 
-`INVALID_APP_KEY` 不直接视为余额/额度耗尽，但必须先走 key 池诊断：调用 `wenbiao_agent_key_pool.status`，让工具把数据库 ACTIVE key 同步到 `wenbiao_agent` profile。若 status 返回 `active_last_provider_status` 为 `INSUFFICIENT_BALANCE` 或 `QUOTA_EXCEEDED`，先执行 `rotate`，成功后原样重试；若 status 正常且无失败状态，原样重试同一个 `http_request` 一次。
+`INVALID_APP_KEY` 不直接视为余额/额度耗尽，但必须先走 key 池诊断：调用 `wenbiao_agent_key_pool.status` 获取当前 generation 与 active 指纹；不得通过覆盖 profile 文件同步密钥。若 status 返回 `active_last_provider_status` 为 `INSUFFICIENT_BALANCE` 或 `QUOTA_EXCEEDED`，先执行 `rotate`，成功后原样重试；若 status 正常且无失败状态，原样重试同一个 `http_request` 一次。
 
 进入轮换恢复前必须先读取 `references/key-pool-recovery.md`，按其中的数据库 key 池动作、SQL 状态流和安全约束执行。不得调用自动注册、登录、设备指纹或读取本地密钥文件作为兜底。
 
@@ -101,7 +101,10 @@ description: 使用 K-ACP 中受限的认证 profile 查询和分析全网招标
 ```json
 {
   "action": "rotate",
-  "provider_status": "INSUFFICIENT_BALANCE",
+  "request_id": "本次请求的 UUID",
+  "failed_key_id": 123,
+  "failed_generation": 41,
+  "provider_code": "INSUFFICIENT_BALANCE",
   "exclude_fingerprints": []
 }
 ```
@@ -110,17 +113,20 @@ description: 使用 K-ACP 中受限的认证 profile 查询和分析全网招标
 
 | 参数 | 类型 | 必填 | 可用值 |
 |---|---:|---:|---|
-| `action` | string | 是 | `status`、`rotate`、`mark_failure` |
-| `provider_status` | string | 仅 `rotate` / `mark_failure` | `INSUFFICIENT_BALANCE`、`QUOTA_EXCEEDED` |
+| `action` | string | 是 | `status`、`rotate`、`mark_failure`；密钥导入仅由管理员受控入口执行 |
+| `request_id` | string | 仅 `rotate` | 本次请求的 UUID，重复调用必须幂等 |
+| `failed_key_id` | integer | 仅 `rotate` | 请求快照使用的 key id |
+| `failed_generation` | integer | 仅 `rotate` | 请求开始时的 generation |
+| `provider_code` | string | 仅 `rotate` | 标准化供应商错误码 |
 | `exclude_fingerprints` | string[] | 否 | 本请求已尝试过的工具返回 fingerprint；默认 `[]` |
 
 轮换规则：
 
 1. 记录本次失败的 fingerprint（若工具响应中存在），调用 `rotate`。
 2. `rotate` 必须把旧 `ACTIVE` key 换下，并把一个新的可用 `STANDBY` key 提升为 `ACTIVE`；不能只标记旧 key 而不切入新 key。
-3. 新 key 选择默认按最新导入优先，即 `imported_at DESC, id DESC`。
+3. 新 key 按 `last_probe_at ASC, imported_at ASC, id ASC` 选择，并排除本请求已尝试的 key。
 4. 仅当工具返回 `success: true` 时，原样重试**同一个** `http_request` 一次。
-5. 一个用户请求最多执行 3 个“轮换 + 重试”周期；仍失败或工具返回 `NO_USABLE_STANDBY_KEY` 时停止。
+5. 一个用户请求每个 key 最多尝试一次，最大尝试数为 `min(3, pool_ready_count + 1)`；仍失败或工具返回 `NO_USABLE_READY_KEY` 时返回结构化错误并停止。
 6. `AUTHENTICATION_FAILED`、`INVALID_APP_KEY`、`RATE_LIMITED`、`INVALID_REQUEST` 或 HTTP 工具错误不直接轮换。认证类错误先执行 status 诊断与 profile 同步；限流、参数错误或网络错误分别提示稍后重试、修正请求参数或检查网络。
 
 ### 失败前置诊断

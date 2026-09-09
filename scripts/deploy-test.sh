@@ -70,9 +70,13 @@ do_rollback() {
   done
   docker compose --project-name k-acp-local $COMPOSE_ENV $COMPOSE_FILES up -d --no-deps --force-recreate ${ALL_SERVICES[*]/#/apboa-}"
   echo ">> 回退完成，执行 --status 验证"
+  do_status
 }
 
 # ---------- 部署主流程 ----------
+if [[ "$MODE" == "status" ]]; then do_status; exit 0; fi
+if [[ "$MODE" == "rollback" ]]; then do_rollback; exit 0; fi
+
 if [[ "$MODE" == "deploy" ]]; then
   branch=$(git -C "$REPO_ROOT" branch --show-current)
   sha=$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")

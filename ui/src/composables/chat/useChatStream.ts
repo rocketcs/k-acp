@@ -155,6 +155,11 @@ export function useChatStream(
   // 即使工具已返回，也保留它直到本轮结束，避免用户在模型继续整理答案时看到空白。
   const runActivities = ref<RunActivity[]>([])
 
+  // toolCallId → 工具名。start 与 result 事件可能乱序抵达或因会话恢复丢失，
+  // result 反查 toolCallsInProgress 失败时以此兜底，避免完成事件因 toolName 为空
+  // 被业务步骤映射（onToolCallActivity 消费方）静默丢弃，步骤卡在 loading。
+  const toolNameById = new Map<string, string>()
+
   // HITL：逐工具确认决策（toolUseId → 状态），所有项决策完即调 /agui/resume
   const pendingConfirms = ref<Record<string, 'pending' | 'approved' | 'rejected'>>({})
 
@@ -181,6 +186,7 @@ export function useChatStream(
       }
     })
     toolCallsInProgress.value = arr
+    arr.forEach((t) => toolNameById.set(t.id, t.name))
     const next: Record<string, 'pending' | 'approved' | 'rejected'> = { ...pendingConfirms.value }
     pending.forEach(p => { next[p.toolUseId] = 'pending' })
     pendingConfirms.value = next
@@ -191,6 +197,7 @@ export function useChatStream(
     handlers: {
       onRunStarted: () => {
         toolCallsInProgress.value = []
+        toolNameById.clear()
         runActivities.value = []
         runStartedAt.value = Date.now()
         streamingContent.value = ''
@@ -235,6 +242,11 @@ export function useChatStream(
         options?.onToolCallActivity?.({ toolName: e.toolCallName, status: 'running' })
 
         agentHasResult.value = true
+        toolNameById.set(e.toolCallId, e.toolCallName)
+        runActivities.value = [
+          ...runActivities.value.filter((activity) => activity.id !== `tool:${e.toolCallId}`),
+          { id: `tool:${e.toolCallId}`, name: e.toolCallName, status: 'running', startTime: Date.now() },
+        ]
         toolCallsInProgress.value = [
           ...toolCallsInProgress.value,
           { id: e.toolCallId, name: e.toolCallName, args: '', startTime: Date.now() }
@@ -244,6 +256,9 @@ export function useChatStream(
       onToolCallArgs: (_e, partialArgs) => {
         // 计划追踪：累积工具参数
         onPlanToolArgs(_e.toolCallId, partialArgs)
+        runActivities.value = runActivities.value.map((activity) =>
+          activity.id === `tool:${_e.toolCallId}` ? { ...activity, args: partialArgs } : activity,
+        )
 
         toolCallsInProgress.value = toolCallsInProgress.value.map((toolCall) =>
           toolCall.id === _e.toolCallId ? { ...toolCall, args: partialArgs } : toolCall,
@@ -253,8 +268,15 @@ export function useChatStream(
         // 计划追踪：处理工具结果
         onPlanToolResult(e.toolCallId)
         const activeTool = toolCallsInProgress.value.find((item) => item.id === e.toolCallId)
+        // 反查失败（乱序/恢复丢失）时按 id 从兜底映射取工具名，不能发空串。
+        const completedToolName = activeTool?.name ?? toolNameById.get(e.toolCallId) ?? ''
+        runActivities.value = runActivities.value.map((activity) =>
+          activity.id === `tool:${e.toolCallId}`
+            ? { ...activity, status: 'completed', elapsed: Date.now() - activity.startTime }
+            : activity,
+        )
 
-        options?.onToolCallActivity?.({ toolName: activeTool?.name ?? '', status: 'completed', content: e.content })
+        options?.onToolCallActivity?.({ toolName: completedToolName, status: 'completed', content: e.content })
 
         try {
           if (agentDetail.value?.agentCode === 'default-tender') {
@@ -294,7 +316,7 @@ export function useChatStream(
           // // 保存工具调用消息，通过队列保证写入顺序
           const sid = currentSessionId.value
           if (sid) {
-            const contentToSave = buildToolCallsContent(toolCallsInProgress.value)
+            const contentToSave = buildToolCallsContent(toolCallsInProgress.value.filter((tool) => tool.id === e.toolCallId))
             if (contentToSave) {
               onMessageSaved?.({
                 id: nextIdBig(),
@@ -316,8 +338,8 @@ export function useChatStream(
             content: e.content,
             messageId: e.messageId,
           })
-          // 清空进行中的工具调用（可根据需要保留，此处清空）
-          toolCallsInProgress.value = []
+          // 并行工具的结果独立返回，不能清除其他尚未完成的工具。
+          toolCallsInProgress.value = toolCallsInProgress.value.filter((tool) => tool.id !== e.toolCallId)
         }
       },
       onRunFinished: (_e) => {
@@ -388,12 +410,14 @@ export function useChatStream(
           ]
         }
       },
-      onRunError: () => {
+      onRunError: (event) => {
+        message.error(event.message || '请求处理失败，请稍后重试')
         agentHasResult.value = true
         finalizeStreamingMessage()
         appendTenderFallbackIfNeeded()
         const failedTool = toolCallsInProgress.value[toolCallsInProgress.value.length - 1]
-        options?.onToolCallActivity?.({ toolName: failedTool?.name ?? '', status: 'failed' })
+        const failedToolName = failedTool?.name ?? (failedTool ? toolNameById.get(failedTool.id) ?? '' : '')
+        options?.onToolCallActivity?.({ toolName: failedToolName, status: 'failed' })
         runActivities.value = runActivities.value.map((activity) =>
           activity.status === 'running'
             ? { ...activity, status: 'failed', elapsed: Date.now() - activity.startTime }
@@ -503,6 +527,8 @@ export function useChatStream(
       forwardedProps.fileIds = overrideFileIds
     }
 
+    resetStreamingState()
+    runStartedAt.value = Date.now()
     agentHasResult.value = false
     await run({
       threadId: currentSessionId.value || undefined,
@@ -519,6 +545,10 @@ export function useChatStream(
     streamingContent.value = ''
     streamingRole.value = 'system'
     toolCallsInProgress.value = []
+    toolNameById.clear()
+    runActivities.value = []
+    hasVisibleAnswer.value = false
+    pendingHighRecallAnswer.value = null
     runStartedAt.value = null
     agentHasResult.value = true
     currentPlan.value = null

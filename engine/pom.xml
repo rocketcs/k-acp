@@ -168,12 +168,11 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- HITL V0 阶段2：验证暂停态落 MySQL（agentscope 官方 session 扩展，仅 test scope） -->
+        <!-- HITL V0 阶段2：暂停态落 MySQL（v2 AgentStateStore 扩展） -->
         <dependency>
             <groupId>io.agentscope</groupId>
-            <artifactId>agentscope-extensions-session-mysql</artifactId>
+            <artifactId>agentscope-extensions-mysql</artifactId>
             <version>${agentscope.version}</version>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

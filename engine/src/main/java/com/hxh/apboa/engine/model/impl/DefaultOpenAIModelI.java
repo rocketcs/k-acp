@@ -7,10 +7,10 @@ import com.hxh.apboa.engine.formatter.FixedSysMsgOpenAIMultiAgentFormatter;
 import com.hxh.apboa.engine.model.IChatModel;
 import com.hxh.apboa.engine.model.GenerateOptionsHelper;
 import com.hxh.apboa.engine.model.HttpTransportHelper;
-import io.agentscope.core.formatter.openai.OpenAIChatFormatter;
-import io.agentscope.core.formatter.openai.OpenAIMultiAgentFormatter;
 import io.agentscope.core.model.Model;
-import io.agentscope.core.model.OpenAIChatModel;
+import io.agentscope.extensions.model.openai.OpenAIChatModel;
+import io.agentscope.extensions.model.openai.formatter.OpenAIChatFormatter;
+import io.agentscope.extensions.model.openai.formatter.OpenAIMultiAgentFormatter;
 import org.springframework.stereotype.Component;
 
 /**
@@ -30,7 +30,8 @@ public class DefaultOpenAIModelI implements IChatModel {
                 .apiKey(config.getApiKey())
                 .modelName(config.getModelCode())
                 .stream(config.getStreaming() != null && config.getStreaming())
-                .httpTransport(HttpTransportHelper.createOkHttpTransport())
+                // AgentScope 2.0.2's blocking OkHttp producer batches deltas under ReAct backpressure.
+                .httpTransport(HttpTransportHelper.createJdkHttpTransport())
                 .generateOptions(GenerateOptionsHelper.create(config));
 
         if (config.getBaseUrl() != null && !config.getBaseUrl().isEmpty()) {

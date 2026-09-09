@@ -122,7 +122,7 @@ function confirm() {
 
 <style scoped lang="scss">
 .diy-welcome-content {
-  width: min(100%, 1280px);
+  width: min(100%, 1100px);
   margin: 0 auto;
   text-align: left;
 }
@@ -131,7 +131,7 @@ function confirm() {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: clamp(12px, 1.4vw, 18px);
+  gap: clamp(12px, 1.2vw, 16px);
 }
 
 .diy-question-card {
@@ -140,26 +140,27 @@ function confirm() {
    * 以卡片的可读最小宽度决定换行，而不是依赖固定的屏幕断点：
    * 宽屏为三列，中等宽度自然变为两列，竖屏则变为单列。
    */
-  flex: 1 1 clamp(280px, 30%, 400px);
+  flex: 1 1 clamp(280px, 31%, 360px);
   align-items: center;
-  gap: clamp(12px, 1.4vw, 18px);
+  gap: clamp(12px, 1.2vw, 16px);
   min-width: min(100%, 280px);
-  min-height: clamp(104px, 14vh, 136px);
-  max-width: 420px;
-  padding: clamp(16px, 2vw, 24px) clamp(18px, 2.2vw, 28px);
-  border: 1px solid #e6ebee;
-  border-radius: 22px;
+  min-height: clamp(96px, 11vh, 124px);
+  max-width: 360px;
+  padding: clamp(14px, 1.7vw, 20px) clamp(16px, 1.9vw, 24px);
+  border: 1px solid #e3e9ed;
+  border-radius: 18px;
   background: #fff;
   color: var(--color-text-primary);
   text-align: left;
   cursor: pointer;
-  box-shadow: 0 8px 22px rgba(26, 47, 55, 0.035);
+  box-shadow: 0 6px 18px rgba(26, 47, 55, 0.045);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 
   &:hover:not(:disabled) {
     border-color: rgba(0, 151, 158, 0.48);
     box-shadow: 0 14px 30px rgba(0, 121, 130, 0.1);
     transform: translateY(-2px);
+    background: #fbfefe;
   }
 
   &:disabled {
@@ -189,14 +190,14 @@ function confirm() {
 
   strong {
     color: #1f2a30;
-    font-size: clamp(17px, 1.55vw, 20px);
+    font-size: clamp(16px, 1.4vw, 19px);
     font-weight: 650;
     line-height: 1.4;
   }
 
   small {
     color: #76838a;
-    font-size: clamp(13px, 1.2vw, 15px);
+    font-size: clamp(13px, 1.05vw, 14px);
     line-height: 1.55;
   }
 }

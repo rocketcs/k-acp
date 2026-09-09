@@ -1,0 +1,38 @@
+# Kylin环境端口override：核心8容器 + 达梦数据库
+services:
+  apboa-console:
+    container_name: k-acp-console
+    ports:
+      - "23060:3060"
+
+  apboa-runtime:
+    container_name: k-acp-runtime
+    ports:
+      - "23061:3061"
+
+  apboa-proxy:
+    container_name: k-acp-proxy
+    ports:
+      - "23062:3062"
+
+  apboa-websocket:
+    container_name: k-acp-websocket
+    ports: !override
+      - "23064:3064"
+
+  apboa-frontend:
+    container_name: k-acp-frontend
+    ports:
+      - "23080:80"
+
+  # 达梦数据库（对外按需开放）
+  dm8-mock:
+    image: changchun/dm8:aug
+    container_name: k-acp-dm8
+    restart: unless-stopped
+    ports:
+      - "5236:5236"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - ./data/dm8:/opt/dm8/data

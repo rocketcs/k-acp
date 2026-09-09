@@ -82,10 +82,12 @@ export default defineConfig(({ mode }) => {
       // 启动服务器后是否自动打开浏览器
       open: false,
       // 代理配置，避免跨域
+      // 目标端口可用 env 覆盖：VITE_API_CONSOLE / VITE_API_RUNTIME / VITE_API_WS
+      // （本地 JVM 模式默认 3060/3061/3064；连 Docker 后端时在 .env.local 改成 23060/23061/23064）
       proxy: {
         '/api/runtime/': {
           ws: true,
-          target: 'http://127.0.0.1:3061',
+          target: env.VITE_API_RUNTIME || 'http://127.0.0.1:3061',
           changeOrigin: true,
           timeout: 0,
           rewrite: (p) => {
@@ -94,7 +96,7 @@ export default defineConfig(({ mode }) => {
         },
         '/api/ws/': {
           ws: true,
-          target: 'http://127.0.0.1:3064',
+          target: env.VITE_API_WS || 'http://127.0.0.1:3064',
           changeOrigin: true,
           timeout: 0,
           rewrite: (p) => {
@@ -103,7 +105,7 @@ export default defineConfig(({ mode }) => {
         },
         '/api': {
           ws: true,
-          target: 'http://127.0.0.1:3060',
+          target: env.VITE_API_CONSOLE || 'http://127.0.0.1:3060',
           changeOrigin: true,
           timeout: 0,
           rewrite: (p) => {

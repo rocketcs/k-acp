@@ -4,8 +4,8 @@ import { buildExternalChatUrl, copyText, type ClipboardEnvironment } from './ext
 
 test('外置对话链接保留部署目录和端口', () => {
   assert.equal(
-    buildExternalChatUrl('http://192.168.8.81:23080', '/web', 'chat-key'),
-    'http://192.168.8.81:23080/web/#/communication/chat-key',
+    buildExternalChatUrl('http://127.0.0.1:23080', '/web', 'chat-key'),
+    'http://127.0.0.1:23080/web/#/communication/chat-key',
   )
 })
 

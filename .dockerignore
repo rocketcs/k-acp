@@ -23,3 +23,12 @@ docker/data
 docker/logs
 LICENSE
 README.md
+
+# 离线打包排除：达梦备份等大文件
+data/
+outputs/
+output/
+tmp/
+docx*
+*.tar.gz
+releases/

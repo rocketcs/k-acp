@@ -47,8 +47,11 @@ interface MessageGroup {
 
 const messageGroups = computed<MessageGroup[]>(() => {
   const groups: MessageGroup[] = []
+  const latestUserIndex = props.messages.reduce((last, message, index) => message.role === 'user' ? index : last, -1)
 
-  for (const msg of props.messages) {
+  for (const [index, msg] of props.messages.entries()) {
+    // 本轮工具进度统一由状态栏展示，历史记录在运行结束后仍可查看。
+    if ((props.showRunActivity || props.showRunWaiting) && index > latestUserIndex && msg.role === 'tool') continue
     if (msg.role === 'thinking' || msg.role === 'tool') {
       const lastGroup = groups[groups.length - 1]
       if (lastGroup && !lastGroup.text) {

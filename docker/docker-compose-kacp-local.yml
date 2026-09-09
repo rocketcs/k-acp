@@ -23,7 +23,9 @@ services:
       AGENTSCOPE_TRACING_ENDPOINT: ${AGENTSCOPE_TRACING_ENDPOINT:-http://host.docker.internal:3000/api/public/otel/v1/traces}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-      LANGFUSE_INGESTION_VERSION: ${LANGFUSE_INGESTION_VERSION:-4}
+      # Kosongkan agar header x-langfuse-ingestion-version tidak dikirim;
+      # header 4 membuat data OTel melewati tabel legacy yang dibaca sync workflow.
+      LANGFUSE_INGESTION_VERSION: ${LANGFUSE_INGESTION_VERSION-4}
       # 高召回检索包含计划、受控搜索和批量原文解析，60 秒会在完成前中断。
       APBOA_TOOL_EXECUTION_TIMEOUT_SECONDS: "240"
       # 财务制度自定义 Tool 的只读 Neo4j 连接；数据库通过 k-acp-local 网络中的 neo4j-finance 别名访问。

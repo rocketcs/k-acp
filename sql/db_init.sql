@@ -1281,4 +1281,44 @@ CREATE TABLE IF NOT EXISTS `langfuse_session_trace_cursor` (
   KEY `idx_langfuse_session_trace_cursor_last_seen` (`tenant_id`, `last_seen_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Wenbiao key runtime. api_key is server-side data and is never exposed to agents.
+CREATE TABLE IF NOT EXISTS `wenbiao_key` (
+  `id` bigint NOT NULL,
+  `key_fingerprint` char(16) NOT NULL,
+  `api_key` varchar(512) NOT NULL COMMENT '已授权问标 API key；仅服务端读取',
+  `state` varchar(16) NOT NULL,
+  `imported_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `last_probe_at` datetime(3) DEFAULT NULL,
+  `last_provider_code` varchar(64) DEFAULT NULL,
+  `failure_count` int NOT NULL DEFAULT 0,
+  `cooldown_until` datetime(3) DEFAULT NULL,
+  `retired_at` datetime(3) DEFAULT NULL,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_wenbiao_key_fingerprint` (`key_fingerprint`),
+  UNIQUE KEY `uk_wenbiao_key_api_key` (`api_key`),
+  KEY `idx_wenbiao_key_selection` (`state`,`last_probe_at`,`imported_at`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wenbiao_key_runtime` (
+  `runtime_id` varchar(64) NOT NULL,
+  `active_key_id` bigint NOT NULL,
+  `generation` bigint NOT NULL DEFAULT 1,
+  `lease_owner` varchar(128) DEFAULT NULL,
+  `lease_until` datetime(3) DEFAULT NULL,
+  `updated_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`runtime_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wenbiao_key_rotation` (
+  `request_id` char(36) NOT NULL,
+  `from_generation` bigint NOT NULL,
+  `to_generation` bigint DEFAULT NULL,
+  `from_key_id` bigint NOT NULL,
+  `to_key_id` bigint DEFAULT NULL,
+  `provider_code` varchar(64) NOT NULL,
+  `result` varchar(32) NOT NULL,
+  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `completed_at` datetime(3) DEFAULT NULL,
+  PRIMARY KEY (`request_id`), KEY `idx_wenbiao_rotation_generation` (`to_generation`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;

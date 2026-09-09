@@ -53,3 +53,20 @@ test('GraphifyEchartsGraph persists dragged node coordinates as fixed force node
   assert.match(component, /@mouseup="onChartMouseup"/)
   assert.match(component, /watch\(\(\) => props\.graphView\.id/)
 })
+
+test('GraphifyEchartsGraph freezes other nodes during force drag', () => {
+  // mousedown must freeze every node except the pressed one via the force
+  // instance (imperative, no setOption mid-drag), and mouseup must merge the
+  // frozen snapshot into fixedPositions so the post-drag re-layout cannot
+  // scatter the graph.
+  assert.match(component, /function freezeOtherNodes\(excludedIndex: number\)/)
+  assert.match(component, /forceLayout\?: \{ setFixed\?: \(index: number\) => void \}/)
+  assert.match(component, /force\.setFixed\?\.\(index\)/)
+  assert.match(component, /if \(index === excludedIndex\) return/)
+  assert.match(component, /frozenNodePositions/)
+  assert.match(component, /freezeOtherNodes\(dataIndex\)/)
+  assert.match(component, /const merged = new Map<string, \{ x: number; y: number \}>\(frozen \?\? \[\]\)/)
+  assert.match(component, /merged\.set\(String\(data\.id\), position\)/)
+  // freeze must be released/reset when the graph view changes
+  assert.match(component, /frozenNodePositions = null/)
+})

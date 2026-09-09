@@ -4,10 +4,10 @@ import com.hxh.apboa.common.enums.ModelProviderType;
 import com.hxh.apboa.common.wrapper.ModelConfigWrapper;
 import com.hxh.apboa.engine.model.IChatModel;
 import com.hxh.apboa.engine.model.GenerateOptionsHelper;
-import io.agentscope.core.formatter.gemini.GeminiChatFormatter;
-import io.agentscope.core.formatter.gemini.GeminiMultiAgentFormatter;
-import io.agentscope.core.model.GeminiChatModel;
 import io.agentscope.core.model.Model;
+import io.agentscope.extensions.model.gemini.GeminiChatModel;
+import io.agentscope.extensions.model.gemini.formatter.GeminiChatFormatter;
+import io.agentscope.extensions.model.gemini.formatter.GeminiMultiAgentFormatter;
 import org.springframework.stereotype.Component;
 
 /**

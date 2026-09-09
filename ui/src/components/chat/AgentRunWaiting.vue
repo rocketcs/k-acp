@@ -40,14 +40,16 @@ onBeforeUnmount(() => {
 
 <style scoped lang="scss">
 .agent-run-waiting {
+  box-sizing: border-box;
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   max-width: 100%;
   margin: 4px 0 8px;
   padding: 8px 11px;
   border: 1px solid rgba(15, 116, 255, 0.12);
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(247, 251, 255, 0.82);
   color: #59718d;
   font-size: 12px;

@@ -8,12 +8,16 @@ import io.agentscope.core.agui.event.AguiEvent;
 import io.agentscope.core.agui.model.RunAgentInput;
 import io.agentscope.core.agui.processor.AguiRequestProcessor;
 import io.agentscope.core.agui.registry.AguiAgentRegistry;
-import io.agentscope.core.session.Session;
 import io.agentscope.spring.boot.agui.common.DefaultAgentResolver;
 import io.agentscope.spring.boot.agui.common.ThreadSessionManager;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import com.hxh.apboa.common.util.TenantUtils;
+import com.hxh.apboa.runtime.agui.ApboaAgentResolver;
+import com.hxh.apboa.runtime.agui.ApboaAguiHitlService;
+import io.agentscope.core.agent.RuntimeContext;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -39,25 +43,27 @@ public class AguiMvcController {
     private final ExecutorService executorService;
     private final ThreadSessionManager sessionManager;
     private final RunTracker runTracker;
+    private final ApboaAguiHitlService hitlService;
+    private final io.agentscope.core.state.AgentStateStore stateStore;
 
     private AguiMvcController(Builder builder) {
-        Session session = builder.session;
-        JdbcTemplate jdbcTemplate = builder.jdbcTemplate;
         this.processor =
-                AguiRequestProcessor.builder()
-                        .agentResolver(
-                                DefaultAgentResolver.builder()
-                                        .registry(builder.registry)
-                                        .sessionManager(builder.sessionManager)
-                                        .serverSideMemory(builder.serverSideMemory)
-                                        .build())
-                        .config(
-                                builder.config != null
-                                        ? builder.config
-                                        : AguiAdapterConfig.defaultConfig())
-                        .session(session)
-                        .jdbcTemplate(jdbcTemplate)
-                        .build();
+                builder.processor != null
+                        ? builder.processor
+                        : AguiRequestProcessor.builder()
+                                .agentResolver(
+                                        new ApboaAgentResolver(
+                                                DefaultAgentResolver.builder()
+                                                        .registry(builder.registry)
+                                                        .sessionManager(builder.sessionManager)
+                                                        .serverSideMemory(builder.serverSideMemory)
+                                                        .build(),
+                                                builder.jdbcTemplate))
+                                        .config(
+                                                builder.config != null
+                                                        ? builder.config
+                                                        : AguiAdapterConfig.defaultConfig())
+                                        .build();
         this.encoder = new AguiEventEncoder();
         this.agentIdHeader =
                 builder.agentIdHeader != null ? builder.agentIdHeader : DEFAULT_AGENT_ID_HEADER;
@@ -65,6 +71,8 @@ public class AguiMvcController {
         this.executorService = Executors.newCachedThreadPool();
         this.sessionManager = builder.sessionManager;
         this.runTracker = builder.runTracker != null ? builder.runTracker : new RunTracker(this.encoder);
+        this.hitlService = builder.hitlService;
+        this.stateStore = builder.stateStore;
     }
 
     /**
@@ -103,9 +111,19 @@ public class AguiMvcController {
                         // 初始化上下文
                         AgentContext.init(input, threadId);
 
+                        // v1 语义保留：未开启记忆时，新用户消息 = 全新会话（清空状态存储）。
+                        // UIP（用户交互协议回复）与 tool 消息（HITL 恢复）不触发清空。
+                        if (stateStore != null && !isMemoryActive(input) && isFreshUserRun(input)) {
+                            try {
+                                stateStore.delete(resolveUserId(threadId), threadId);
+                            } catch (Exception ex) {
+                                logger.warn("清空会话状态失败 threadId={}: {}", threadId, ex.getMessage());
+                            }
+                        }
+
                         // Process request - returns both agent and event stream
                         AguiRequestProcessor.ProcessResult result =
-                                processor.process(input, headerAgentId, pathAgentId);
+                                processor.process(input, headerAgentId, pathAgentId, buildRuntimeContext(threadId));
 
                         // 注册 RunTracker + 订阅 Flux 管道（与 resume 共用）
                         subscribeAndTrack(emitter, threadId, runId, result);
@@ -131,6 +149,49 @@ public class AguiMvcController {
         return emitter;
     }
 
+    private boolean isMemoryActive(RunAgentInput input) {
+        return Boolean.TRUE.equals(input.getForwardedProp("memoryActive"));
+    }
+
+    private boolean isFreshUserRun(RunAgentInput input) {
+        List<io.agentscope.core.agui.model.AguiMessage> messages = input.getMessages();
+        if (messages == null || messages.isEmpty()) {
+            return false;
+        }
+        io.agentscope.core.agui.model.AguiMessage first = messages.getFirst();
+        if (!"user".equalsIgnoreCase(first.getRole())) {
+            return false;
+        }
+        String messageId = first.getId();
+        boolean isUIP = messageId != null && messageId.toLowerCase().startsWith("uip");
+        return !isUIP;
+    }
+
+    private String resolveUserId(String threadId) {
+        return AgentContext.getIfExists()
+                .map(ctx -> ctx.getUserInfo() != null ? String.valueOf(ctx.getUserInfo().getId()) : "anonymous")
+                .orElse("anonymous");
+    }
+
+    /**
+     * 构建运行期 RuntimeContext（会话分区 key + 平台元数据 extras）。
+     */
+    private RuntimeContext buildRuntimeContext(String threadId) {
+        String userId = AgentContext.getIfExists()
+                .map(ctx -> ctx.getUserInfo() != null ? String.valueOf(ctx.getUserInfo().getId()) : "anonymous")
+                .orElse("anonymous");
+        RuntimeContext ctx = RuntimeContext.builder()
+                .sessionId(threadId)
+                .userId(userId)
+                .build();
+        AgentContext.getIfExists().ifPresent(ac -> {
+            ctx.put("threadId", threadId);
+            ctx.put("tenantId", ac.getTenantId());
+            ctx.put("tenantCode", ac.getTenantCode());
+        });
+        return ctx;
+    }
+
     /**
      * HITL resume：根据用户确认决策恢复暂停的 agent。
      *
@@ -151,7 +212,7 @@ public class AguiMvcController {
      */
     public SseEmitter handleResume(
             String threadId,
-            List<AguiRequestProcessor.ResumeDecision> decisions,
+            List<ApboaAguiHitlService.ResumeDecision> decisions,
             boolean memoryActive) {
         SseEmitter emitter = new SseEmitter(sseTimeout);
         String runId = UUID.randomUUID().toString();
@@ -166,11 +227,13 @@ public class AguiMvcController {
                         agentContext.setMemoryActive(memoryActive);
                         AgentContext.init(agentContext);
 
-                        AguiRequestProcessor.ProcessResult result =
-                                processor.resume(threadId, decisions, memoryActive);
+                        com.hxh.apboa.runtime.agui.ApboaAguiHitlService.AguiRequestProcessResult result =
+                                hitlService.resume(threadId, decisions, memoryActive);
+                        AguiRequestProcessor.ProcessResult procResult =
+                                new AguiRequestProcessor.ProcessResult(result.agent(), result.events());
 
                         // 注册 RunTracker + 订阅 Flux 管道（与 run 共用）
-                        subscribeAndTrack(emitter, threadId, runId, result);
+                        subscribeAndTrack(emitter, threadId, runId, procResult);
 
                     } catch (Exception e) {
                         logger.error("Error resuming AG-UI request: {}", e.getMessage());
@@ -202,10 +265,7 @@ public class AguiMvcController {
      */
     public List<Map<String, Object>> getPendingConfirms(String threadId) {
         try {
-            AgentContext agentContext = new AgentContext();
-            agentContext.setThreadId(threadId);
-            AgentContext.init(agentContext);
-            return processor.getPendingConfirms(threadId);
+            return hitlService.getPendingConfirms(threadId);
         } catch (Exception e) {
             logger.warn("获取待确认列表失败 threadId={}: {}", threadId, e.getMessage());
             return List.of();
@@ -390,9 +450,11 @@ public class AguiMvcController {
         private boolean serverSideMemory = false;
         private String agentIdHeader;
         private long sseTimeout = 600000L;
-        private Session session;
         private JdbcTemplate jdbcTemplate;
         private RunTracker runTracker;
+        private ApboaAguiHitlService hitlService;
+        private AguiRequestProcessor processor;
+        private io.agentscope.core.state.AgentStateStore stateStore;
 
         /**
          * Set the agent registry.
@@ -461,18 +523,40 @@ public class AguiMvcController {
         }
 
         /**
-         * Set the session storage.
+         * Set the AgentStateStore (v2 统一状态存储，用于 memoryActive=false 时每轮清空会话).
          *
-         * @param session The session storage (InMemorySession or MysqlSession)
+         * @param stateStore The state store
          * @return This builder
          */
-        public Builder session(Session session) {
-            this.session = session;
+        public Builder stateStore(io.agentscope.core.state.AgentStateStore stateStore) {
+            this.stateStore = stateStore;
             return this;
         }
 
         /**
-         * Set the jdbcTemplate storage.
+         * Set a prebuilt processor (overrides registry-based construction).
+         *
+         * @param processor The request processor
+         * @return This builder
+         */
+        public Builder processor(AguiRequestProcessor processor) {
+            this.processor = processor;
+            return this;
+        }
+
+        /**
+         * Set the HITL service (resume / pending confirms).
+         *
+         * @param hitlService The HITL service
+         * @return This builder
+         */
+        public Builder hitlService(ApboaAguiHitlService hitlService) {
+            this.hitlService = hitlService;
+            return this;
+        }
+
+        /**
+         * Set the jdbcTemplate (used by ApboaAgentResolver for tenant lookup).
          *
          * @param jdbcTemplate jdbcTemplate
          * @return This builder

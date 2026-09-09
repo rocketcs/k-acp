@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { CheckOutlined, LoadingOutlined } from '@ant-design/icons-vue'
+import { CheckOutlined } from '@ant-design/icons-vue'
 import type { RunActivity } from '@/types'
-import { aggregateRunActivities, getRunElapsedMs } from '@/utils/chat/runActivity'
+import { aggregateRunActivities, getActivityDetail, getRunElapsedMs } from '@/utils/chat/runActivity'
 
 const props = defineProps<{
   activities: readonly RunActivity[]
@@ -14,7 +14,6 @@ defineEmits<{
   (e: 'abort'): void
 }>()
 
-const expanded = ref(true)
 const now = ref(Date.now())
 let timer: ReturnType<typeof setInterval> | null = null
 
@@ -24,7 +23,7 @@ const activeActivity = computed(() =>
   [...aggregatedActivities.value].reverse().find((activity) => activity.status === 'running'),
 )
 const completedCount = computed(() =>
-  aggregatedActivities.value.filter((activity) => activity.status === 'completed').length,
+  props.activities.filter((activity) => activity.status === 'completed').length,
 )
 const failedCount = computed(() =>
   aggregatedActivities.value.filter((activity) => activity.status === 'failed').length,
@@ -37,16 +36,13 @@ const elapsed = computed(() => {
 })
 const headline = computed(() => {
   if (!isRunning.value) return '处理完成'
-  return activeActivity.value ? `正在${activeActivity.value.label}` : '正在启动工作流'
+  if (activeActivity.value) return `正在执行：${activeActivity.value.label}`
+  return aggregatedActivities.value.length ? '正在整理回复' : '正在处理请求'
 })
-const visibleActivities = computed(() => expanded.value ? aggregatedActivities.value : [])
-
-function activityLabel(activity: ReturnType<typeof aggregateRunActivities>[number]) {
-  if (activity.status === 'completed') return `${activity.label}完成`
-  if (activity.status === 'failed') return `${activity.label}待重试`
-  if (activity.status === 'pending') return `等待${activity.label}`
-  return `正在${activity.label}`
-}
+const currentDetail = computed(() => getActivityDetail(
+  [...props.activities].reverse().find((activity) => activity.status === 'running'),
+))
+const runningCount = computed(() => props.activities.filter((activity) => activity.status === 'running').length)
 
 function stopTimer() {
   if (!timer) return
@@ -83,33 +79,20 @@ onBeforeUnmount(() => {
     <div class="agent-run-activity__summary">
       <span v-if="isRunning" class="agent-run-activity__pulse" aria-hidden="true"></span>
       <CheckOutlined v-else class="agent-run-activity__complete-icon" aria-hidden="true" />
-      <strong>{{ headline }}</strong>
-      <span v-if="aggregatedActivities.length" class="agent-run-activity__metric">已完成 {{ completedCount }}/{{ aggregatedActivities.length }} 步</span>
+      <strong :title="headline">{{ headline }}</strong>
+      <span v-if="currentDetail" class="agent-run-activity__info" :title="currentDetail">{{ currentDetail }}</span>
+      <span v-if="runningCount > 1" class="agent-run-activity__metric">{{ runningCount }} 项并行</span>
+      <span v-if="activities.length" class="agent-run-activity__metric">已完成 {{ completedCount }}/{{ activities.length }}</span>
       <span v-if="failedCount" class="agent-run-activity__metric is-warning">{{ failedCount }} 步待重试</span>
       <time>{{ isRunning ? '已等待' : '耗时' }} {{ elapsed }}</time>
     </div>
-    <button v-if="isRunning" type="button" class="agent-run-activity__abort" @click="$emit('abort')">停止处理</button>
-    <button
-      v-if="aggregatedActivities.length"
-      type="button"
-      class="agent-run-activity__details-toggle"
-      @click="expanded = !expanded"
-    >{{ expanded ? '收起进度' : '查看进度' }}</button>
-
-    <div v-if="expanded && visibleActivities.length" class="agent-run-activity__details">
-      <span v-for="activity in visibleActivities" :key="activity.id" :class="`is-${activity.status}`">
-        <LoadingOutlined v-if="activity.status === 'running'" spin />
-        <CheckOutlined v-else-if="activity.status === 'completed'" />
-        <i v-else aria-hidden="true"></i>
-        {{ activityLabel(activity) }}
-        <em v-if="activity.count > 1">{{ activity.count }} 次</em>
-      </span>
-    </div>
+    <button v-if="isRunning" type="button" class="agent-run-activity__abort" title="停止处理" aria-label="停止处理" @click="$emit('abort')"><span class="agent-run-activity__stop-icon" aria-hidden="true"></span></button>
   </section>
 </template>
 
 <style scoped lang="scss">
 .agent-run-activity {
+  box-sizing: border-box;
   display: flex;
   width: min(100%, 960px);
   align-items: center;
@@ -118,7 +101,7 @@ onBeforeUnmount(() => {
   margin: 4px 0 8px;
   padding: 10px 14px;
   border: 1px solid #d9e7fb;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #f8fbff;
   color: #627b99;
   font-size: 13px;
@@ -146,6 +129,13 @@ onBeforeUnmount(() => {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
+}
+
+.agent-run-activity__info {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agent-run-activity__pulse {
@@ -193,6 +183,14 @@ onBeforeUnmount(() => {
   &:hover { color: #3e556e; }
 }
 
+.agent-run-activity__stop-icon {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
 .agent-run-activity__details {
   display: flex;
   width: 100%;
@@ -203,7 +201,7 @@ onBeforeUnmount(() => {
   color: #6b8199;
   font-size: 12px;
 
-  span { display: inline-flex; align-items: center; gap: 5px; }
+  span { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; overflow-wrap: anywhere; }
   .is-running { color: #3977b7; }
   .is-completed { color: #5d7d6b; }
   .is-failed { color: #a1704a; }

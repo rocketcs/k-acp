@@ -24,14 +24,14 @@ case "${1:-}" in
     [[ $# -ge 2 ]] || { echo "用法: $0 --push [rsync选项] <本地> <远程>" >&2; exit 64; }
     local_path="${@: -2:1}"; remote_path="${@: -1}"
     flags=("${@:1:$#-2}")
-    exec rsync -az --stats "${flags[@]}" -e "ssh" "$local_path" "kacp-test:$remote_path"
+    exec rsync -az --stats ${flags[@]+"${flags[@]}"} -e "ssh" "$local_path" "kacp-test:$remote_path"
     ;;
   --pull)
     shift
     [[ $# -ge 2 ]] || { echo "用法: $0 --pull [rsync选项] <远程> <本地>" >&2; exit 64; }
     remote_path="${@: -2:1}"; local_path="${@: -1}"
     flags=("${@:1:$#-2}")
-    exec rsync -az --stats "${flags[@]}" -e "ssh" "kacp-test:$remote_path" "$local_path"
+    exec rsync -az --stats ${flags[@]+"${flags[@]}"} -e "ssh" "kacp-test:$remote_path" "$local_path"
     ;;
   "")
     echo "用法: $0 \"<远程命令>\" | --push [opts] <本地> <远程> | --pull [opts] <远程> <本地>" >&2; exit 64

@@ -602,9 +602,12 @@ const handleVEPRetry = async (vepCode: string) => {
   await sendMessage(retryText, [{ id: 'vep', role: 'user', content: retryText }] as ChatMessageVO[])
 }
 
-async function submitMessage(options: ChatSubmission): Promise<boolean> {
-  if (!agentId.value || isRunning.value) return false
+const isSubmitting = ref(false)
 
+async function submitMessage(options: ChatSubmission): Promise<boolean> {
+  if (!agentId.value || isRunning.value || isSubmitting.value) return false
+
+  isSubmitting.value = true
   let createdSessionId: string | null = null
   try {
     if (!currentSessionId.value) {
@@ -637,7 +640,10 @@ async function submitMessage(options: ChatSubmission): Promise<boolean> {
     )
     return true
   } catch {
+    message.error('消息发送失败，请稍后重试')
     return false
+  } finally {
+    isSubmitting.value = false
   }
 }
 
@@ -697,7 +703,7 @@ const handleSend = async () => {
   const text = inputText.value.trim()
   const filesToSend = uploadedFiles.value.filter((f) => !f.uploading)
   const hasFiles = filesToSend.length > 0
-  if ((!text && !hasFiles) || !agentId.value || isRunning.value || externalSubmissionInFlight) return
+  if ((!text && !hasFiles) || !agentId.value || isRunning.value || isSubmitting.value || externalSubmissionInFlight) return
 
   const fileIdsToSend = filesToSend.map((f) => f.id)
   if (props.submissionAdapter && submissionAdapterInFlight) return
@@ -915,6 +921,7 @@ defineExpose({ submitExternalSubmission, requestAttachmentPicker, abortRun })
       :input-value="inputText"
       :uploaded-files="uploadedFiles"
       :isRunning="isRunning"
+      :is-submitting="isSubmitting"
       :agent-id="agentId"
       :memory-active="memoryActive"
       :plan-active="planActive"

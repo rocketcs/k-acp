@@ -294,6 +294,8 @@ services:
         VITE_APP_BASE_API: ${VITE_APP_BASE_API}
         VITE_APP_CONTEXT_PATH: ${VITE_APP_CONTEXT_PATH}
         VITE_GRAPH_EXPLORER_URL: ${VITE_GRAPH_EXPLORER_URL:-http://kg.demo.pine.kingsware.cn:6800}
+        VITE_NANWANG_GRAPH_EXPLORER_URL: ${VITE_NANWANG_GRAPH_EXPLORER_URL:-/web/nanwang-graph/dm8-graph-demo-cn.html?data=sample-graph-data-cn.json&api=/api/nanwang-graph}
+        VITE_NANWANG_GRAPH_EXPLORER_API_BASE: ${VITE_NANWANG_GRAPH_EXPLORER_API_BASE:-/api/nanwang-graph}
     container_name: apboa-frontend
     restart: unless-stopped
     healthcheck:
@@ -308,9 +310,11 @@ services:
       RUNTIME_PORT: "3061"
       WEBSOCKET_HOST: apboa-websocket
       WEBSOCKET_PORT: "3064"
+      NANWANG_GRAPH_HOST: ${NANWANG_GRAPH_HOST:-apboa-nanwang-semantic}
+      NANWANG_GRAPH_PORT: ${NANWANG_GRAPH_PORT:-8767}
     entrypoint: >
       /bin/sh -c "
-        envsubst '$$RUNTIME_HOST $$RUNTIME_PORT $$WEBSOCKET_HOST $$WEBSOCKET_PORT' < /etc/nginx/conf.d/default.conf > /etc/nginx/conf.d/default.conf.tmp &&
+        envsubst '$$RUNTIME_HOST $$RUNTIME_PORT $$WEBSOCKET_HOST $$WEBSOCKET_PORT $$NANWANG_GRAPH_HOST $$NANWANG_GRAPH_PORT' < /etc/nginx/conf.d/default.conf > /etc/nginx/conf.d/default.conf.tmp &&
         mv /etc/nginx/conf.d/default.conf.tmp /etc/nginx/conf.d/default.conf &&
         nginx -g 'daemon off;'
       "

@@ -1,0 +1,120 @@
+# ============================================================
+# Kylin环境 (10.11.2.68) 专用配置
+# 端口映射符合Kylin环境要求
+# ============================================================
+
+services:
+  # ==================== MySQL ====================
+  apboa-mysql:
+    container_name: kylin-mysql
+    ports:
+      - "23306:3306"
+
+  # ==================== Redis ====================
+  apboa-redis:
+    container_name: kylin-redis
+    ports:
+      - "26379:6379"
+
+  # ==================== pgvector ====================
+  apboa-pgvector:
+    container_name: kylin-pgvector
+    ports:
+      - "25433:5432"
+
+  # ==================== 管理控制台 ====================
+  apboa-console:
+    container_name: kylin-console
+    ports:
+      - "23060:3060"
+
+  # ==================== AI运行时 ====================
+  apboa-runtime:
+    container_name: kylin-runtime
+    ports:
+      - "23061:3061"
+
+  # ==================== Shell代理 ====================
+  apboa-proxy:
+    container_name: kylin-proxy
+    ports:
+      - "23062:3062"
+
+  # ==================== WebSocket ====================
+  apboa-websocket:
+    container_name: kylin-websocket
+    ports:
+      - "23064:3064"
+
+  # ==================== 前端 ====================
+  apboa-frontend:
+    container_name: kylin-frontend
+    ports:
+      - "23080:80"    # 对外访问端口
+
+  # ==================== Wren MCP服务器 ====================
+  # 用于医疗目录的MCP服务
+  wren-mcp:
+    image: wren-mcp-server:latest
+    container_name: kylin-wren-mcp
+    restart: unless-stopped
+    environment:
+      # PostgreSQL配置
+      POSTGRES_HOST: data-query-postgres
+      POSTGRES_USER: ${WREN_DB_USER:-data_query}
+      POSTGRES_CONTAINER_DEFAULT_DB: ${WREN_DB_NAME:-data_query}
+      POSTGRES_SCHEMA: ${WREN_DB_SCHEMA:-curated}
+      WREN_DB_USER: ${WREN_DB_USER:-data_query}
+      WREN_DB_PASSWORD: ${WREN_DB_PASSWORD:-data_query_password}
+      WREN_DB_PROFILE: ${WREN_DB_PROFILE:-medical-catalog}
+      WREN_DB_SCHEMA: ${WREN_DB_SCHEMA:-curated}
+      WREN_CATALOG: ${WREN_CATALOG:-medical_catalog}
+      WREN_COMMAND: wren
+      # Neo4j配置
+      NEO4J_USERNAME: ${NEO4J_USERNAME:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-Neo4jKacp!2026}
+      NEO4J_LOCAL_URI: ${NEO4J_URI:-bolt://k-acp-neo4j:7687}
+      WREN_GRAPH_PASSWORD: ${NEO4J_PASSWORD:-Neo4jKacp!2026}
+      WREN_GRAPH_TEST_USERNAME: ${NEO4J_USERNAME:-neo4j}
+      WREN_GRAPH_TEST_PASSWORD: ${NEO4J_PASSWORD:-Neo4jKacp!2026}
+      WREN_GRAPH_TEST_URI: ${NEO4J_URI:-bolt://k-acp-neo4j:7687}
+      WREN_GRAPH_TIMEOUT_SECONDS: 5
+      # 容器名称
+      POSTGRES_CONTAINER_NAME: data-query-postgres
+      # 代理配置
+      no_proxy: localhost,127.0.0.1,::1,data-query-postgres,k-acp-neo4j
+      TZ: Asia/Shanghai
+    ports:
+      - "8770:8770"   # MCP主端口
+      - "8766:8765"   # MCP辅助端口
+    depends_on:
+      - data-query-postgres
+    networks:
+      - kylin-network
+
+  # ==================== 数据查询PostgreSQL ====================
+  # Wren MCP使用的PostgreSQL数据库
+  data-query-postgres:
+    image: postgres:17-alpine
+    container_name: kylin-data-query-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${WREN_DB_NAME:-data_query}
+      POSTGRES_USER: ${WREN_DB_USER:-data_query}
+      POSTGRES_PASSWORD: ${WREN_DB_PASSWORD:-data_query_password}
+      TZ: Asia/Shanghai
+    ports:
+      - "15433:5432"
+    volumes:
+      - ${DATA_PATH:-./data}/data_query_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WREN_DB_USER:-data_query}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kylin-network
+
+networks:
+  apboa_simple:
+    name: kylin-network

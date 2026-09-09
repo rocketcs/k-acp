@@ -20,6 +20,7 @@ const props = defineProps<{
   showRunWaiting?: boolean
   runStartedAt?: number | null
   showInput?: boolean
+  isDiyChat?: boolean
   memoryActive?: boolean
   planActive?: boolean
   enableMemory?: boolean
@@ -72,6 +73,7 @@ defineExpose({ requestAttachmentPicker })
     class="chat-welcome"
     :class="{
       'has-diy-form': diyFormActive,
+      'is-diy-chat': isDiyChat,
       'is-diy-welcome': Boolean(diyConfig),
     }"
   >

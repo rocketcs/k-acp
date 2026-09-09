@@ -7,11 +7,12 @@ import com.hxh.apboa.agent.service.CodeExecutionConfigService;
 import com.hxh.apboa.common.entity.*;
 import com.hxh.apboa.common.enums.ToolType;
 import com.hxh.apboa.engine.agent.A2aAgentHelper;
-import com.hxh.apboa.engine.agent.ReActAgentHelper;
+import com.hxh.apboa.engine.agent.HarnessAgentHelper;
 import com.hxh.apboa.engine.agui.AgentContext;
 import com.hxh.apboa.engine.hook.builtins.IConfirmationHook;
 import com.hxh.apboa.engine.mcp.McpClientFactory;
 import com.hxh.apboa.engine.tool.dynamices.DynamicAgentTool;
+import com.hxh.apboa.engine.workspace.tool.ConfirmableToolWrapper;
 import com.hxh.apboa.engine.workspace.tool.SearchReplaceFileTool;
 import com.hxh.apboa.tool.service.AgentToolService;
 import com.hxh.apboa.tool.service.ToolService;
@@ -40,7 +41,7 @@ public class ToolkitFactory {
     private final ToolService toolService;
     private final AgentToolService agentToolService;
     private final AgentSubAgentService agentSubAgentService;
-    private final ReActAgentHelper reActAgentHelper;
+    private final HarnessAgentHelper harnessAgentHelper;
     private final A2aAgentHelper a2aAgentHelper;
     private final McpClientFactory mcpClientFactory;
     private final AgentDefinitionService agentDefinitionService;
@@ -56,7 +57,7 @@ public class ToolkitFactory {
                           AgentToolService agentToolService,
                           AgentSubAgentService agentSubAgentService,
                           @Lazy
-                          ReActAgentHelper reActAgentHelper,
+                          HarnessAgentHelper harnessAgentHelper,
                           @Lazy
                           A2aAgentHelper a2aAgentHelper,
                           McpClientFactory mcpClientFactory,
@@ -71,7 +72,7 @@ public class ToolkitFactory {
         this.toolService = toolService;
         this.agentToolService = agentToolService;
         this.agentSubAgentService = agentSubAgentService;
-        this.reActAgentHelper = reActAgentHelper;
+        this.harnessAgentHelper = harnessAgentHelper;
         this.a2aAgentHelper = a2aAgentHelper;
         this.mcpClientFactory = mcpClientFactory;
         this.agentCodeExecutionService = agentCodeExecutionService;
@@ -234,7 +235,7 @@ public class ToolkitFactory {
                 switch (definition.getAgentType()) {
                     case CUSTOM:
                         toolkit.registration()
-                                .subAgent(() -> reActAgentHelper.getReActAgent(definition),
+                                .subAgent(() -> harnessAgentHelper.getHarnessAgent(definition),
                                         createSubAgentConfig(definition))
                                 .apply();
                         break;

@@ -1,21 +1,21 @@
 import type { RunActivity } from '@/types'
 
-/** 思考卡仅属于 DIY Chat，且只用于回答正文出现之前的等待阶段。 */
+/** 所有聊天在正文出现之前都显示运行进度。 */
 export function shouldShowRunActivity(
-  isDiyChat: boolean,
+  _isDiyChat: boolean,
   isRunning: boolean,
   hasVisibleAnswer: boolean,
 ): boolean {
-  return isDiyChat && isRunning && !hasVisibleAnswer
+  return isRunning && !hasVisibleAnswer
 }
 
 /** 阶段性文本已出现但任务未结束时，用紧凑保活状态替代大尺寸思考卡。 */
 export function shouldShowRunWaiting(
-  isDiyChat: boolean,
+  _isDiyChat: boolean,
   isRunning: boolean,
   hasVisibleAnswer: boolean,
 ): boolean {
-  return isDiyChat && isRunning && hasVisibleAnswer
+  return isRunning && hasVisibleAnswer
 }
 
 /** DIY Chat 运行时用状态卡代替输入框；普通 Chat 保持原交互。 */
@@ -29,8 +29,8 @@ export function shouldShowChoiceCustomInput(isDiyChat: boolean, allowCustom?: bo
 }
 
 /** 普通 Chat 保留原工具条；DIY Chat 只在需要用户确认时展示它。 */
-export function shouldShowLegacyToolCall(isDiyChat: boolean, needConfirm?: boolean): boolean {
-  return !isDiyChat || needConfirm === true
+export function shouldShowLegacyToolCall(_isDiyChat: boolean, needConfirm?: boolean): boolean {
+  return needConfirm === true
 }
 
 export interface AggregatedRunActivity {
@@ -43,9 +43,23 @@ export interface AggregatedRunActivity {
 
 export function getActivityLabel(name: string): string {
   return {
+    query_graph: '查询知识图谱',
+    get_graph_summary: '读取图谱概况',
+    load_skill_through_path: '读取专业知识指引',
     wren_query: '查询业务数据',
     wren_models: '准备分析能力',
   }[name] ?? name
+}
+
+export function getActivityDetail(activity?: RunActivity): string {
+  if (!activity?.args || activity.name !== 'query_graph') return ''
+  try {
+    const args = JSON.parse(activity.args)
+    if (typeof args.query === 'string' && args.query.trim()) return `关键词：${args.query.trim()}`
+    if (args.mode === 'neighbors') return '检索相关实体与关系'
+    if (args.mode === 'node') return '读取实体详情'
+  } catch { /* 参数流尚未接收完整。 */ }
+  return ''
 }
 
 /**

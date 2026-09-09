@@ -74,6 +74,7 @@ export const RouteNames = {
   LARGE_SCREEN_IMAGE_CHAT: 'LargeScreenImageChat',
   BIAOSHU_INTERPRETER_CHAT: 'BiaoshuInterpreterChat',
   GRAPHIFY_DATA_QUERY_CHAT: 'GraphifyDataQueryChat',
+  NANWANG_DATA_QUERY_CHAT: 'NanwangDataQueryChat',
   CHAT_HISTORY: 'ChatHistory',
   COMMUNICATION: 'Communication',
 
@@ -167,6 +168,7 @@ export const RoutePaths = {
   LARGE_SCREEN_IMAGE_CHAT: '/chat/diy/large-screen-image',
   BIAOSHU_INTERPRETER_CHAT: '/chat/diy/biaoshu-interpreter',
   GRAPHIFY_DATA_QUERY_CHAT: '/chat/diy/graphify-data-query',
+  NANWANG_DATA_QUERY_CHAT: '/chat/diy/nanwang-data-query',
   CHAT_HISTORY: '/chat/history',
   COMMUNICATION: '/communication',
 

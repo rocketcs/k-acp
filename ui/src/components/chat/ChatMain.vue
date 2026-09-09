@@ -37,6 +37,7 @@ const props = defineProps<{
   inputValue: string
   uploadedFiles?: UploadedFileItem[]
   isRunning: boolean
+  isSubmitting?: boolean
   agentId: string
   memoryActive?: boolean
   planActive?: boolean
@@ -103,10 +104,10 @@ const workspaceFilePreviewNode = ref<FlatFileItem | null>(null)
 const welcomeRef = ref<InstanceType<typeof Welcome> | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const showRunActivity = computed(() =>
-  props.forceRunActivity ? props.isRunning : shouldShowRunActivity(props.isDiyChat, props.isRunning, props.hasVisibleAnswer),
+  props.forceRunActivity || !props.isDiyChat ? props.isRunning : shouldShowRunActivity(props.isDiyChat, props.isRunning, props.hasVisibleAnswer),
 )
 const showRunWaiting = computed(() =>
-  !props.forceRunActivity && shouldShowRunWaiting(props.isDiyChat, props.isRunning, props.hasVisibleAnswer),
+  props.isDiyChat && !props.forceRunActivity && shouldShowRunWaiting(props.isDiyChat, props.isRunning, props.hasVisibleAnswer),
 )
 const showInput = computed(() => shouldShowChatInput(props.isDiyChat, props.isRunning))
 
@@ -304,6 +305,9 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
 
     </header>
 
+    <div v-if="isSubmitting && !isRunning" role="status" class="chat-submitting">
+      <LoadingOutlined spin /> 正在发送消息
+    </div>
     <div v-if="messageSize <= 1" class="chat-welcome-container">
       <Welcome
         ref="welcomeRef"
@@ -319,6 +323,7 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
         :show-run-waiting="showRunWaiting"
         :run-started-at="runStartedAt"
         :show-input="showInput"
+        :is-diy-chat="isDiyChat"
         :memory-active="memoryActive"
         :plan-active="planActive"
         :enable-memory="enableMemory"
@@ -439,6 +444,12 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
 
 <style scoped lang="scss">
 @use '@/styles/chat/index.scss' as *;
+
+.chat-submitting {
+  padding: 10px 16px;
+  color: #59718d;
+  font-size: 13px;
+}
 
 .chat-welcome-container {
   display: flex;

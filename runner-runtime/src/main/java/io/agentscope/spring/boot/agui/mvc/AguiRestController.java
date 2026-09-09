@@ -19,7 +19,9 @@ import com.hxh.apboa.agent.service.ChatSessionService;
 import com.hxh.apboa.common.config.auth.ChatKeyAccess;
 import com.hxh.apboa.common.config.auth.SkAccess;
 import com.hxh.apboa.common.entity.ChatSession;
+import com.hxh.apboa.runtime.agui.ApboaAguiHitlService;
 import io.agentscope.core.agui.model.RunAgentInput;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.http.MediaType;
@@ -157,9 +159,16 @@ public class AguiRestController {
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter resume(
-            @PathVariable("threadId") String threadId, @RequestBody ResumeRequest body) {
+            @PathVariable("threadId") String threadId,
+            @RequestBody HitlResumeRequest body) {
         return aguiMvcController.handleResume(threadId, body.decisions(), body.memoryActive());
     }
+
+    /**
+     * HITL resume 请求体（前端契约保持 v1：逐工具决策数组 + 记忆开关）。
+     */
+    public record HitlResumeRequest(
+            List<ApboaAguiHitlService.ResumeDecision> decisions, boolean memoryActive) {}
 
     /**
      * HITL 待确认列表端点：从持久 Session 的暂停态重建「待确认工具」，供前端刷新/重进会话时

@@ -209,9 +209,6 @@ const openPreview = (index: number) => {
     </template>
     <template v-else-if="isThinking">
       <div class="chat-message-bubble">
-        <div v-if="!agentHasResult && !content" class="chat-loading-dots">
-          <span></span><span></span><span></span>
-        </div>
         <!-- 推理过程面板（独立于正文显示） -->
         <div v-if="isThinking" class="chat-reasoning-panel">
           <div class="chat-reasoning-header" @click="reasoningExpanded = !reasoningExpanded">
@@ -235,9 +232,6 @@ const openPreview = (index: number) => {
     </template>
     <template v-else-if="isAssistant">
       <div class="chat-message-bubble">
-        <div v-if="!agentHasResult && !content" class="chat-loading-dots">
-          <span></span><span></span><span></span>
-        </div>
         <!-- 正文内容 -->
         <div v-if="isAssistant" class="chat-md-content">
           <component

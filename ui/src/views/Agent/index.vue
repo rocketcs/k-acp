@@ -44,7 +44,11 @@ const configPanelAgentData = ref<AgentDefinitionVO | undefined>(undefined)
 const infiniteLoadingKey = ref(0)
 /** 是否首次加载 */
 const isFirstLoad = ref(true)
-const GRAPHIFY_DATA_QUERY_AGENT_CODE = 'default-graphify-data-query'
+/** 拥有专属对话页的智能体：列表入口直接路由到对应 feature 页面 */
+const FEATURE_CHAT_ROUTES: Record<string, (typeof RouteNames)[keyof typeof RouteNames]> = {
+  'default-graphify-data-query': RouteNames.GRAPHIFY_DATA_QUERY_CHAT,
+  'default-nanwang-data-query': RouteNames.NANWANG_DATA_QUERY_CHAT,
+}
 
 /**
  * 智能体类型选项
@@ -258,10 +262,11 @@ async function handleGoVisit(id: string) {
 
   try {
     const detail = await agentApi.detail(id)
-    if (detail.data.data?.agentCode === GRAPHIFY_DATA_QUERY_AGENT_CODE) {
-      const url = router.resolve({ name: RouteNames.GRAPHIFY_DATA_QUERY_CHAT }).href
+    const featureRoute = FEATURE_CHAT_ROUTES[detail.data.data?.agentCode ?? '']
+    if (featureRoute) {
+      const url = router.resolve({ name: featureRoute }).href
       if (targetWindow) targetWindow.location.href = url
-      else await router.push({ name: RouteNames.GRAPHIFY_DATA_QUERY_CHAT })
+      else await router.push({ name: featureRoute })
       return
     }
     const response = await agentDiyApi.getPublished(id)

@@ -4,10 +4,10 @@ import com.hxh.apboa.common.enums.ModelProviderType;
 import com.hxh.apboa.common.wrapper.ModelConfigWrapper;
 import com.hxh.apboa.engine.model.IChatModel;
 import com.hxh.apboa.engine.model.GenerateOptionsHelper;
-import io.agentscope.core.formatter.anthropic.AnthropicChatFormatter;
-import io.agentscope.core.formatter.anthropic.AnthropicMultiAgentFormatter;
-import io.agentscope.core.model.AnthropicChatModel;
 import io.agentscope.core.model.Model;
+import io.agentscope.extensions.model.anthropic.AnthropicChatModel;
+import io.agentscope.extensions.model.anthropic.formatter.AnthropicChatFormatter;
+import io.agentscope.extensions.model.anthropic.formatter.AnthropicMultiAgentFormatter;
 import org.springframework.stereotype.Component;
 
 /**

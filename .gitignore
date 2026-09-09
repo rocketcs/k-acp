@@ -72,6 +72,7 @@ application-dev.yml
 tmp_*
 /data/
 /outputs/
+/output/mock-data/
 /output/imagegen/
 /output/finance-reimbursement-graph/
 .frontend-update-hook

@@ -21,8 +21,11 @@ const emit = defineEmits<{
 
 const chartRef = ref<InstanceType<typeof VChart> | null>(null)
 const fixedPositions = ref(new Map<string, { x: number; y: number }>())
-const pressedNode = ref<{ id: string; x: number; y: number } | null>(null)
+const pressedNode = ref<{ id: string; dataIndex: number; x: number; y: number } | null>(null)
 const draggedNodeId = ref<string | null>(null)
+// 非响应式快照：拖拽期间冻结其它节点的坐标，mouseup 时才合并进 fixedPositions，
+// 避免拖拽中途触发响应式 setOption 打断手势。
+let frozenNodePositions: Map<string, { x: number; y: number }> | null = null
 const graphData = computed(() => {
   const base = toEchartsGraphData(props.graphView)
   return {
@@ -96,10 +99,34 @@ type GraphChartInternals = {
       getModel?: () => {
         getSeriesByIndex?: (index: number) => {
           getData?: () => { getItemLayout?: (dataIndex: number) => unknown }
+          forceLayout?: { setFixed?: (index: number) => void }
         }
       }
     }
   }
+}
+
+function forceInstanceOf(): { setFixed?: (index: number) => void } | null {
+  const internals = chartRef.value as unknown as GraphChartInternals | null
+  return internals?.chart?.value?.getModel?.()?.getSeriesByIndex?.(0)?.forceLayout ?? null
+}
+
+/**
+ * 力导布局下拖动一个节点时，仿真的斥力会把其它节点也推开。在 mousedown
+ * （拖拽手势生效前）把除被拖节点外的所有节点在仿真实例里标记 fixed，
+ * 并以非响应式变量记录它们的当前坐标；这样拖拽过程只有被拖节点移动。
+ */
+function freezeOtherNodes(excludedIndex: number) {
+  const force = forceInstanceOf()
+  if (!force?.setFixed) return
+  const snapshot = new Map<string, { x: number; y: number }>()
+  graphData.value.data.forEach((node, index) => {
+    if (index === excludedIndex) return
+    force.setFixed?.(index)
+    const position = readNodePosition(index, null)
+    if (position) snapshot.set(node.id, position)
+  })
+  frozenNodePositions = snapshot.size ? snapshot : null
 }
 
 function readNodePosition(dataIndex: number | undefined, data: { x?: number; y?: number } | null) {
@@ -128,8 +155,10 @@ function onChartMousedown(params: ECElementEvent) {
   const data = params.data as { id?: string } | null
   const point = pointerPosition(params)
   if (!data?.id || !point) return
-  pressedNode.value = { id: String(data.id), ...point }
+  const dataIndex = params.dataIndex
+  pressedNode.value = { id: String(data.id), dataIndex, ...point }
   draggedNodeId.value = null
+  if (typeof dataIndex === 'number') freezeOtherNodes(dataIndex)
 }
 
 function onChartMousemove(params: ECElementEvent) {
@@ -148,6 +177,8 @@ function onChartMousemove(params: ECElementEvent) {
  */
 function onChartMouseup(params: ECElementEvent) {
   const draggedId = draggedNodeId.value
+  const frozen = frozenNodePositions
+  frozenNodePositions = null
   pressedNode.value = null
   draggedNodeId.value = null
   if (params.dataType !== 'node') return
@@ -155,7 +186,11 @@ function onChartMouseup(params: ECElementEvent) {
   if (!data?.id || draggedId !== String(data.id)) return
   const position = readNodePosition(params.dataIndex, data)
   if (!position) return
-  fixedPositions.value = new Map(fixedPositions.value).set(String(data.id), position)
+  // 拖拽结束后把所有节点（含本次冻结的其它节点）固定在当前坐标，
+  // 这样响应式 setOption 重新注册力导布局时也不会再散开。
+  const merged = new Map<string, { x: number; y: number }>(frozen ?? [])
+  merged.set(String(data.id), position)
+  fixedPositions.value = merged
 }
 
 function onChartClick(params: ECElementEvent) {
@@ -173,6 +208,7 @@ watch(() => props.graphView.id, () => {
   fixedPositions.value = new Map()
   pressedNode.value = null
   draggedNodeId.value = null
+  frozenNodePositions = null
 })
 
 defineExpose({ fit })

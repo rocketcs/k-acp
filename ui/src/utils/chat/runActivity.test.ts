@@ -39,7 +39,8 @@ test('运行结束后不显示执行卡', () => {
 test('阶段性文本后维持紧凑等待状态', () => {
   assert.equal(shouldShowRunWaiting(true, true, true), true)
   assert.equal(shouldShowRunWaiting(true, true, false), false)
-  assert.equal(shouldShowRunWaiting(false, true, true), false)
+  assert.equal(shouldShowRunWaiting(false, true, true), true)
+  assert.equal(shouldShowRunWaiting(false, false, true), false)
 })
 
 test('DIY 运行时隐藏输入框，普通 Chat 保持输入框', () => {
@@ -54,9 +55,12 @@ test('DIY 追问卡隐藏自定义输入，普通 Chat 保留协议行为', () =
   assert.equal(shouldShowChoiceCustomInput(false, false), false)
 })
 
-test('思考卡与工具条只改变 DIY Chat，普通 Chat 保持原样', () => {
-  assert.equal(shouldShowRunActivity(false, true, false), false)
-  assert.equal(shouldShowLegacyToolCall(false, false), true)
+test('普通 Chat 等待正文时显示进度，同时保留工具条和确认操作', () => {
+  assert.equal(shouldShowRunActivity(false, true, false), true)
+  assert.equal(shouldShowRunActivity(false, true, true), false)
+  assert.equal(shouldShowRunActivity(false, false, false), false)
+  assert.equal(shouldShowLegacyToolCall(false, false), false)
+  assert.equal(shouldShowLegacyToolCall(false, true), true)
   assert.equal(shouldShowLegacyToolCall(true, false), false)
   assert.equal(shouldShowLegacyToolCall(true, true), true)
 })

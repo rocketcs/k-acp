@@ -43,6 +43,15 @@ const commonRoutes: AppRouteRecordRaw[] = [
     },
   },
   {
+    path: RoutePaths.NANWANG_DATA_QUERY_CHAT,
+    name: RouteNames.NANWANG_DATA_QUERY_CHAT,
+    component: () => import('@/features/nanwang-data-query/GraphifyDataQueryChat.vue'),
+    meta: {
+      title: '南网问数助手',
+      hidden: true,
+    },
+  },
+  {
     path: `${RoutePaths.CHAT_DIY}/:agentId`,
     name: RouteNames.CHAT_DIY,
     component: () => import('@/views/Chat/index.vue'),

@@ -1,6 +1,8 @@
 spring:
   profiles:
     active: dev
+  autoconfigure:
+    exclude: io.agentscope.spring.boot.agui.mvc.AgentscopeAguiMvcAutoConfiguration
   application:
     name: apboa-runtime
   servlet:

@@ -5,11 +5,11 @@ import com.hxh.apboa.common.wrapper.ModelConfigWrapper;
 import com.hxh.apboa.engine.model.IChatModel;
 import com.hxh.apboa.engine.model.GenerateOptionsHelper;
 import com.hxh.apboa.engine.model.HttpTransportHelper;
-import io.agentscope.core.formatter.ollama.OllamaChatFormatter;
-import io.agentscope.core.formatter.ollama.OllamaMultiAgentFormatter;
 import io.agentscope.core.model.Model;
-import io.agentscope.core.model.OllamaChatModel;
-import io.agentscope.core.model.ollama.OllamaOptions;
+import io.agentscope.extensions.model.ollama.OllamaChatModel;
+import io.agentscope.extensions.model.ollama.formatter.OllamaChatFormatter;
+import io.agentscope.extensions.model.ollama.formatter.OllamaMultiAgentFormatter;
+import io.agentscope.extensions.model.ollama.options.OllamaOptions;
 import org.springframework.stereotype.Component;
 
 /**
