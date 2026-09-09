@@ -3,6 +3,7 @@ import {computed, ref, watch, onMounted} from 'vue'
 import {
   MenuOutlined,
   DatabaseOutlined,
+  ApartmentOutlined,
   FolderOutlined,
   FolderOpenOutlined,
   LoadingOutlined
@@ -17,6 +18,7 @@ import type { ChatAttachmentPolicy } from '@/composables/chat/useChatAttachments
 import type {FlatFileItem} from "@/composables/chat/useWorkspaceFiles.ts";
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
 import WorkspaceFilePreview from "@/components/workspace/WorkspaceFilePreview.vue";
+import SemanticaExploreModal from './SemanticaExploreModal.vue'
 import { shouldShowChatInput, shouldShowRunActivity, shouldShowRunWaiting } from '@/utils/chat/runActivity'
 
 const props = defineProps<{
@@ -63,6 +65,8 @@ const props = defineProps<{
   currentPlan?: PlanInfo | null
   diyConfig?: DiyPageConfig | null
   showGraphExplorer?: boolean
+  /** 智能医生专属入口：打开本机 Semantica 知识图谱。 */
+  showSemanticaExplore?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -101,6 +105,7 @@ const savedScrollTop = ref(0)
 
 const workspaceFilePreviewVisible = ref(false)
 const workspaceFilePreviewNode = ref<FlatFileItem | null>(null)
+const semanticaExploreOpen = ref(false)
 const welcomeRef = ref<InstanceType<typeof Welcome> | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const showRunActivity = computed(() =>
@@ -289,6 +294,19 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
           <span>数据管理</span>
         </button>
       </ATooltip>
+      <!-- 智能医生知识图谱入口：不离开当前对话，打开完整知识图谱。 -->
+      <ATooltip v-if="showSemanticaExplore" placement="left" title="打开知识图谱">
+        <button
+          type="button"
+          class="chat-semantic-explore-btn"
+          title="打开知识图谱"
+          aria-label="打开知识图谱"
+          @click="semanticaExploreOpen = true"
+        >
+          <ApartmentOutlined />
+          <span>知识图谱</span>
+        </button>
+      </ATooltip>
       <!-- 工作空间入口按钮（与左侧菜单按钮对称） -->
       <ATooltip placement="left" title="工作空间">
         <button
@@ -304,6 +322,11 @@ defineExpose({ scrollToBottom, requestAttachmentPicker })
       </ATooltip>
 
     </header>
+
+    <SemanticaExploreModal
+      v-if="showSemanticaExplore"
+      v-model:open="semanticaExploreOpen"
+    />
 
     <div v-if="isSubmitting && !isRunning" role="status" class="chat-submitting">
       <LoadingOutlined spin /> 正在发送消息

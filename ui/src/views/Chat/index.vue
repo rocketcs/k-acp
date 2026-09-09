@@ -125,6 +125,11 @@ const handleLogout = () => {
 }
 
 const agentId = computed(() => (props.chatAgentId || route.params.agentId) as string || '')
+
+// 智能医生固定使用这个 Agent 页面；入口只在该对话中展示，避免污染其他智能体。
+const SEMANTICA_DOCTOR_AGENT_ID = '2096644338200215554'
+const showSemanticaExplore = computed(() => agentId.value === SEMANTICA_DOCTOR_AGENT_ID)
+
 const isDiyRoute = computed(() => route.name === RouteNames.CHAT_DIY)
 const shouldLoadDiyConfig = computed(() => isDiyRoute.value || props.forceDiyConfig === true)
 const diyConfig = ref<DiyPageConfig | null>(null)
@@ -944,6 +949,7 @@ defineExpose({ submitExternalSubmission, requestAttachmentPicker, abortRun })
       :current-plan="currentPlan"
       :diy-config="displayDiyConfig"
       :show-graph-explorer="showGraphExplorer"
+      :show-semantica-explore="showSemanticaExplore"
       @update:input-value="inputText = $event"
       @update:uploaded-files="uploadedFiles = $event"
       @memory="handleMemoryChange"

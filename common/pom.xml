@@ -18,6 +18,12 @@
     </properties>
 
     <dependencies>
+        <!-- MCP tool-call result JSON mapper required by AgentScope MCP clients -->
+        <dependency>
+            <groupId>io.modelcontextprotocol.sdk</groupId>
+            <artifactId>mcp-json-jackson2</artifactId>
+            <version>0.17.0</version>
+        </dependency>
         <!-- 依赖common-base -->
         <dependency>
             <groupId>com.hxh.apboa.next</groupId>
