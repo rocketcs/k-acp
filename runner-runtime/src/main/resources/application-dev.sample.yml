@@ -29,6 +29,7 @@ spring:
     url: jdbc:mysql://127.0.0.1:3306/apboa_next?useSSL=false&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&transformedBitIsBoolean=true&serverTimezone=GMT%2B8&nullCatalogMeansCurrent=true&allowPublicKeyRetrieval=true
     username: root
     password: YOUR_PASSWORD
+
     druid:
       initial-size: 5
       min-idle: 5
@@ -40,6 +41,11 @@ spring:
       test-while-idle: true
       time-between-eviction-runs-millis: 60000
       min-evictable-idle-time-millis: 300000
+
+# 文档导出配置（PDF 中文字体）
+document-export:
+  # PDFBox 需要包含 glyf 表的 TrueType 字体。
+  pdf-font-path: /usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf
 
 jwt:
   secret: ${JWT_SECRET:ZJr8c2xF0y5b7yM+1H9v9cGZq6nZ5e0k5r3Cw7H8vJQ=}

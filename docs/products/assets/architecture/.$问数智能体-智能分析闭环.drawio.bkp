@@ -1,0 +1,128 @@
+<mxfile host="Electron" agent="Codex">
+  <diagram id="question-agent-analysis-loop" name="问数智能体智能分析闭环">
+    <mxGraphModel dx="2054" dy="1210" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="lane-interaction" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3F8FE;strokeColor=#C7DDF3;strokeWidth=1;fontColor=#2A6093;fontSize=18;fontStyle=1;align=left;verticalAlign=top;spacingTop=14;spacingLeft=18;" value="交互入口" vertex="1">
+          <mxGeometry height="610" width="245" x="70" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-engine" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBFCFE;strokeColor=#D7E0EA;strokeWidth=1;fontColor=#455A70;fontSize=18;fontStyle=1;align=left;verticalAlign=top;spacingTop=14;spacingLeft=18;" value="问数智能体｜智能分析引擎" vertex="1">
+          <mxGeometry height="610" width="820" x="345" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-foundation" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FBF8;strokeColor=#CEE3D1;strokeWidth=1;fontColor=#39714A;fontSize=18;fontStyle=1;align=left;verticalAlign=top;spacingTop=14;spacingLeft=18;" value="数据与知识底座" vertex="1">
+          <mxGeometry height="610" width="335" x="1195" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="user-question" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF4FF;strokeColor=#5B9BD5;strokeWidth=2;fontColor=#1C4E80;fontSize=19;align=center;verticalAlign=middle;spacing=8;" value="&lt;b&gt;用户提问&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px;color:#55708A&quot;&gt;“本月销售额为什么下降？”&lt;/font&gt;" vertex="1">
+          <mxGeometry height="105" width="195" x="95" y="255" as="geometry" />
+        </mxCell>
+        <mxCell id="user-followup" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F7FF;strokeColor=#9CC4E7;strokeWidth=1;fontColor=#2B638F;fontSize=18;align=center;verticalAlign=middle;spacing=8;" value="&lt;b&gt;追问 / 反馈&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px;color:#55708A&quot;&gt;“按区域看一下”&lt;/font&gt;" vertex="1">
+          <mxGeometry height="95" width="195" x="95" y="525" as="geometry" />
+        </mxCell>
+        <mxCell id="semantic" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9F3FF;strokeColor=#5B9BD5;strokeWidth=2;fontColor=#1C4E80;fontSize=18;align=center;verticalAlign=middle;spacing=8;" value="&lt;b&gt;① 语义理解&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px&quot;&gt;识别意图、指标、维度&lt;br&gt;时间范围与筛选条件&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="190" x="410" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="planning" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0ECFF;strokeColor=#8F7CC8;strokeWidth=2;fontColor=#51438A;fontSize=18;align=center;verticalAlign=middle;spacing=8;" value="&lt;b&gt;② 分析规划&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px&quot;&gt;拆解问题与分析路径&lt;br&gt;选择工具和计算方式&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="190" x="665" y="235" as="geometry" />
+        </mxCell>
+        <mxCell id="mapping" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0ECFF;strokeColor=#8F7CC8;strokeWidth=2;fontColor=#51438A;fontSize=18;align=center;verticalAlign=middle;spacing=8;" value="&lt;b&gt;③ 指标映射&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px&quot;&gt;匹配指标口径与业务知识&lt;br&gt;生成可执行查询语义&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="190" x="920" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="query" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF9F2;strokeColor=#70B27D;strokeWidth=2;fontColor=#2E6D3C;fontSize=18;align=center;verticalAlign=middle;spacing=8;" value="&lt;b&gt;④ 数据查询&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px&quot;&gt;权限校验、SQL 生成&lt;br&gt;多源数据获取与聚合&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="190" x="920" y="475" as="geometry" />
+        </mxCell>
+        <mxCell id="analysis" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF4E5;strokeColor=#E2A54A;strokeWidth=2;fontColor=#9A621B;fontSize=18;align=center;verticalAlign=middle;spacing=8;" value="&lt;b&gt;⑤ 智能分析&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px&quot;&gt;趋势、对比、异常检测&lt;br&gt;归因分析与影响评估&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="190" x="665" y="585" as="geometry" />
+        </mxCell>
+        <mxCell id="answer" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0F1;strokeColor=#D7838B;strokeWidth=2;fontColor=#984B56;fontSize=18;align=center;verticalAlign=middle;spacing=8;" value="&lt;b&gt;⑥ 结果呈现&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px&quot;&gt;指标卡、图表、结论摘要&lt;br&gt;证据链与可解释说明&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="190" x="410" y="475" as="geometry" />
+        </mxCell>
+        <mxCell id="trust" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#B8C5D2;dashed=1;dashPattern=6 4;fontColor=#62768B;fontSize=15;align=center;verticalAlign=middle;" value="可信校验层：指标口径校验｜权限校验｜数据质量校验｜结果一致性校验" vertex="1">
+          <mxGeometry height="42" width="700" x="420" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="data-sources" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF7EC;strokeColor=#70B27D;strokeWidth=1;fontColor=#2E6D3C;fontSize=17;align=center;verticalAlign=middle;spacing=8;" value="&lt;b&gt;数据源&lt;/b&gt;&lt;br&gt;业务数据库｜数据仓库&lt;br&gt;API / 文件 / 实时流" vertex="1">
+          <mxGeometry height="100" width="265" x="1230" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="knowledge" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF7EC;strokeColor=#5EAB6C;strokeWidth=2;fontColor=#2E6D3C;fontSize=19;align=center;verticalAlign=middle;spacing=8;" value="&lt;b&gt;知识图谱&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px&quot;&gt;实体关系｜业务术语&lt;br&gt;指标依赖｜维度层级&lt;/font&gt;" vertex="1">
+          <mxGeometry height="105" width="265" x="1230" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="metric-system" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F8F1;strokeColor=#9ACAA0;strokeWidth=1;fontColor=#39714A;fontSize=17;align=center;verticalAlign=middle;spacing=8;" value="&lt;b&gt;指标体系与分析知识&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:14px&quot;&gt;指标口径｜分析模板&lt;br&gt;业务规则｜经验沉淀&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="265" x="1230" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="governance" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4FAF5;strokeColor=#B1D3B5;strokeWidth=1;fontColor=#4A7554;fontSize=17;align=center;verticalAlign=middle;spacing=8;" value="&lt;b&gt;治理与安全&lt;/b&gt;&lt;br&gt;权限策略｜脱敏规则&lt;br&gt;审计记录｜质量监控" vertex="1">
+          <mxGeometry height="80" width="265" x="1230" y="665" as="geometry" />
+        </mxCell>
+        <mxCell id="output-note" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9EF;strokeColor=#E7C88B;strokeWidth=1;fontColor=#8B651F;fontSize=15;align=center;verticalAlign=middle;" value="洞察输出：发生了什么｜为什么发生｜接下来做什么" vertex="1">
+          <mxGeometry height="48" width="215" x="85" y="405" as="geometry" />
+        </mxCell>
+        <mxCell id="e-question-semantic" edge="1" parent="1" source="user-question" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5B9BD5;strokeWidth=2;endArrow=block;endFill=1;" target="semantic" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-semantic-planning" edge="1" parent="1" source="semantic" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6E83B5;strokeWidth=2;endArrow=block;endFill=1;" target="planning" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-planning-mapping" edge="1" parent="1" source="planning" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#8F7CC8;strokeWidth=2;endArrow=block;endFill=1;" target="mapping" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-mapping-query" edge="1" parent="1" source="mapping" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#70B27D;strokeWidth=2;endArrow=block;endFill=1;" target="query" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-query-analysis" edge="1" parent="1" source="query" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#D3943C;strokeWidth=2;endArrow=block;endFill=1;" target="analysis" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-analysis-answer" edge="1" parent="1" source="analysis" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#D7838B;strokeWidth=2;endArrow=block;endFill=1;" target="answer" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-answer-followup" edge="1" parent="1" source="answer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#B56D76;strokeWidth=2;endArrow=block;endFill=1;" target="user-followup" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-followup-semantic" edge="1" parent="1" source="user-followup" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#5B9BD5;strokeWidth=2;endArrow=block;endFill=1;fontColor=#5B7088;fontSize=14;" target="semantic" value="持续追问">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="365" y="572" />
+              <mxPoint x="365" y="310" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-data-query" edge="1" parent="1" source="data-sources" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#70B27D;strokeWidth=1.5;endArrow=block;endFill=1;fontColor=#4A7554;fontSize=14;" target="query" value="取数">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1175" y="300" />
+              <mxPoint x="1175" y="525" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-knowledge-mapping" edge="1" parent="1" source="knowledge" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#5EAB6C;strokeWidth=1.5;endArrow=block;endFill=1;fontColor=#4A7554;fontSize=14;" target="mapping" value="实体与关系匹配">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1175" y="442" />
+              <mxPoint x="1175" y="310" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-metric-mapping" edge="1" parent="1" source="metric-system" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#9ACAA0;strokeWidth=1.5;endArrow=block;endFill=1;fontColor=#4A7554;fontSize=14;" target="mapping" value="指标口径">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1175" y="580" />
+              <mxPoint x="1175" y="310" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-governance-query" edge="1" parent="1" source="governance" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#B1D3B5;strokeWidth=1.5;endArrow=block;endFill=1;fontColor=#4A7554;fontSize=14;" target="query" value="校验">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1175" y="705" />
+              <mxPoint x="1175" y="535" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-analysis-trust" edge="1" parent="1" source="analysis" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#AAB7C4;strokeWidth=1.5;endArrow=block;endFill=1;" target="trust" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-trust-answer" edge="1" parent="1" source="trust" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#AAB7C4;strokeWidth=1.5;endArrow=block;endFill=1;" target="answer" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

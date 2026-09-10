@@ -1,5 +1,5 @@
-ARG MAVEN_IMAGE=maven:3.9-eclipse-temurin-21
-ARG JRE_IMAGE=eclipse-temurin:21-jre
+ARG MAVEN_IMAGE=docker.m.daocloud.io/library/maven:3.9-eclipse-temurin-21
+ARG JRE_IMAGE=docker.m.daocloud.io/library/eclipse-temurin:21-jre
 # ============================================================
 # 阶段一：Maven 构建
 # ============================================================
@@ -16,6 +16,7 @@ COPY common-base/pom.xml ./common-base/
 COPY common/pom.xml ./common/
 COPY heartbeat/pom.xml ./heartbeat/
 COPY engine/pom.xml ./engine/
+COPY gateway/pom.xml ./gateway/
 COPY scheduler/pom.xml ./scheduler/
 COPY workflow/pom.xml ./workflow/
 COPY runner-console/pom.xml ./runner-console/
@@ -40,20 +41,25 @@ COPY biz/biz-sk/pom.xml ./biz/biz-sk/
 COPY biz/biz-skill/pom.xml ./biz/biz-skill/
 COPY biz/biz-studio/pom.xml ./biz/biz-studio/
 COPY biz/biz-tool/pom.xml ./biz/biz-tool/
-COPY biz/biz-cache/pom.xml ./biz/biz-cache/
-COPY biz/biz-mq/pom.xml ./biz/biz-mq/
-COPY biz/biz-datasource/pom.xml ./biz/biz-datasource/
 COPY biz/biz-workflow/pom.xml ./biz/biz-workflow/
+COPY biz/biz-cache/pom.xml ./biz/biz-cache/
+COPY biz/biz-datasource/pom.xml ./biz/biz-datasource/
+COPY biz/biz-gateway/pom.xml ./biz/biz-gateway/
+COPY biz/biz-mq/pom.xml ./biz/biz-mq/
+COPY biz/biz-channel/pom.xml ./biz/biz-channel/
+COPY biz/biz-dashboard/pom.xml ./biz/biz-dashboard/
 
 # 复制 Maven 私有仓库配置
 COPY docker/maven/settings.xml /root/.m2/settings.xml
 
-# 预下载依赖
-RUN mvn dependency:go-offline -pl runner-websocket -am -DskipTests -q
+# 预下载依赖。缓存仓库内容而非整个 .m2，避免遮蔽上面的 settings.xml。
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mvn -B -ntp dependency:go-offline -pl runner-websocket -am -DskipTests -q
 
 # 复制源码并构建
 COPY . .
-RUN mvn package -pl runner-websocket -am -DskipTests -q
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mvn -B -ntp package -pl runner-websocket -am -DskipTests -q
 
 # ============================================================
 # 阶段二：运行镜像
@@ -61,6 +67,11 @@ RUN mvn package -pl runner-websocket -am -DskipTests -q
 FROM ${JRE_IMAGE}
 
 WORKDIR /app
+
+# 安装 curl（Docker healthcheck 使用）
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 复制构建产物
 COPY --from=build /build/runner-websocket/target/runner-websocket-*.jar app.jar

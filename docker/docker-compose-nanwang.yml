@@ -1,0 +1,60 @@
+# ============================================================
+# 南网问数助手 · 扩展组件（DM8 模拟库 + 语义图谱 Neo4j + 语义 MCP 服务）
+# 使用：docker compose --project-name k-acp-local --env-file docker/.env.kacp
+#       -f docker/docker-compose-simple.yml -f docker/docker-compose-kacp-local.yml
+#       -f docker/docker-compose-langfuse.yml -f docker/docker-compose-nanwang.yml <cmd>
+# 依赖：k-acp-local 网络（随主栈创建）；MySQL/中间件由主栈提供
+# ============================================================
+
+services:
+  # DM8 电力物资模拟库（MOCK_APP，只读账号 NANWANG_RO）
+  apboa-dm8:
+    image: changchun/dm8:aug
+    container_name: k-acp-dm8
+    restart: unless-stopped
+    ports:
+      - "25236:5236"
+    volumes:
+      - /home/lzd/nanwang-data/dm8-data:/opt/dmdbms/data
+    networks:
+      - apboa_simple
+    environment:
+      TZ: Asia/Shanghai
+
+  # 南网语义/实例图谱（Neo4j，与医保 k-acp-neo4j 相互独立）
+  apboa-neo4j-mock:
+    image: docker.m.daocloud.io/library/neo4j:2026.07.1
+    container_name: k-acp-neo4j-mock
+    restart: unless-stopped
+    ports:
+      - "27474:7474"
+      - "27687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/MockGraph2026!
+      TZ: Asia/Shanghai
+    volumes:
+      - /home/lzd/nanwang-data/neo4j-mock-data:/data
+    networks:
+      - apboa_simple
+
+  # 语义层 MCP 服务（Streamable HTTP，平台 mcp_server 指向 http://apboa-nanwang-semantic:8767/mcp）
+  apboa-nanwang-semantic:
+    build:
+      context: ..
+      dockerfile: nanwang-semantic/Dockerfile
+    image: k-acp-local-apboa-nanwang-semantic:latest
+    container_name: k-acp-nanwang-semantic
+    restart: unless-stopped
+    ports:
+      - "28767:8767"
+    environment:
+      TZ: Asia/Shanghai
+      NANWANG_DM_URL: jdbc:dm://apboa-dm8:5236?compatibleMode=mysql
+      NANWANG_DM_PASSWORD: NwRo@2026Query
+      NANWANG_META_URL: jdbc:mysql://apboa-mysql:3306/apboa_next?useSSL=false&characterEncoding=utf-8&allowPublicKeyRetrieval=true
+      NANWANG_META_USERNAME: root
+      NANWANG_META_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      NANWANG_NEO4J_URI: bolt://apboa-neo4j-mock:7687
+      NANWANG_NEO4J_PASSWORD: MockGraph2026!
+    networks:
+      - apboa_simple

@@ -76,7 +76,6 @@ public class AgentDefinitionServiceImpl extends ServiceImpl<AgentDefinitionMappe
         }
 
         AgentDefinitionVO vo = BeanUtils.copy(entity, AgentDefinitionVO.class);
-        vo.setAvatar(AgentAvatarUtils.avatarForAgentId(entity.getId()));
 
         vo.setHook(agentHookService.getHookIds(id));
         Long studioConfigId = agentStudioService.getStudioIdByAgentId(id);
@@ -111,9 +110,10 @@ public class AgentDefinitionServiceImpl extends ServiceImpl<AgentDefinitionMappe
     @Transactional(rollbackFor = Exception.class)
     public Boolean saveAgentDefinition(AgentDefinitionVO vo) {
         AgentDefinition agentDefinition = BeanUtils.copy(vo, AgentDefinition.class);
+        agentDefinition.setAvatar(AgentAvatarUtils.randomAvatar());
         save(agentDefinition);
         vo.setId(agentDefinition.getId());
-        vo.setAvatar(AgentAvatarUtils.avatarForAgentId(agentDefinition.getId()));
+        vo.setAvatar(agentDefinition.getAvatar());
 
         saveSubItems(vo);
 
@@ -132,7 +132,7 @@ public class AgentDefinitionServiceImpl extends ServiceImpl<AgentDefinitionMappe
                     new LambdaQueryWrapper<JobInfo>()
                             .eq(JobInfo::getType, "AGENT")
                             .eq(JobInfo::getBizId, vo.getId()));
-            if (!agent.isEmpty() && agent.getFirst().isEnabled()) {
+            if (!agent.isEmpty() && agent.getFirst().getEnabled()) {
                 throw new RuntimeException("请先禁用定时任务");
             }
             if (vo.getEnabled()) {

@@ -1,46 +1,183 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
+import {
+  CheckCircleOutlined,
+  DownOutlined,
+  LoadingOutlined
+} from '@ant-design/icons-vue'
 import MessageItem from './MessageItem.vue'
 import ToolCallItem from './ToolCallItem.vue'
-import type { DisplayMessage } from '@/types'
+import AgentRunActivity from './AgentRunActivity.vue'
+import AgentRunWaiting from './AgentRunWaiting.vue'
+import type { DisplayMessage, RunActivity } from '@/types'
+import { shouldShowLegacyToolCall } from '@/utils/chat/runActivity'
 import type {FlatFileItem} from "@/composables/chat/useWorkspaceFiles.ts";
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
 
-defineProps<{
+const props = defineProps<{
   messages: DisplayMessage[]
   agentHasResult?: boolean
   toolCalls: Array<{ id: string; name: string; args: string; result?: string; elapsed?: number, needConfirm?: boolean }>
+  runActivities: RunActivity[]
+  completedRunActivities?: readonly RunActivity[]
+  isDiyChat: boolean
+  runActivityPlacement?: 'tail' | 'after-latest-user'
+  showRunActivity: boolean
+  showRunWaiting: boolean
+  retainFinishedRunActivity?: boolean
+  runStartedAt: number | null
 }>()
 
 defineEmits<{
+  (e: 'abort'): void
   (e: 'toolContent', value: any): void
   (e: 'inputTagPreview', value: FlatFileItem): void
   (e: 'interactionSubmit', payload: InteractionSubmitPayload): void
   (e: 'uipRetry', uipCode: string): void
   (e: 'vepRetry', vepCode: string): void
 }>()
+
+/** 将连续的 thinking/tool 消息聚合为可展开的行为面板。 */
+interface MessageGroup {
+  text: boolean
+  key: string
+  isStreaming: boolean
+  messages: DisplayMessage[]
+}
+
+const messageGroups = computed<MessageGroup[]>(() => {
+  const groups: MessageGroup[] = []
+  const latestUserIndex = props.messages.reduce((last, message, index) => message.role === 'user' ? index : last, -1)
+
+  for (const [index, msg] of props.messages.entries()) {
+    // 本轮工具进度统一由状态栏展示，历史记录在运行结束后仍可查看。
+    if ((props.showRunActivity || props.showRunWaiting) && index > latestUserIndex && msg.role === 'tool') continue
+    if (msg.role === 'thinking' || msg.role === 'tool') {
+      const lastGroup = groups[groups.length - 1]
+      if (lastGroup && !lastGroup.text) {
+        lastGroup.messages.push(msg)
+        lastGroup.isStreaming = msg.isStreaming || false
+      } else {
+        groups.push({
+          text: false,
+          key: msg.id,
+          isStreaming: msg.isStreaming || false,
+          messages: [msg]
+        })
+      }
+    } else {
+      groups.push({
+        text: true,
+        key: msg.id,
+        isStreaming: false,
+        messages: [msg]
+      })
+    }
+  }
+
+  return groups
+})
+
+/** 运行状态可紧贴最新用户提问，避免悬浮或跟随正在生成的助手正文移动。 */
+const latestUserGroupIndex = computed(() => {
+  for (let index = messageGroups.value.length - 1; index >= 0; index--) {
+    if (firstMessage(messageGroups.value[index]!).role === 'user') return index
+  }
+  return -1
+})
+
+const expandedMap = ref<Record<string, boolean>>({})
+const retainedActivities = computed(() => props.completedRunActivities ?? [])
+
+function isExpanded(key: string): boolean {
+  return expandedMap.value[key] ?? false
+}
+
+function toggleAggregate(key: string) {
+  expandedMap.value = { ...expandedMap.value, [key]: !expandedMap.value[key] }
+}
+
+function firstMessage(group: MessageGroup): DisplayMessage {
+  return group.messages[0]!
+}
 </script>
 
 <template>
   <div class="chat-main-messages">
-    <MessageItem
-      v-for="(msg, index) in messages"
-      @inputTagPreview="$emit('inputTagPreview', $event as FlatFileItem)"
-      @interaction-submit="$emit('interactionSubmit', $event)"
-      @uip-retry="$emit('uipRetry', $event)"
-      @vep-retry="$emit('vepRetry', $event)"
-      :id="msg.id"
-      :current-index="index"
-      :total-messages="messages.length"
-      :key="msg.id"
-      :role="msg.role"
-      :content="msg.content"
-      :created-at="msg.createdAt"
-      :agent-has-result="agentHasResult"
-      :is-streaming="msg.isStreaming"
-    />
+    <template v-for="(group, gIdx) in messageGroups" :key="group.key">
+      <div v-if="group.messages.length > 1" class="chat-aggregate-panel">
+        <div class="chat-aggregate-header" @click="toggleAggregate(group.key)">
+          <span class="chat-aggregate-icon">
+            <LoadingOutlined v-if="group.isStreaming" spin />
+            <CheckCircleOutlined v-else />
+          </span>
+          <span class="chat-aggregate-title">行为聚合 ({{ group.messages.length }})</span>
+          <span class="chat-aggregate-arrow" :class="{ expanded: isExpanded(group.key) }">
+            <DownOutlined />
+          </span>
+        </div>
+        <div class="chat-aggregate-body" :class="{ 'is-expanded': isExpanded(group.key) }">
+          <MessageItem
+            v-for="msg in group.messages"
+            :key="msg.id"
+            :id="msg.id"
+            :current-index="0"
+            :total-messages="0"
+            :role="msg.role"
+            :content="msg.content"
+            :presentation="msg.presentation"
+            :created-at="msg.createdAt"
+            :agent-has-result="agentHasResult"
+            :is-streaming="msg.isStreaming"
+            :is-diy-chat="isDiyChat"
+            @inputTagPreview="$emit('inputTagPreview', $event as FlatFileItem)"
+            @interaction-submit="$emit('interactionSubmit', $event)"
+            @uip-retry="$emit('uipRetry', $event)"
+            @vep-retry="$emit('vepRetry', $event)"
+          />
+        </div>
+      </div>
+      <MessageItem
+        v-else
+        :id="firstMessage(group).id"
+        :current-index="gIdx"
+        :total-messages="messageGroups.length"
+        :role="firstMessage(group).role"
+        :content="firstMessage(group).content"
+        :presentation="firstMessage(group).presentation"
+        :created-at="firstMessage(group).createdAt"
+        :agent-has-result="agentHasResult"
+        :is-streaming="firstMessage(group).isStreaming"
+        :is-diy-chat="isDiyChat"
+        @inputTagPreview="$emit('inputTagPreview', $event as FlatFileItem)"
+        @interaction-submit="$emit('interactionSubmit', $event)"
+        @uip-retry="$emit('uipRetry', $event)"
+        @vep-retry="$emit('vepRetry', $event)"
+      />
+      <template v-if="runActivityPlacement === 'after-latest-user' && gIdx === latestUserGroupIndex">
+        <AgentRunActivity
+          v-if="showRunActivity"
+          :activities="runActivities"
+          :started-at="runStartedAt"
+          :is-running="true"
+          @abort="$emit('abort')"
+        />
+        <AgentRunWaiting
+          v-else-if="showRunWaiting"
+          :started-at="runStartedAt"
+          @abort="$emit('abort')"
+        />
+        <AgentRunActivity
+          v-else-if="retainFinishedRunActivity && retainedActivities.length"
+          :activities="retainedActivities"
+          :started-at="runStartedAt"
+          :is-running="false"
+        />
+      </template>
+    </template>
     <TransitionGroup name="jelly">
       <ToolCallItem
-        v-for="t in toolCalls"
+        v-for="t in toolCalls.filter((toolCall) => shouldShowLegacyToolCall(isDiyChat, toolCall.needConfirm))"
         :key="t.id"
         :id="t.id"
         :name="t.name"
@@ -52,6 +189,20 @@ defineEmits<{
         @toolContent="(content: any) => $emit('toolContent', content)"
       />
     </TransitionGroup>
+    <template v-if="runActivityPlacement !== 'after-latest-user'">
+      <AgentRunActivity
+        v-if="showRunActivity"
+        :activities="runActivities"
+        :started-at="runStartedAt"
+        :is-running="true"
+        @abort="$emit('abort')"
+      />
+      <AgentRunWaiting
+        v-else-if="showRunWaiting"
+        :started-at="runStartedAt"
+        @abort="$emit('abort')"
+      />
+    </template>
   </div>
 </template>
 

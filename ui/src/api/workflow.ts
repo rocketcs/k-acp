@@ -61,10 +61,6 @@ export function workflowVersions(id: string) {
   return request.get<ApiResponse<WorkflowVersion[]>>(`/api/workflow/${id}/versions`)
 }
 
-export function workflowRollback(id: string, version: string) {
-  return request.post<ApiResponse<Workflow>>(`/api/workflow/${id}/versions/${version}/rollback`)
-}
-
 export function workflowDeleteVersion(id: string, version: string) {
   return request.delete<ApiResponse<boolean>>(`/api/workflow/${id}/versions/${version}`)
 }
@@ -105,6 +101,10 @@ export function enabledMqs() {
   return request.get<ApiResponse<WorkflowResource[]>>('/api/mq', { params: { enabled: 1 } })
 }
 
+export function enabledChannels() {
+  return request.get<ApiResponse<WorkflowResource[]>>('/api/channel', { params: { enabled: 1 } })
+}
+
 export function checkCacheConnect(resource: WorkflowResource) {
   return request.post<ApiResponse<boolean>>('/api/cache/check/connect', resource)
 }
@@ -115,4 +115,8 @@ export function checkDatasourceConnect(resource: WorkflowResource) {
 
 export function checkMqConnect(resource: WorkflowResource) {
   return request.post<ApiResponse<boolean>>('/api/mq/check/connect', resource)
+}
+
+export function checkChannelConnect(resource: WorkflowResource) {
+  return request.post<ApiResponse<boolean>>('/api/channel/check/connect', resource)
 }

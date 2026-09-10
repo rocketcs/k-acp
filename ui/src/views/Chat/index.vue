@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { RouteNames } from '@/router'
 import { Modal, message } from 'ant-design-vue'
 import { useAccountStore, useChatStore } from '@/stores'
@@ -13,10 +13,11 @@ import ChatSidebar from '@/components/chat/ChatSidebar.vue'
 import ChatMain from '@/components/chat/ChatMain.vue'
 import RenameModal from '@/components/chat/RenameModal.vue'
 import WorkspacePanel from '@/components/workspace/WorkspacePanel.vue'
-import type { DisplayMessage, ChatMessageVO, UploadedFileItem, ChatSessionVO } from '@/types'
+import type { DisplayMessage, ChatMessageVO, UploadedFileItem, ChatSessionVO, ChatMessagePresentation, ChatMessagePresentationInput, RunActivity } from '@/types'
+import type { ChatAttachmentPolicy } from '@/composables/chat/useChatAttachments'
 import * as chatSessionApi from '@/api/chatSession'
 import * as agentDiyApi from '@/api/agentDiy'
-import { getActiveRuns, getStatus } from '@/api/agui'
+import { getActiveRuns, getStatus, getPending } from '@/api/agui'
 import { LoadingOutlined } from '@ant-design/icons-vue'
 import {
   buildUserTextFromPayload,
@@ -25,26 +26,128 @@ import {
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
 import type { DiyOutputFormat, DiyPageConfig } from '@/types'
 import { buildOutputInstruction } from '@/utils/diy/questionTemplate'
+import { prependChatAttachmentContent, splitChatAttachmentContent } from '@/utils/chat/messageContent'
+import { createRuntimeUserMessage } from '@/utils/chat/runtimeMessages'
+import { shouldDisplayChatMessage } from '@/utils/chat/messageVisibility'
+import { isSemanticaAgent, resolveSemanticaAgentCodes } from '@/utils/chat/semanticaEntry'
+import { RoutePaths } from '@/router/constants'
+
+type ChatSubmissionInput = {
+  text: string
+  fileIds: string[]
+}
+
+type ChatSubmission = {
+  displayText: string
+  persistedText?: string
+  runtimeText: string
+  titleText: string
+  fileIds: string[]
+  attachedFiles?: UploadedFileItem[]
+}
+
+type ChatMessageDisplayInput = {
+  role: string
+  content: string
+}
+
+type ToolResultPersistenceInput = {
+  toolCallId: string
+  toolName: string
+  args: string
+  content: string
+  messageId: string
+}
 
 const props = withDefaults(defineProps<{
   showAccount: boolean
   chatAgentId: string | null | undefined
+  submissionAdapter?: (input: ChatSubmissionInput) => ChatSubmission | null | Promise<ChatSubmission | null>
+  messageDisplayAdapter?: (input: ChatMessageDisplayInput) => string
+  messagePresentationAdapter?: (input: ChatMessagePresentationInput) => ChatMessagePresentation
+  attachmentPolicy?: ChatAttachmentPolicy
+  attachmentDropEnabled?: boolean
+  attachmentAutoSubmitAdapter?: (input: ChatSubmissionInput & { uploadedFile: UploadedFileItem }) => ChatSubmission | null
+  onAttachmentRemoved?: (file: UploadedFileItem) => void
+  onSessionMessagesChanged?: (input: { sessionId: string | null; messages: readonly ChatMessageVO[] }) => void
+  /** 特定路由可只保留助手的最终回答，隐藏持久化的工具执行轨迹。 */
+  hideToolMessages?: boolean
+  /** 仅由特定路由使用：将满足其结果契约的工具返回写入当前会话，以便刷新后重建展示。 */
+  toolResultPersistenceAdapter?: (input: ToolResultPersistenceInput) => string | null
+  /** 特定路由用：把工具执行活动以业务标签回调出去，替代原始工具调用条。 */
+  onToolCallActivity?: (t: { toolName: string; status: 'running' | 'completed' | 'failed'; content?: string }) => void
+  /** 特定路由可在助手开始输出最终正文时同步业务阶段。 */
+  onAssistantTextActivity?: (content: string) => void
+  /** 特定路由用：在整轮请求的开始和结束时同步运行状态，供固定进度区持续展示。 */
+  onRunStateChanged?: (isRunning: boolean) => void
+  /** 特定路由可将工具活动转换为面向业务的步骤名称。 */
+  runActivityAdapter?: (activities: readonly RunActivity[]) => RunActivity[]
+  /** 特定路由可在运行结束后继续保留最后一张进度卡。 */
+  completedRunActivities?: readonly RunActivity[]
+  /** 运行状态默认出现在消息末尾；特定路由可要求紧跟最新用户消息。 */
+  runActivityPlacement?: 'tail' | 'after-latest-user'
+  /** 特定路由即使未按通用 DIY 路由命名，也始终显示运行状态卡。 */
+  forceRunActivity?: boolean
+  /** 仅特定路由开启：运行完成后保留最后一张进度卡在原位置。 */
+  retainFinishedRunActivity?: boolean
+  /** 非 /chat/diy 路由也按 agentId 加载并展示已发布的 DIY 欢迎页配置。 */
+  forceDiyConfig?: boolean
+  /** 特定路由可覆盖 DIY 欢迎页标题。 */
+  welcomeHeadlineOverride?: string
+  /** 强制开启工具执行过程展示（用于需要保留 MCP 工具结果的受治理数据查询类 agent）。 */
+  forceToolProcessActive?: boolean
+  /** 仅特定路由在输入框上方显示完整数据管理入口。 */
+  showGraphExplorer?: boolean
 }>(), {
   showAccount: true,
-  chatAgentId: null
+  chatAgentId: null,
+  forceToolProcessActive: false
 })
 
+const emit = defineEmits<{ (e: 'graphExplorer'): void }>()
+
 const route = useRoute()
+const router = useRouter()
 const accountStore = useAccountStore()
 const chatStore = useChatStore()
 const userInfo = computed(() => accountStore.userInfo)
 
+/** 退出登录：与主页侧栏保持一致的确认与跳转行为。 */
+const handleLogout = () => {
+  Modal.confirm({
+    title: '确认',
+    icon: null,
+    content: '确认退出当前系统,是否继续?',
+    onOk: async () => {
+      await accountStore.logout()
+      await router.push(RoutePaths.LOGIN)
+    }
+  })
+}
+
 const agentId = computed(() => (props.chatAgentId || route.params.agentId) as string || '')
+
 const isDiyRoute = computed(() => route.name === RouteNames.CHAT_DIY)
+const shouldLoadDiyConfig = computed(() => isDiyRoute.value || props.forceDiyConfig === true)
 const diyConfig = ref<DiyPageConfig | null>(null)
+const displayDiyConfig = computed(() => {
+  const config = diyConfig.value
+  const headlineOverride = props.welcomeHeadlineOverride?.trim()
+
+  if (!config || !headlineOverride || config.headline === headlineOverride) {
+    return config
+  }
+
+  return { ...config, headline: headlineOverride }
+})
 
 // 智能体详情
 const { agentDetail, allowFileType } = useAgentDetail(agentId)
+
+// 智能医生的知识图谱入口只在医疗类智能体对话中展示，避免污染其他智能体。
+// Agent ID 各环境不同（本地 default-doctor、测试环境 default-hospital），按 agent_code 判断。
+const semanticaAgentCodes = resolveSemanticaAgentCodes(import.meta.env.VITE_SEMANTICA_DOCTOR_AGENT_CODES)
+const showSemanticaExplore = computed(() => isSemanticaAgent(agentDetail.value?.agentCode, semanticaAgentCodes))
 
 // 记忆/规划是否可用（由 agentDetail 决定）
 const accountId = computed(() => accountStore.userInfo?.id)
@@ -66,6 +169,7 @@ const planActive = computed(() => {
   return chatStore.getPlanActive(id as string, accountId.value as string, enablePlanning.value)
 })
 const toolProcessActive = computed(() => {
+  if (props.forceToolProcessActive) return true
   const id = agentDetail.value?.id ?? agentId.value
   chatStore.preferences
   return chatStore.getToolProcessActive(id as string, accountId.value as string, showToolProcess.value)
@@ -136,13 +240,17 @@ const fileIds = computed(() =>
 const {
   agentHasResult,
   streamingContent,
+  hasVisibleAnswer,
+  runStartedAt,
   streamingMessageId,
   streamingRole,
   toolCallsInProgress,
+  runActivities,
   isRunning,
   currentPlan,
   sendMessage,
-  sendToolContent,
+  decideConfirm,
+  restorePending,
   abortRun,
   reconnect: reconnectStream,
   disconnect: disconnectStream,
@@ -157,10 +265,33 @@ const {
   toolProcessActive,
   (chatMsg: ChatMessageVO) => {
     messagesList.value.push(chatMsg)
+  }, {
+    onToolResult: (event) => { void persistAdaptedToolResult(event) },
+    onToolCallActivity: props.onToolCallActivity,
+    onAssistantTextActivity: props.onAssistantTextActivity,
   })
 
 // 输入框内容
 const inputText = ref('')
+const chatMainRef = ref<InstanceType<typeof ChatMain> | null>(null)
+/** Newly-created sessions cannot notify feature hooks until their first persisted user message is present. */
+const createdSessionPersistedMessageIds = new Map<string, string | null>()
+
+async function persistAdaptedToolResult(input: ToolResultPersistenceInput) {
+  const content = props.toolResultPersistenceAdapter?.(input)
+  const sessionId = currentSessionId.value
+  if (!content || !sessionId) return
+
+  try {
+    const response = await chatSessionApi.appendMessage(sessionId, { role: 'tool', content })
+    const persisted = response.data?.data
+    if (persisted && !messagesList.value.some((message) => String(message.id) === String(persisted.id))) {
+      messagesList.value.push(persisted)
+    }
+  } catch (error) {
+    console.warn('[Chat] 持久化工具结果失败', error)
+  }
+}
 
 // 记录最近一次流式消息的 ID，用于 DOM key 桥接，避免流式→保存切换时的闪烁
 const lastStreamingKey = ref<string | null>(null)
@@ -171,18 +302,41 @@ watch(streamingMessageId, (newId) => {
   }
 })
 
-/** 构建文件前缀字符串 */
-function buildFilesPrefix(files: UploadedFileItem[]): string {
-  if (!files.length) return ''
-  return JSON.stringify({ files }) + '@==##::::##==@'
-}
+watch(
+  [currentSessionId, messagesList, loadingMessages],
+  ([sessionId, messages, isLoading]) => {
+    const persistedMessageId = sessionId === null ? undefined : createdSessionPersistedMessageIds.get(sessionId)
+    if (
+      isLoading
+      || persistedMessageId === null
+      || (persistedMessageId !== undefined && !messages.some((message) => String(message.id) === persistedMessageId))
+    ) return
+    props.onSessionMessagesChanged?.({ sessionId, messages })
+  },
+  { deep: true, flush: 'post' },
+)
+
+watch(isRunning, (isRunning) => {
+  props.onRunStateChanged?.(isRunning)
+})
+
+const presentationRunActivities = computed(() =>
+  props.runActivityAdapter ? props.runActivityAdapter(runActivities.value) : runActivities.value,
+)
+const presentationCompletedRunActivities = computed(() =>
+  props.runActivityAdapter && props.completedRunActivities
+    ? props.runActivityAdapter([...props.completedRunActivities])
+    : props.completedRunActivities ?? [],
+)
 
 // 构建展示消息
 const displayMessages = computed<DisplayMessage[]>(() => {
   const list: DisplayMessage[] = []
   for (let i = 0; i < messagesList.value.length; i++) {
     const m = messagesList.value[i]
-    if (!m || m.role === 'system' || m.role === 'thinking' || !m.content) continue
+    if (!m || m.role === 'system' || m.role === 'thinking' || !m.content || !shouldDisplayChatMessage(m.role, props.hideToolMessages)) continue
+    const { attachmentPrefix, text } = splitChatAttachmentContent(m.content)
+    const content = attachmentPrefix + (props.messageDisplayAdapter?.({ role: m.role, content: text }) ?? text)
 
     let displayId = String(m.id)
     // key 桥接：流式刚结束时，将最后一条 assistant 消息的展示 key 替换为流式 ID
@@ -193,21 +347,44 @@ const displayMessages = computed<DisplayMessage[]>(() => {
       }
     }
 
+    const presentation = props.messagePresentationAdapter?.({
+      // Presentation provenance must use the persisted source ID; displayId may bridge a
+      // just-finished stream for DOM stability and is not a message identity.
+      id: String(m.id),
+      role: m.role as DisplayMessage['role'],
+      content,
+      rawContent: m.content,
+      isStreaming: false,
+      isCurrent: i === messagesList.value.length - 1,
+    })
+    const displayContent = presentation?.kind === 'markdown' ? presentation.content : content
     list.push({
       id: displayId,
       role: m.role as DisplayMessage['role'],
-      content: m.content || '',
+      content: displayContent,
       createdAt: m.createdAt,
       isStreaming: false,
+      presentation,
     })
   }
 
   if (streamingMessageId.value && streamingRole.value !== 'thinking') {
+    const content = streamingContent.value
+    const presentation = props.messagePresentationAdapter?.({
+      id: streamingMessageId.value,
+      role: streamingRole.value,
+      content,
+      rawContent: content,
+      isStreaming: true,
+      isCurrent: true,
+    })
+    const displayContent = presentation?.kind === 'markdown' ? presentation.content : content
     list.push({
       id: streamingMessageId.value,
       role: streamingRole.value,
-      content: streamingContent.value,
+      content: displayContent,
       isStreaming: true,
+      presentation,
     })
   }  else {
     // 响应加载动画（没有任何推理或文本内容时）
@@ -217,6 +394,9 @@ const displayMessages = computed<DisplayMessage[]>(() => {
         role: 'assistant',
         content: '',
         isStreaming: true,
+        presentation: props.messagePresentationAdapter?.({
+          id: '', role: 'assistant', content: '', rawContent: '', isStreaming: true, isCurrent: true,
+        }),
       })
     }
   }
@@ -269,6 +449,21 @@ const handleNewSession = async () => {
   preserveRunningSession.value = false
 }
 
+/**
+ * HITL 刷新恢复：非运行中的会话可能处于「工具确认暂停态」（刷新/重进后前端内存态已丢），
+ * 调 /agui/pending 从后端持久暂停态重建「允许/禁止」确认 UI，使其可续点并正常 resume。
+ * 暂停态会话已不在 active-runs（RunTracker 已 markCompleted），故独立于 reconnect 单独恢复。
+ * @param sid 会话 ID
+ */
+const restoreConfirm = async (sid: string) => {
+  try {
+    const pending = await getPending(sid)
+    if (pending.length) restorePending(pending)
+  } catch {
+    // 忽略：无暂停态或网络错误
+  }
+}
+
 // 选择会话
 const handleSelectSession = async (session: ChatSessionVO) => {
   // 切换前断开当前 SSE，但不中断后台 Agent
@@ -280,6 +475,9 @@ const handleSelectSession = async (session: ChatSessionVO) => {
   if (runningSessions.value.has(String(session.id))) {
     // 注意：不要加 await，否则会阻塞会话切换
     reconnectStream(String(session.id))
+  } else {
+    // 非运行中：尝试恢复 HITL 确认暂停态（不加 await，避免阻塞会话切换）
+    void restoreConfirm(String(session.id))
   }
   preserveRunningSession.value = false
 }
@@ -337,9 +535,9 @@ const submitRename = async () => {
   }
 }
 
-// 发送工具执行结果
-const handelToolContent = async (value: any) => {
-  await sendToolContent(value)
+// HITL：value = { toolUseId, name, approved }，记录该工具决策（全部决策完内部自动调 resume 续跑）
+const handelToolContent = (value: any) => {
+  decideConfirm(value.toolUseId, value.approved)
 }
 
 // 处理交互提交
@@ -368,17 +566,27 @@ const handleInteractionSubmit = async (payload: InteractionSubmitPayload) => {
     assistantMsg.content = updatedContent
   }
 
-  // // 2. 保存用户提交消息到 DB（与 handleSend 保持一致，先 await 再 sendMessage）
-  // try {
-  //   const res = await chatSessionApi.appendMessage(sid, { role: 'user', content: userText })
-  //   if (res.data?.data) messagesList.value.push(res.data.data as ChatMessageVO)
-  // } catch (err) {
-  //   console.warn('[UIP] 保存用户提交消息失败', err)
-  // }
-
-  // 3. 发送给 Agent 继续对话
+  // 2. 追问提交是当前会话中的新一轮用户消息：先持久化并加入展示列表，
+  //    再启动 Agent，确保流程卡片能锚定在这条消息后面（与首次发送一致）。
   const userText = buildUserTextFromPayload(payload)
-  await sendMessage(userText, [{ id: 'uip', role: 'user', content: userText }] as ChatMessageVO[])
+  let persistedUserMessage: ChatMessageVO | null = null
+  try {
+    const res = await chatSessionApi.appendMessage(sid, { role: 'user', content: userText })
+    if (res.data?.data) {
+      persistedUserMessage = res.data.data as ChatMessageVO
+      messagesList.value.push(persistedUserMessage)
+    }
+  } catch (err) {
+    console.warn('[UIP] 保存用户提交消息失败', err)
+  }
+
+  // 3. 发送给 Agent 继续对话。持久化失败时不启动新一轮，避免出现
+  //    流程已运行但对话记录缺失、流程卡片无法定位的状态。
+  if (!persistedUserMessage) return
+  await sendMessage(
+    userText,
+    [createRuntimeUserMessage(persistedUserMessage, userText)],
+  )
 }
 
 // 处理 UIP 卡片渲染失败重试
@@ -401,37 +609,100 @@ const handleVEPRetry = async (vepCode: string) => {
   await sendMessage(retryText, [{ id: 'vep', role: 'user', content: retryText }] as ChatMessageVO[])
 }
 
-async function submitMessage(options: {
-  displayText: string
-  runtimeText: string
-  titleText: string
-  fileIds?: string[]
-}) {
-  if (!agentId.value || isRunning.value) return
+const isSubmitting = ref(false)
 
-  if (!currentSessionId.value) {
-    const newSession = await createSession(formatSessionTitle(options.titleText || '新对话'))
-    if (!newSession) return
-    currentSessionId.value = String(newSession.id)
-    currentSessionTitle.value = newSession.title || '新对话'
+async function submitMessage(options: ChatSubmission): Promise<boolean> {
+  if (!agentId.value || isRunning.value || isSubmitting.value) return false
+
+  isSubmitting.value = true
+  let createdSessionId: string | null = null
+  try {
+    if (!currentSessionId.value) {
+      const newSession = await createSession(formatSessionTitle(options.titleText || '新对话'))
+      if (!newSession) return false
+      createdSessionId = String(newSession.id)
+      createdSessionPersistedMessageIds.set(createdSessionId, null)
+      currentSessionId.value = createdSessionId
+      currentSessionTitle.value = newSession.title || '新对话'
+    }
+
+    const userMsg = await chatSessionApi.appendMessage(currentSessionId.value, {
+      role: 'user',
+      content: options.persistedText ?? options.displayText,
+    })
+    if (createdSessionId) {
+      createdSessionPersistedMessageIds.set(createdSessionId, String(userMsg.data.data.id))
+    }
+    if (messagesList.value.length <= 1) {
+      const title = formatSessionTitle(options.titleText || '新对话')
+      await updateSessionTitle(currentSessionId.value, title)
+      currentSessionTitle.value = title
+    }
+    messagesList.value.push(userMsg.data.data)
+
+    await sendMessage(
+      options.runtimeText,
+      [createRuntimeUserMessage(userMsg.data.data, options.runtimeText)],
+      options.fileIds,
+    )
+    return true
+  } catch {
+    message.error('消息发送失败，请稍后重试')
+    return false
+  } finally {
+    isSubmitting.value = false
   }
+}
 
-  const userMsg = await chatSessionApi.appendMessage(currentSessionId.value, {
-    role: 'user',
-    content: options.displayText,
+function withAttachmentPrefix(submission: ChatSubmission, attachedFiles: UploadedFileItem[] | undefined): ChatSubmission {
+  if (!attachedFiles?.length) return submission
+  return {
+    ...submission,
+    displayText: prependChatAttachmentContent(attachedFiles, submission.displayText),
+    persistedText: prependChatAttachmentContent(attachedFiles, submission.persistedText ?? submission.displayText),
+  }
+}
+
+const completedAttachmentIds = new Set<string>()
+let submissionAdapterInFlight = false
+let externalSubmissionInFlight = false
+
+const handleAttachmentUploadComplete = (uploadedFile: UploadedFileItem) => {
+  if (uploadedFile.uploading || uploadedFile.id.startsWith('temp-') || completedAttachmentIds.has(uploadedFile.id)) return
+  completedAttachmentIds.add(uploadedFile.id)
+  const submission = props.attachmentAutoSubmitAdapter?.({
+    text: inputText.value.trim(),
+    fileIds: uploadedFiles.value.filter((file) => !file.uploading).map((file) => file.id),
+    uploadedFile,
   })
-  if (messagesList.value.length <= 1) {
-    const title = formatSessionTitle(options.titleText || '新对话')
-    await updateSessionTitle(currentSessionId.value, title)
-    currentSessionTitle.value = title
-  }
-  messagesList.value.push(userMsg.data.data)
+  if (!submission) return
+  void submitMessage(withAttachmentPrefix(submission, submission.attachedFiles ?? [uploadedFile]))
+}
 
-  await sendMessage(
-    options.runtimeText,
-    [{ role: 'user', content: options.runtimeText }] as ChatMessageVO[],
-    options.fileIds,
-  )
+const handleAttachmentRemoved = (file: UploadedFileItem) => {
+  if (props.attachmentAutoSubmitAdapter) completedAttachmentIds.delete(file.id)
+  props.onAttachmentRemoved?.(file)
+}
+
+async function submitExternalSubmission(
+  submission: ChatSubmission,
+  options?: { consumeComposerOnSuccess?: boolean },
+): Promise<boolean> {
+  if (!agentId.value || isRunning.value || externalSubmissionInFlight) return false
+  externalSubmissionInFlight = true
+  try {
+    const sent = await submitMessage(withAttachmentPrefix(submission, submission.attachedFiles))
+    if (sent && options?.consumeComposerOnSuccess) {
+      inputText.value = ''
+      uploadedFiles.value = []
+      completedAttachmentIds.clear()
+    }
+    return sent
+  } catch {
+    return false
+  } finally {
+    externalSubmissionInFlight = false
+  }
 }
 
 // 发送普通输入消息
@@ -439,20 +710,33 @@ const handleSend = async () => {
   const text = inputText.value.trim()
   const filesToSend = uploadedFiles.value.filter((f) => !f.uploading)
   const hasFiles = filesToSend.length > 0
-  if ((!text && !hasFiles) || !agentId.value || isRunning.value) return
+  if ((!text && !hasFiles) || !agentId.value || isRunning.value || isSubmitting.value || externalSubmissionInFlight) return
 
-  const finalText = hasFiles ? buildFilesPrefix(filesToSend) + text : text
   const fileIdsToSend = filesToSend.map((f) => f.id)
+  if (props.submissionAdapter && submissionAdapterInFlight) return
+  let submission: ChatSubmission | null
+  if (props.submissionAdapter) {
+    submissionAdapterInFlight = true
+    try {
+      submission = await props.submissionAdapter({ text, fileIds: fileIdsToSend })
+    } finally {
+      submissionAdapterInFlight = false
+    }
+  } else {
+    submission = {
+      displayText: text,
+      runtimeText: hasFiles ? prependChatAttachmentContent(filesToSend, text) : text,
+      titleText: text,
+      fileIds: fileIdsToSend,
+    }
+  }
+  if (!submission) return
 
   inputText.value = ''
   uploadedFiles.value = []
+  completedAttachmentIds.clear()
 
-  await submitMessage({
-    displayText: finalText,
-    runtimeText: finalText,
-    titleText: text,
-    fileIds: fileIdsToSend,
-  })
+  await submitMessage(withAttachmentPrefix(submission, filesToSend))
 }
 
 const handleQuickSend = async (payload: { text: string; outputFormat: DiyOutputFormat }) => {
@@ -462,6 +746,7 @@ const handleQuickSend = async (payload: { text: string; outputFormat: DiyOutputF
     displayText: text,
     runtimeText: `${text}\n\n${buildOutputInstruction(payload.outputFormat)}`,
     titleText: text,
+    fileIds: [],
   })
 }
 
@@ -528,8 +813,13 @@ onMounted(async () => {
   try {
     const activeIds = await getActiveRuns()
     runningSessions.value = new Set(activeIds)
-    if (currentSessionId.value && activeIds.includes(currentSessionId.value)) {
-      reconnectStream(currentSessionId.value)
+    if (currentSessionId.value) {
+      if (activeIds.includes(currentSessionId.value)) {
+        reconnectStream(currentSessionId.value)
+      } else {
+        // 非运行中：可能是 HITL 确认暂停态，尝试从持久暂停态重建确认 UI
+        void restoreConfirm(currentSessionId.value)
+      }
     }
     if (activeIds.length > 0) {
       startPolling()
@@ -540,7 +830,7 @@ onMounted(async () => {
 })
 
 watch(
-  [isDiyRoute, agentId],
+  [shouldLoadDiyConfig, agentId],
   async ([enabled, currentAgentId]) => {
     diyConfig.value = null
     if (!enabled || !currentAgentId) return
@@ -575,6 +865,17 @@ watch(isRunning, (running) => {
   }
   runningSessions.value = next
 })
+
+const requestAttachmentPicker = (options?: { replace?: boolean }) => {
+  if (options?.replace) {
+    inputText.value = ''
+    uploadedFiles.value = []
+    completedAttachmentIds.clear()
+  }
+  chatMainRef.value?.requestAttachmentPicker(options)
+}
+
+defineExpose({ submitExternalSubmission, requestAttachmentPicker, abortRun })
 </script>
 
 <template>
@@ -596,6 +897,7 @@ watch(isRunning, (running) => {
       @select-session="handleSelectSession"
       @session-menu="handleSessionMenu"
       @load-more="loadMoreSessions"
+      @logout="handleLogout"
     />
 
     <RenameModal
@@ -615,15 +917,28 @@ watch(isRunning, (running) => {
       :welcome-desc="agentDetail?.description || '有什么想说的，直接发给我就好～'"
       :messages="displayMessages"
       :tool-calls="toolCallsInProgress"
+      :run-activities="presentationRunActivities"
+      :completed-run-activities="presentationCompletedRunActivities"
+      :run-activity-placement="runActivityPlacement"
+      :force-run-activity="forceRunActivity"
+      :retain-finished-run-activity="retainFinishedRunActivity"
+      :is-diy-chat="isDiyRoute"
+      :has-visible-answer="hasVisibleAnswer"
+      :run-started-at="runStartedAt"
       :input-value="inputText"
       :uploaded-files="uploadedFiles"
       :isRunning="isRunning"
+      :is-submitting="isSubmitting"
       :agent-id="agentId"
       :memory-active="memoryActive"
       :plan-active="planActive"
       :enable-memory="enableMemory"
       :enable-planning="enablePlanning"
       :allow-upload-file-type="allowFileType"
+      :attachment-policy="attachmentPolicy"
+      :attachment-drop-enabled="attachmentDropEnabled"
+      :on-upload-complete="attachmentAutoSubmitAdapter ? handleAttachmentUploadComplete : undefined"
+      :on-attachment-removed="attachmentAutoSubmitAdapter || onAttachmentRemoved ? handleAttachmentRemoved : undefined"
       :agent-has-result="agentHasResult"
       :show-tool-process="showToolProcess"
       :tool-process-active="toolProcessActive"
@@ -634,7 +949,9 @@ watch(isRunning, (running) => {
       :has-more-history="hasMoreHistory"
       :history-loading="historyLoading"
       :current-plan="currentPlan"
-      :diy-config="diyConfig"
+      :diy-config="displayDiyConfig"
+      :show-graph-explorer="showGraphExplorer"
+      :show-semantica-explore="showSemanticaExplore"
       @update:input-value="inputText = $event"
       @update:uploaded-files="uploadedFiles = $event"
       @memory="handleMemoryChange"
@@ -652,6 +969,7 @@ watch(isRunning, (running) => {
       @uip-retry="handleUIPRetry"
       @vep-retry="handleVEPRetry"
       @quick-send="handleQuickSend"
+      @graph-explorer="emit('graphExplorer')"
     />
     <!-- 工作空间面板（作为 flex 子项从右侧滑出） -->
     <WorkspacePanel

@@ -9,6 +9,8 @@ import { useRoute, useRouter } from 'vue-router'
 import homeAvatar from '@/assets/avatar/home.png'
 import agentAvatar from '@/assets/avatar/agent.png'
 import workflowAvatar from '@/assets/avatar/workflow.png'
+import automationAvatar from '@/assets/avatar/automation.png'
+import apiServiceAvatar from '@/assets/avatar/api-service.png'
 import knowledgeAvatar from '@/assets/avatar/knowledgebase.png'
 import modelProviderAvatar from '@/assets/avatar/model-provider.png'
 import skillAvatar from '@/assets/avatar/skill.png'
@@ -43,7 +45,7 @@ interface MenuItem {
  * 菜单配置
  */
 const menuConfig: MenuItem[] = [
-  // 开发分类
+  // 首页分类
   {
     key: 'home-category',
     label: '首页',
@@ -77,6 +79,20 @@ const menuConfig: MenuItem[] = [
     label: '工作流',
     avatar: workflowAvatar,
     path: '/workflow',
+    type: 'menu'
+  },
+  {
+    key: 'automation',
+    label: '自动化',
+    avatar: automationAvatar,
+    path: '/automation',
+    type: 'menu'
+  },
+  {
+    key: 'api-service',
+    label: 'API服务',
+    avatar: apiServiceAvatar,
+    path: '/api-service',
     type: 'menu'
   },
   {

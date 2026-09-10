@@ -6,6 +6,7 @@ import type { IconName } from '@/components/common/icons'
 export const nodeIconMap: Record<string, IconName> = {
   START: 'nodestart',
   END: 'nodeend',
+  NO_OPERATION: 'nodenoOperation',
   IF_ELSE: 'nodeif_else',
   CACHE_FETCH: 'nodecache',
   CACHE_SET: 'nodecache',
@@ -27,11 +28,17 @@ export const nodeIconMap: Record<string, IconName> = {
   SERIALIZE: 'nodeserialize',
   UNSERIALIZE: 'nodeunserialize',
   VARIABLE_AGG: 'nodevariable_agg',
+  CONSTANT: 'nodevariable',
   NON_EMPTY_SELECT: 'nodenon_empty_select',
   MATCH_RESULT: 'nodematch_result',
   AGENT: 'nodellm',
   TOOL_EXECUTE: 'nodetool',
   MCP_CALL: 'nodemcp',
+  EMAIL_SEND: 'nodeemail',
+  WECOM_SEND: 'nodeqiyeweixin',
+  DINGTALK_SEND: 'nodedingding',
+  FEISHU_SEND: 'nodefeishu',
+  INTENT_RECOGNITION: 'nodeintentRecognition',
 }
 
 /**

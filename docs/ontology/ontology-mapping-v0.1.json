@@ -1,0 +1,123 @@
+{
+  "version": "0.1.0",
+  "namespace": "urn:kacp:mock:",
+  "description": "DM8 MOCK_APP 电力物资数据到本地物资本体的字段映射规范",
+  "source": {
+    "database": "dm8-mock",
+    "schema": "MOCK_APP",
+    "readOnly": true
+  },
+  "classes": {
+    "Warehouse": {
+      "idTemplate": "urn:kacp:mock:warehouse:{warehouse_id}",
+      "sourceTable": "MOCK_APP.MM_SD_ZNCK_WAREHOUSE_INFO_M"
+    },
+    "StockRecord": {
+      "idTemplate": "urn:kacp:mock:stock:{warehouse_distr_id}",
+      "sourceTable": "MOCK_APP.MM_SD_ZNCK_WAREHOUSE_DISTR_M"
+    },
+    "Material": {
+      "idTemplate": "urn:kacp:mock:material:{material_id}",
+      "sourceTable": "MOCK_APP.MM_SD_ZNCK_WAREHOUSE_DISTR_M"
+    },
+    "Supplier": {
+      "idTemplate": "urn:kacp:mock:supplier:{vendor_id}",
+      "sourceTable": "MOCK_APP.MM_SD_ZNCK_WAREHOUSE_DISTR_M"
+    },
+    "Project": {
+      "idTemplate": "urn:kacp:mock:project:{project_id}",
+      "sourceTable": "MOCK_APP.MM_SD_ZNCK_WAREHOUSE_DISTR_M"
+    },
+    "Region": {
+      "idTemplate": "urn:kacp:mock:region:{province_code}:{bureau_code}",
+      "sourceTables": [
+        "MOCK_APP.MM_SD_ZNCK_WAREHOUSE_DISTR_M",
+        "MOCK_APP.MM_SD_ZNCK_WAREHOUSE_INFO_M",
+        "MOCK_APP.MM_SD_ZTFX_WAR_MONEY_K"
+      ]
+    },
+    "InventorySummary": {
+      "idTemplate": "urn:kacp:mock:summary:{seq_id}",
+      "sourceTable": "MOCK_APP.MM_SD_ZTFX_WAR_MONEY_K"
+    }
+  },
+  "properties": {
+    "containsStock": {"domain": "Warehouse", "range": "StockRecord", "source": "actual_warehouse_id"},
+    "warehouse": {"domain": "StockRecord", "range": "Warehouse", "inverseOf": "containsStock", "source": "actual_warehouse_id"},
+    "refersToMaterial": {"domain": "StockRecord", "range": "Material", "source": "material_id"},
+    "suppliedBy": {"domain": "StockRecord", "range": "Supplier", "source": "vendor_id"},
+    "assignedToProject": {"domain": "StockRecord", "range": "Project", "source": "project_id", "nullable": true},
+    "locatedIn": {"domain": "Warehouse", "range": "Region", "source": ["province_code", "bureau_code"]},
+    "summarizedBy": {"domain": "Warehouse", "range": "InventorySummary", "source": ["province_code", "bureau_code"]}
+  },
+  "mappings": [
+    {
+      "table": "MOCK_APP.MM_SD_ZNCK_WAREHOUSE_DISTR_M",
+      "subject": "StockRecord",
+      "key": "warehouse_distr_id",
+      "fields": {
+        "warehouse_distr_id": {"property": "id", "required": true},
+        "actual_warehouse_id": {"relation": "warehouse", "required": true},
+        "material_id": {"relation": "refersToMaterial", "required": true},
+        "vendor_id": {"relation": "suppliedBy", "required": false},
+        "project_id": {"relation": "assignedToProject", "required": false},
+        "actual_qty": {"property": "quantity", "datatype": "decimal", "unit": "item"},
+        "unit_price": {"property": "unitPrice", "datatype": "decimal", "unit": "CNY"},
+        "actual_total_price": {"property": "totalPrice", "datatype": "decimal", "unit": "CNY"},
+        "actual_total_tax": {"property": "totalTax", "datatype": "decimal", "unit": "CNY"},
+        "unit_name": {"property": "unit"},
+        "usage_name": {"property": "usageType", "vocabulary": "usageType"},
+        "receipt_date": {"property": "receiptDate", "datatype": "dateTime"},
+        "inventory_age_name": {"property": "inventoryAge", "vocabulary": "inventoryAge"},
+        "province_code": {"property": "provinceCode"},
+        "bureau_code": {"property": "bureauCode"}
+      }
+    },
+    {
+      "table": "MOCK_APP.MM_SD_ZNCK_WAREHOUSE_INFO_M",
+      "subject": "Warehouse",
+      "key": "warehouse_id",
+      "fields": {
+        "warehouse_id": {"property": "id", "required": true},
+        "warehouse_name": {"property": "name", "required": true},
+        "warehouse_code": {"property": "code"},
+        "warehouse_level": {"property": "level", "datatype": "integer", "vocabulary": "warehouseLevel", "sourceCommentConflict": "字段注释写 0-3，但实际数据为 1-4"},
+        "warehouse_level_name": {"property": "levelName"},
+        "warehouse_addr": {"property": "address"},
+        "geographical_lng": {"property": "longitude", "datatype": "decimal"},
+        "geographical_lat": {"property": "latitude", "datatype": "decimal"},
+        "idle_amt": {"property": "idleAmount", "datatype": "decimal", "unit": "10kCNY"},
+        "scrap_amt": {"property": "scrapAmount", "datatype": "decimal", "unit": "10kCNY"},
+        "reserve_amt": {"property": "reserveAmount", "datatype": "decimal", "unit": "10kCNY"},
+        "project_amt": {"property": "projectAmount", "datatype": "decimal", "unit": "10kCNY"},
+        "total_amt": {"property": "totalAmount", "datatype": "decimal", "unit": "10kCNY"},
+        "province_code": {"property": "provinceCode"},
+        "bureau_code": {"property": "bureauCode"}
+      }
+    },
+    {
+      "table": "MOCK_APP.MM_SD_ZTFX_WAR_MONEY_K",
+      "subject": "InventorySummary",
+      "key": "seq_id",
+      "fields": {
+        "seq_id": {"property": "id", "required": true},
+        "time_id": {"property": "period"},
+        "usage_type_id": {"property": "usageTypeId", "datatype": "integer"},
+        "warehouse_level_id": {"property": "warehouseLevel", "datatype": "integer"},
+        "warehouse_money": {"property": "amount", "datatype": "decimal", "unit": "CNY"},
+        "warehouse_pre_money": {"property": "previousAmount", "datatype": "decimal", "unit": "CNY"},
+        "province_code": {"property": "provinceCode"},
+        "bureau_code": {"property": "bureauCode"}
+      }
+    }
+  ],
+  "vocabularies": {
+    "warehouseLevel": {"1": "区域仓", "2": "周转仓", "3": "急救包", "4": "施工现场"},
+    "usageType": ["项目物资", "储备物资", "闲置物资", "报废物资", "战略储备物资", "常规储备物资"],
+    "inventoryAge": ["1年以内", "1-3年", "3-5年", "5-10年", "10年以上"]
+  },
+  "provenance": {
+    "required": ["sourceTable", "sourceKey", "extractorVersion", "reviewStatus"],
+    "reviewStatus": ["pending", "approved", "rejected", "conflict"]
+  }
+}

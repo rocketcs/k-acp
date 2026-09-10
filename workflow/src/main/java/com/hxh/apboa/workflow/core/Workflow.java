@@ -98,6 +98,14 @@ public abstract class Workflow {
         NodeOutput lastOutput = null;
         while (currentNode != null) {
             lastOutput = currentNode.execute(subContext);
+            if (lastOutput == null || lastOutput.getStatus() != NodeOutput.ExecutionStatus.SUCCESS) {
+                String nodeName = lastOutput == null ? currentNode.getName() : lastOutput.getNodeName();
+                String error = lastOutput == null ? "节点未返回执行结果" : lastOutput.getErrorMessage();
+                if (error == null || error.isBlank()) {
+                    error = String.valueOf(lastOutput.getVerifyErrors());
+                }
+                throw new RuntimeException("子工作流节点执行失败: " + nodeName + ": " + error);
+            }
 
             // 获取下一个节点
             String nextNodeId = currentNode.getNextNodeId(subContext);
@@ -114,7 +122,16 @@ public abstract class Workflow {
                         currentNode = null;
                     }
                 } else {
-                    currentNode = null;
+                    // Loop sub-workflows are compiled independently from their
+                    // edge definitions, so their nodes do not have edge IDs
+                    // attached through Workflow#addEdge. Fall back to the
+                    // edge's source field to continue the sub-workflow.
+                    Node executingNode = currentNode;
+                    Edge outEdge = subEdges.stream()
+                            .filter(edge -> executingNode.getId().equals(edge.getSource()))
+                            .findFirst()
+                            .orElse(null);
+                    currentNode = outEdge == null ? null : nodeMap.get(outEdge.getTarget());
                 }
             }
         }

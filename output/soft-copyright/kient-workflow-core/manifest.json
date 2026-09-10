@@ -1,0 +1,29 @@
+{
+  "software_title": "K-iENT企业流程智能体平台 V1.0",
+  "source_root": "src/main/java/com/kingsware/kient",
+  "file_count": 63,
+  "source_line_count": 3937,
+  "groups": [
+    {
+      "path": "node/base",
+      "file_count": 52,
+      "source_line_count": 3155
+    },
+    {
+      "path": "workflow/core",
+      "file_count": 3,
+      "source_line_count": 284
+    },
+    {
+      "path": "workflow/run",
+      "file_count": 2,
+      "source_line_count": 185
+    },
+    {
+      "path": "node/agent",
+      "file_count": 6,
+      "source_line_count": 374
+    }
+  ],
+  "document": "K-iENT企业流程智能体平台V1.0—核心源代码.docx"
+}

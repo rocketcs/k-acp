@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, nextTick } from 'vue'
 import type { DisplayMessage } from '@/types'
-
-const FILE_SEP = '@==##::::##==@'
+import { splitChatAttachmentContent } from '@/utils/chat/messageContent'
 
 const props = defineProps<{
   messages: DisplayMessage[]
@@ -13,12 +12,9 @@ const props = defineProps<{
  * 从用户消息中提取纯文本（去除文件前缀）
  */
 function extractUserText(content: string): string {
+  const { text } = splitChatAttachmentContent(content)
   // 去除富文本标签
-  const t = content.replace(/<\/?(?:workspace-file|agent-tool|agent-skill)>/g, '')
-  // 去除文件前缀
-  const idx = t.indexOf(FILE_SEP)
-  if (idx === -1) return t.trim()
-  return t.slice(idx + FILE_SEP.length).trim()
+  return text.replace(/<\/?(?:workspace-file|agent-tool|agent-skill)>/g, '').trim()
 }
 
 /**

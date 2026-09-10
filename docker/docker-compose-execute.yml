@@ -11,20 +11,19 @@ services:
       context: ..
       dockerfile: docker/runtime/Dockerfile
       args:
-        MAVEN_IMAGE: ${DOCKER_REGISTRY}maven:3.9-eclipse-temurin-21
-        JRE_IMAGE: ${DOCKER_REGISTRY}eclipse-temurin:21-jre
+        MAVEN_IMAGE: docker.m.daocloud.io/library/maven:3.9-eclipse-temurin-21
+        JRE_IMAGE: docker.m.daocloud.io/library/eclipse-temurin:21-jre
     container_name: apboa-runtime
     restart: unless-stopped
-    cap_drop:
-      - ALL
-    cap_add:
-      - SETUID
-      - SETGID
-      - CHOWN
-    security_opt:
-      - no-new-privileges:true
+    # root 运行（业务可信服务，容器隔离承担安全边界），无 cap/security 限制
     mem_limit: ${RUNTIME_MEM_LIMIT:-8g}
     cpus: ${RUNTIME_CPU_LIMIT:-8}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3061/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
     environment:
       SPRING_PROFILES_ACTIVE: docker
       MYSQL_HOST: ${MYSQL_HOST}
@@ -52,6 +51,10 @@ services:
       WEBSOCKET_HOST: ${WEBSOCKET_HOST:-apboa-websocket}
       WEBSOCKET_PORT: ${WEBSOCKET_PORT:-3064}
       WORKSPACE_CAPACITY_MB: ${WORKSPACE_CAPACITY_MB:-30}
+      # Python/Node 依赖安装落盘目录（容器重建后依赖持久化）
+      PIP_TARGET: /opt/tools/pylib
+      PYTHONPATH: /opt/tools/pylib
+      NPM_CONFIG_PREFIX: /opt/tools/npm-global
       # 心跳标识：由 start-execute.sh 自动注入，同一节点的三个服务必须相同
       APBOA_NODE_ID: ${APBOA_NODE_ID}
       APBOA_HOST_NAME: ${APBOA_HOST_NAME}
@@ -60,6 +63,7 @@ services:
     volumes:
       - ${LOG_PATH:-./logs}/runtime:/app/logs
       - ${DATA_PATH:-./data}/.apboa:/app/.apboa
+      - ${DATA_PATH:-./data}/runtime-tools:/opt/tools
     ports:
       - "${RUNTIME_PORT:-3061}:3061"
     networks:
@@ -71,8 +75,8 @@ services:
       context: ..
       dockerfile: docker/proxy/Dockerfile
       args:
-        MAVEN_IMAGE: ${DOCKER_REGISTRY}maven:3.9-eclipse-temurin-21
-        JRE_IMAGE: ${DOCKER_REGISTRY}eclipse-temurin:21-jre
+        MAVEN_IMAGE: docker.m.daocloud.io/library/maven:3.9-eclipse-temurin-21
+        JRE_IMAGE: docker.m.daocloud.io/library/eclipse-temurin:21-jre
     container_name: apboa-proxy
     restart: unless-stopped
     # 安全加固：Shell 代理执行不可信命令，必须严格限制
@@ -91,6 +95,12 @@ services:
     mem_limit: ${SHELLPROXY_MEM_LIMIT:-1g}
     cpus: ${SHELLPROXY_CPU_LIMIT:-2}
     pids_limit: ${SHELLPROXY_PIDS_LIMIT:-200}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3062/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JAVA_TOOL_OPTIONS: "-Djava.io.tmpdir=/tmp -Dspring.pid.file="
@@ -99,6 +109,10 @@ services:
       SHELL_MAX_TIMEOUT: ${SHELLPROXY_MAX_TIMEOUT:-3600}
       SHELL_MAX_OUTPUT_SIZE: ${SHELLPROXY_MAX_OUTPUT_SIZE:-52428800}
       SHELLPROXY_JAVA_HEAP_PERCENTAGE: ${SHELLPROXY_JAVA_HEAP_PERCENTAGE:-50.0}
+      # Python/Node 依赖安装落盘目录（read_only 根文件系统下唯一持久化可写点）
+      PIP_TARGET: /opt/tools/pylib
+      PYTHONPATH: /opt/tools/pylib
+      NPM_CONFIG_PREFIX: /opt/tools/npm-global
       # 心跳标识：由 start-execute.sh 自动注入，同一节点的三个服务必须相同
       APBOA_NODE_ID: ${APBOA_NODE_ID}
       APBOA_HOST_NAME: ${APBOA_HOST_NAME}
@@ -107,6 +121,7 @@ services:
     volumes:
       - ${LOG_PATH:-./logs}/proxy:/app/logs
       - ${DATA_PATH:-./data}/.apboa:/app/.apboa
+      - ${DATA_PATH:-./data}/proxy-tools:/opt/tools
     networks:
       - apboa_execute
 
@@ -116,18 +131,11 @@ services:
       context: ..
       dockerfile: docker/file/Dockerfile
       args:
-        MAVEN_IMAGE: ${DOCKER_REGISTRY}maven:3.9-eclipse-temurin-21
-        JRE_IMAGE: ${DOCKER_REGISTRY}eclipse-temurin:21-jre
+        MAVEN_IMAGE: docker.m.daocloud.io/library/maven:3.9-eclipse-temurin-21
+        JRE_IMAGE: docker.m.daocloud.io/library/eclipse-temurin:21-jre
     container_name: apboa-file
     restart: unless-stopped
-    cap_drop:
-      - ALL
-    cap_add:
-      - SETUID
-      - SETGID
-      - CHOWN
-    security_opt:
-      - no-new-privileges:true
+    # root 运行（业务可信服务，容器隔离承担安全边界），无 cap/security 限制
     mem_limit: ${FILE_MEM_LIMIT:-512m}
     cpus: ${FILE_CPU_LIMIT:-0.5}
     environment:

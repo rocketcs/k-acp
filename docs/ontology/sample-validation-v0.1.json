@@ -1,0 +1,56 @@
+{
+  "version": "0.1.0",
+  "source": {
+    "database": "dm8-mock",
+    "schema": "MOCK_APP",
+    "checkedTables": [
+      "MM_SD_ZNCK_WAREHOUSE_DISTR_M",
+      "MM_SD_ZNCK_WAREHOUSE_INFO_M"
+    ],
+    "inventoryRows": 436673,
+    "warehouseRows": 7127
+  },
+  "checks": [
+    {"name":"negative_quantity","result":0,"status":"pass"},
+    {"name":"negative_total_price","result":0,"status":"pass"},
+    {"name":"quantity_times_unit_price_mismatch","result":0,"status":"pass","tolerance":0.01},
+    {"name":"orphan_warehouse_reference","result":0,"status":"pass"},
+    {"name":"null_material_reference","result":0,"status":"pass"},
+    {"name":"null_supplier_reference","result":0,"status":"pass"},
+    {"name":"null_project_reference","result":363564,"status":"review","rule":"项目关联允许为空；仅 usage=U1 项目物资时建议要求 project_id 非空"},
+    {"name":"invalid_usage_code","result":0,"status":"pass"},
+    {"name":"invalid_inventory_age_code","result":0,"status":"pass"},
+    {"name":"warehouse_level_domain","observedValues":[1,2,3,4],"status":"pass","note":"实际值为 1-4，与字段注释 0-3 不一致，已在映射中记录"}
+  ],
+  "fullScan": {
+    "status": "pass",
+    "stockRows": 436673,
+    "distinctStockIds": 436673,
+    "warehouseRows": 7127,
+    "distinctWarehouseIds": 7127,
+    "distinctMaterials": 2400,
+    "distinctSuppliers": 500,
+    "distinctProjects": 50619,
+    "orphanWarehouseReferences": 0,
+    "invalidUsageCodes": 0,
+    "invalidInventoryAgeCodes": 0,
+    "negativeQuantities": 0,
+    "negativePrices": 0,
+    "priceMismatches": 0,
+    "projectMissingForProjectUsage": 0,
+    "projectPresentForNonProjectUsage": 0,
+    "usageDistribution": {
+      "U1": 73109,
+      "U2": 71401,
+      "U3": 72764,
+      "U4": 72807,
+      "U5": 72156,
+      "U6": 74436
+    }
+  },
+  "nextRules": [
+    "当 usage=U1 时，project_id 应非空",
+    "当 usage!=U1 时，project_id 为空是允许的",
+    "warehouse_level 使用实际枚举 1-4，并保留源字段注释冲突记录"
+  ]
+}

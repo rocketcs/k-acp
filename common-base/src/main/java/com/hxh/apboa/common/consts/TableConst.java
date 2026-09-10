@@ -14,6 +14,7 @@ public class TableConst {
     public static final String SENSITIVE_WORD = "sensitive_word_config";
     public static final String JOB_LOG = "quartz_job_log";
     public static final String JOB_INFO = "quartz_job_info";
+    public static final String JOB_RECORD = "quartz_job_records";
     public static final String PARAMS = "params";
     public static final String PROVIDER = "model_provider";
     public static final String MODEL = "model_config";
@@ -44,7 +45,7 @@ public class TableConst {
     public static final String AGENT_A2A = "agent_a2a";
     public static final String ACCOUNT = "account";
     public static final String SECRET_KEY = "secret_key";
-    public static final String CODE_EXECUTION_CONFIG  = "code_execution_config ";
+    public static final String CODE_EXECUTION_CONFIG  = "code_execution_config";
     public static final String AGENT_CODE_EXECUTION  = "agent_code_execution";
     public static final String RAG_DOCUMENT = "rag_document";
     public static final String RAG_DOCUMENT_CHUNK = "rag_document_chunk";
@@ -57,13 +58,25 @@ public class TableConst {
     public static final String CACHE = "cache";
     public static final String DATASOURCE = "datasource";
     public static final String MQ = "mq";
+    public static final String CHANNEL = "channel";
     public static final String PLUGIN = "plugin";
     public static final String WORKFLOW = "workflow";
     public static final String WORKFLOW_CACHE = "workflow_cache";
     public static final String WORKFLOW_DATASOURCE = "workflow_datasource";
     public static final String WORKFLOW_MQ = "workflow_mq";
+    public static final String WORKFLOW_CHANNEL = "workflow_channel";
     public static final String WORKFLOW_NODE_EXECUTION = "workflow_node_execution";
     public static final String WORKFLOW_PLUGIN = "workflow_plugin";
     public static final String WORKFLOW_RUN = "workflow_run";
     public static final String WORKFLOW_VERSION = "workflow_version";
+    public static final String GATEWAY_APP = "gateway_app";
+    public static final String GATEWAY_API = "gateway_api";
+    public static final String GATEWAY_API_WORKFLOW = "gateway_api_workflow";
+    public static final String GATEWAY_ACCESS_LOG = "gateway_access_log";
+    public static final String DASHBOARD = "dashboard";
+    public static final String DASHBOARD_USER = "dashboard_user";
+    public static final String DASHBOARD_DATASET = "dashboard_dataset";
+    public static final String DASHBOARD_HISTORY = "dashboard_history";
+    public static final String LANGFUSE_SESSION_TRACING = "langfuse_session_tracing";
+    public static final String LANGFUSE_SESSION_TRACE_CURSOR = "langfuse_session_trace_cursor";
 }

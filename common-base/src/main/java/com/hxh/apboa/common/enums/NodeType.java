@@ -16,6 +16,10 @@ public enum NodeType {
      */
     END,
     /**
+     * 空操作节点
+     */
+    NO_OPERATION,
+    /**
      * 获取缓存节点
      */
     CACHE_FETCH,
@@ -116,6 +120,10 @@ public enum NodeType {
      */
     VARIABLE_AGG,
     /**
+     * 常量节点（Groovy 表达式动态计算值）
+     */
+    CONSTANT,
+    /**
      * 分类节点（作用和 switch-case 一样）
      */
     CLASSIFY,
@@ -134,5 +142,25 @@ public enum NodeType {
     /**
      * mcp调用节点
      */
-    MCP_CALL
+    MCP_CALL,
+    /**
+     * 发送邮件节点
+     */
+    EMAIL_SEND,
+    /**
+     * 企业微信消息节点
+     */
+    WECOM_SEND,
+    /**
+     * 钉钉消息节点
+     */
+    DINGTALK_SEND,
+    /**
+     * 飞书消息节点
+     */
+    FEISHU_SEND,
+    /**
+     * 意图识别节点
+     */
+    INTENT_RECOGNITION
 }

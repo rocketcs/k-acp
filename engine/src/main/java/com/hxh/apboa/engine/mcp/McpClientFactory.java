@@ -9,6 +9,7 @@ import com.hxh.apboa.common.enums.McpProtocol;
 import com.hxh.apboa.common.enums.McpToolExposureMode;
 import com.hxh.apboa.common.vo.AgentMcpBindingVO;
 import com.hxh.apboa.node.agent.McpConfig;
+import com.hxh.apboa.engine.hook.builtins.IConfirmationHook;
 import com.hxh.apboa.mcp.config.impl.HttpMcpClientConfig;
 import com.hxh.apboa.mcp.config.impl.SseMcpClientConfig;
 import com.hxh.apboa.mcp.config.impl.StdioMcpClientConfig;
@@ -126,11 +127,19 @@ public class McpClientFactory {
                 if (toolSchema == null) {
                     return;
                 }
+                // HITL：按 MCP 工具自身 need_confirm 登记确认清单
+                // （key 用原生名 toolSchema.name() 匹配 ToolUseBlock.name；确认后由 agent 自执行，天然带租户/MCP 上下文）
+                if (Boolean.TRUE.equals(tool.getNeedConfirm())) {
+                    IConfirmationHook.setNeedConfirmTool(toolSchema.name());
+                } else {
+                    IConfirmationHook.removeNeedConfirmTool(toolSchema.name());
+                }
                 result.add(new LazyMcpAgentTool(
                         degradeContext,
                         toolSchema,
                         () -> getInitializedClient(mcpServer.getId()),
-                        mcpRuntimeDegradeService));
+                        mcpRuntimeDegradeService,
+                        () -> invalidateClient(mcpServer.getId())));
             });
         }
         return result;
@@ -190,7 +199,8 @@ public class McpClientFactory {
                         degradeContext,
                         toolSchema,
                         () -> getInitializedClient(mcpServer.getId()),
-                        mcpRuntimeDegradeService));
+                        mcpRuntimeDegradeService,
+                        () -> invalidateClient(mcpServer.getId())));
             });
         }
         return result;
@@ -217,6 +227,14 @@ public class McpClientFactory {
         });
 
         return context.initializedClient;
+    }
+
+    /**
+     * Invalidate a cached client after a transport/session failure. The next
+     * lazy tool invocation will create and initialize a fresh MCP session.
+     */
+    public void invalidateClient(Long mcpServerId) {
+        closeStaleContext(mcpServerId);
     }
 
     private SharedMcpClientContext createContext(McpServer mcpServer, String contextKey) {
@@ -272,6 +290,11 @@ public class McpClientFactory {
     private McpSchema.Tool parseToolSchema(McpTool tool) {
         if (tool.getRawSchema() == null) {
             log.warn("MCP tool '{}' raw schema is empty", tool.getToolName());
+            return null;
+        }
+        if (!tool.getRawSchema().isObject()) {
+            log.warn("MCP tool '{}' raw schema must be a JSON object but was {}; re-sync the MCP tool catalog",
+                    tool.getToolName(), tool.getRawSchema().getNodeType());
             return null;
         }
         try {

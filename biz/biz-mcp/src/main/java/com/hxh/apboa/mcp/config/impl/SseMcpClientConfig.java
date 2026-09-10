@@ -1,7 +1,6 @@
 package com.hxh.apboa.mcp.config.impl;
 
 import com.hxh.apboa.common.entity.McpServer;
-import com.hxh.apboa.common.enums.McpMode;
 import com.hxh.apboa.common.enums.McpProtocol;
 import com.hxh.apboa.common.key.McpSseKey;
 import com.hxh.apboa.mcp.config.McpClientConfig;
@@ -36,11 +35,7 @@ public class SseMcpClientConfig implements McpClientConfig {
                 .initializationTimeout(Duration.ofSeconds(30));
 
         // 构建MCP客户端并返回
-        if (mcpServer.getMode() == McpMode.SYNC) {
-            return builder.buildSync();
-        } else {
-            return builder.buildAsync().block();
-        }
+        return buildClient(builder, mcpServer.getMode());
     }
 
     /**

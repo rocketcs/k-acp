@@ -51,8 +51,31 @@ logs
 
 # Local k-acp runtime secrets and generated Graphify artifacts
 docker/.env.kacp
+docker/.env.kylin
+docker/.env.kylin.core-dm8
 graphify-out/
 
 # Codex environment connection credentials. Commit only the accompanying
 # .env.example templates; each environment's .env is local to the operator.
 env/*/.env
+
+# Local agent state, generated caches, and temporary artifacts
+.mindfs/
+.superpowers/
+agent_context.json
+__pycache__/
+tmp/
+.gstack/
+
+# 本地个人运行配置（仓库只提交 .sample.yml）
+application-dev.yml
+
+# 本地生成产物与临时文件
+tmp_*
+/data/
+/outputs/
+/output/mock-data/
+/output/imagegen/
+/output/finance-reimbursement-graph/
+.frontend-update-hook
+.pi/

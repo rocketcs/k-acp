@@ -12,6 +12,7 @@
         :code="part.code as string"
         :is-streaming="isStreaming"
         :disabled="disabled"
+        :is-diy-chat="isDiyChat"
         @submit="emit('interactionSubmit', $event)"
         @retry="emit('uipRetry', $event)"
       />
@@ -40,6 +41,7 @@ const props = defineProps<{
   content: string
   disabled?: boolean
   isStreaming?: boolean
+  isDiyChat?: boolean
 }>()
 
 const emit = defineEmits<{

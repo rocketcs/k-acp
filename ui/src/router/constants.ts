@@ -20,6 +20,11 @@ export const RouteNames = {
   // 主页
   HOME: 'Home',
   DASHBOARD: 'Dashboard',
+  DASHBOARD_DESIGN: 'DashboardDesign',
+  DASHBOARD_DATASET: 'DashboardDataset',
+  AUTOMATION: 'Automation',
+  API_SERVICE: 'ApiService',
+  CHAT_CLUSTER: 'ChatCluster',
 
   // Agent管理
   AGENT: 'Agent',
@@ -48,6 +53,7 @@ export const RouteNames = {
   SKILL: 'Skill',
   SKILL_EDITOR: 'SkillEditor',
   SKILL_EDITOR_NEW: 'SkillEditorNew',
+  SKILL_HUB: 'SkillHub',
 
   // MCP管理
   MCP: 'Mcp',
@@ -65,6 +71,10 @@ export const RouteNames = {
   // 智能体对话
   CHAT: 'Chat',
   CHAT_DIY: 'ChatDiy',
+  LARGE_SCREEN_IMAGE_CHAT: 'LargeScreenImageChat',
+  BIAOSHU_INTERPRETER_CHAT: 'BiaoshuInterpreterChat',
+  GRAPHIFY_DATA_QUERY_CHAT: 'GraphifyDataQueryChat',
+  NANWANG_DATA_QUERY_CHAT: 'NanwangDataQueryChat',
   CHAT_HISTORY: 'ChatHistory',
   COMMUNICATION: 'Communication',
 
@@ -79,13 +89,15 @@ export const RouteNames = {
   // 运维管理
   OPS_MONITOR: 'OpsMonitor',
   OPS_STORAGE: 'OpsStorage',
+  OPS_SESSION_TRACING: 'OpsSessionTracing',
 
   // 审查管理
   REVIEW_AGENT: 'ReviewAgent',
   REVIEW_WORKFLOW: 'ReviewWorkflow',
 
   // 错误页面
-  NOT_FOUND: 'NotFound'
+  NOT_FOUND: 'NotFound',
+  FORBIDDEN: 'Forbidden'
 } as const
 
 /**
@@ -102,6 +114,11 @@ export const RoutePaths = {
   ROOT: '/',
   HOME: '/home',
   DASHBOARD: '/dashboard',
+  DASHBOARD_DESIGN: '/dashboard/design',
+  DASHBOARD_DATASET: '/dashboard/dataset-manage',
+  AUTOMATION: '/automation',
+  API_SERVICE: '/api-service',
+  CHAT_CLUSTER: '/chat-cluster',
 
   // Agent管理
   AGENT: 'agent',
@@ -133,6 +150,7 @@ export const RoutePaths = {
   SKILL: 'skill',
   SKILL_NEW: 'skill/new',
   SKILL_EDIT: 'skill/:id/edit',
+  SKILL_HUB: '/skill/hub',
 
   // MCP管理
   MCP: 'mcp',
@@ -147,6 +165,10 @@ export const RoutePaths = {
   // 智能体对话
   CHAT: '/chat',
   CHAT_DIY: '/chat/diy',
+  LARGE_SCREEN_IMAGE_CHAT: '/chat/diy/large-screen-image',
+  BIAOSHU_INTERPRETER_CHAT: '/chat/diy/biaoshu-interpreter',
+  GRAPHIFY_DATA_QUERY_CHAT: '/chat/diy/graphify-data-query',
+  NANWANG_DATA_QUERY_CHAT: '/chat/diy/nanwang-data-query',
   CHAT_HISTORY: '/chat/history',
   COMMUNICATION: '/communication',
 
@@ -161,6 +183,7 @@ export const RoutePaths = {
   // 运维管理
   OPS_MONITOR: 'ops/monitor',
   OPS_STORAGE: 'ops/storage',
+  OPS_SESSION_TRACING: 'ops/session-tracing',
 
   // 审查管理
   REVIEW_AGENT: 'review/agent',

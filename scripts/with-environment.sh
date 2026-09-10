@@ -3,7 +3,7 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 <local|test|prod> [--require ssh|mysql] -- <command> [args...]" >&2
+  echo "Usage: $0 <local|test|kylin> [--require ssh|mysql] -- <command> [args...]" >&2
   exit 64
 }
 
@@ -11,7 +11,7 @@ usage() {
 
 environment="$1"
 case "$environment" in
-  local|test|prod) ;;
+  local|test|kylin) ;;
   *) usage ;;
 esac
 

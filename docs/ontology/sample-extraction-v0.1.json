@@ -1,0 +1,53 @@
+{
+  "version": "0.1.0",
+  "extraction": {
+    "database": "dm8-mock",
+    "schema": "MOCK_APP",
+    "sourceTable": "MOCK_APP.MM_SD_ZNCK_WAREHOUSE_DISTR_M",
+    "joinTable": "MOCK_APP.MM_SD_ZNCK_WAREHOUSE_INFO_M",
+    "sampleSize": 20,
+    "totalSourceRows": 436673,
+    "extractorVersion": "mock-ontology-v0.1",
+    "reviewStatus": "pending",
+    "sql": "SELECT i.warehouse_distr_id, i.actual_warehouse_id, i.material_id, i.vendor_id, i.project_id, i.actual_qty, i.unit_price, i.actual_total_price, i.usage, i.inventory_age_id, w.warehouse_level, i.province_code, i.bureau_code FROM MOCK_APP.MM_SD_ZNCK_WAREHOUSE_DISTR_M i LEFT JOIN MOCK_APP.MM_SD_ZNCK_WAREHOUSE_INFO_M w ON w.warehouse_id = i.actual_warehouse_id ORDER BY i.warehouse_distr_id FETCH FIRST 20 ROWS ONLY"
+  },
+  "enumMappings": {
+    "usage": {
+      "U1": "项目物资",
+      "U2": "储备物资",
+      "U3": "闲置物资",
+      "U4": "报废物资",
+      "U5": "战略储备物资",
+      "U6": "常规储备物资"
+    },
+    "inventoryAgeId": {
+      "-1": "1年以内",
+      "1": "1-3年",
+      "3": "3-5年",
+      "5": "5-10年",
+      "10": "10年以上"
+    }
+  },
+  "records": [
+    {"id":"urn:kacp:mock:stock:INV000000000","warehouse":"urn:kacp:mock:warehouse:WH0000527","material":"urn:kacp:mock:material:MAT000001","supplier":"urn:kacp:mock:supplier:V00001","project":null,"quantity":1,"unitPrice":50,"totalPrice":50,"usage":"闲置物资","inventoryAge":"1年以内","warehouseLevel":2,"provinceCode":"P31","bureauCode":"B3102"},
+    {"id":"urn:kacp:mock:stock:INV000000001","warehouse":"urn:kacp:mock:warehouse:WH0003393","material":"urn:kacp:mock:material:MAT000002","supplier":"urn:kacp:mock:supplier:V00002","project":null,"quantity":2,"unitPrice":51,"totalPrice":102,"usage":"储备物资","inventoryAge":"1-3年","warehouseLevel":4,"provinceCode":"P14","bureauCode":"B1405"},
+    {"id":"urn:kacp:mock:stock:INV000000002","warehouse":"urn:kacp:mock:warehouse:WH0005305","material":"urn:kacp:mock:material:MAT000003","supplier":"urn:kacp:mock:supplier:V00003","project":null,"quantity":3,"unitPrice":52,"totalPrice":156,"usage":"储备物资","inventoryAge":"3-5年","warehouseLevel":4,"provinceCode":"P04","bureauCode":"B0407"},
+    {"id":"urn:kacp:mock:stock:INV000000003","warehouse":"urn:kacp:mock:warehouse:WH0006198","material":"urn:kacp:mock:material:MAT000004","supplier":"urn:kacp:mock:supplier:V00004","project":null,"quantity":4,"unitPrice":53,"totalPrice":212,"usage":"储备物资","inventoryAge":"5-10年","warehouseLevel":2,"provinceCode":"P29","bureauCode":"B2905"},
+    {"id":"urn:kacp:mock:stock:INV000000004","warehouse":"urn:kacp:mock:warehouse:WH0000237","material":"urn:kacp:mock:material:MAT000005","supplier":"urn:kacp:mock:supplier:V00005","project":null,"quantity":5,"unitPrice":54,"totalPrice":270,"usage":"储备物资","inventoryAge":"10年以上","warehouseLevel":1,"provinceCode":"P20","bureauCode":"B2008"},
+    {"id":"urn:kacp:mock:stock:INV000000005","warehouse":"urn:kacp:mock:warehouse:WH0002412","material":"urn:kacp:mock:material:MAT000006","supplier":"urn:kacp:mock:supplier:V00006","project":null,"quantity":6,"unitPrice":55,"totalPrice":330,"usage":"战略储备物资","inventoryAge":"1年以内","warehouseLevel":2,"provinceCode":"P25","bureauCode":"B2503"},
+    {"id":"urn:kacp:mock:stock:INV000000006","warehouse":"urn:kacp:mock:warehouse:WH0004047","material":"urn:kacp:mock:material:MAT000007","supplier":"urn:kacp:mock:supplier:V00007","project":null,"quantity":7,"unitPrice":56,"totalPrice":392,"usage":"报废物资","inventoryAge":"1-3年","warehouseLevel":1,"provinceCode":"P17","bureauCode":"B1711"},
+    {"id":"urn:kacp:mock:stock:INV000000007","warehouse":"urn:kacp:mock:warehouse:WH0006883","material":"urn:kacp:mock:material:MAT000008","supplier":"urn:kacp:mock:supplier:V00008","project":"urn:kacp:mock:project:PRJ0000007","quantity":8,"unitPrice":57,"totalPrice":456,"usage":"项目物资","inventoryAge":"3-5年","warehouseLevel":3,"provinceCode":"P01","bureauCode":"B0113"},
+    {"id":"urn:kacp:mock:stock:INV000000008","warehouse":"urn:kacp:mock:warehouse:WH0000028","material":"urn:kacp:mock:material:MAT000009","supplier":"urn:kacp:mock:supplier:V00009","project":null,"quantity":9,"unitPrice":58,"totalPrice":522,"usage":"报废物资","inventoryAge":"5-10年","warehouseLevel":1,"provinceCode":"P28","bureauCode":"B2801"},
+    {"id":"urn:kacp:mock:stock:INV000000009","warehouse":"urn:kacp:mock:warehouse:WH0001958","material":"urn:kacp:mock:material:MAT000010","supplier":"urn:kacp:mock:supplier:V00010","project":null,"quantity":10,"unitPrice":59,"totalPrice":590,"usage":"战略储备物资","inventoryAge":"10年以上","warehouseLevel":1,"provinceCode":"P05","bureauCode":"B0504"},
+    {"id":"urn:kacp:mock:stock:INV000000010","warehouse":"urn:kacp:mock:warehouse:WH0003979","material":"urn:kacp:mock:material:MAT000011","supplier":"urn:kacp:mock:supplier:V00011","project":null,"quantity":11,"unitPrice":60,"totalPrice":660,"usage":"储备物资","inventoryAge":"1年以内","warehouseLevel":1,"provinceCode":"P11","bureauCode":"B1109"},
+    {"id":"urn:kacp:mock:stock:INV000000011","warehouse":"urn:kacp:mock:warehouse:WH0006585","material":"urn:kacp:mock:material:MAT000012","supplier":"urn:kacp:mock:supplier:V00012","project":"urn:kacp:mock:project:PRJ0000011","quantity":12,"unitPrice":61,"totalPrice":732,"usage":"项目物资","inventoryAge":"1-3年","warehouseLevel":3,"provinceCode":"P13","bureauCode":"B1303"},
+    {"id":"urn:kacp:mock:stock:INV000000012","warehouse":"urn:kacp:mock:warehouse:WH0000073","material":"urn:kacp:mock:material:MAT000013","supplier":"urn:kacp:mock:supplier:V00013","project":null,"quantity":13,"unitPrice":62,"totalPrice":806,"usage":"闲置物资","inventoryAge":"3-5年","warehouseLevel":1,"provinceCode":"P11","bureauCode":"B1103"},
+    {"id":"urn:kacp:mock:stock:INV000000013","warehouse":"urn:kacp:mock:warehouse:WH0002792","material":"urn:kacp:mock:material:MAT000014","supplier":"urn:kacp:mock:supplier:V00014","project":null,"quantity":14,"unitPrice":63,"totalPrice":882,"usage":"闲置物资","inventoryAge":"5-10年","warehouseLevel":3,"provinceCode":"P02","bureauCode":"B0201"},
+    {"id":"urn:kacp:mock:stock:INV000000014","warehouse":"urn:kacp:mock:warehouse:WH0004227","material":"urn:kacp:mock:material:MAT000015","supplier":"urn:kacp:mock:supplier:V00015","project":null,"quantity":15,"unitPrice":64,"totalPrice":960,"usage":"储备物资","inventoryAge":"10年以上","warehouseLevel":2,"provinceCode":"P11","bureauCode":"B1102"},
+    {"id":"urn:kacp:mock:stock:INV000000015","warehouse":"urn:kacp:mock:warehouse:WH0006185","material":"urn:kacp:mock:material:MAT000016","supplier":"urn:kacp:mock:supplier:V00016","project":null,"quantity":16,"unitPrice":65,"totalPrice":1040,"usage":"闲置物资","inventoryAge":"1年以内","warehouseLevel":2,"provinceCode":"P16","bureauCode":"B1605"},
+    {"id":"urn:kacp:mock:stock:INV000000016","warehouse":"urn:kacp:mock:warehouse:WH0000871","material":"urn:kacp:mock:material:MAT000017","supplier":"urn:kacp:mock:supplier:V00017","project":"urn:kacp:mock:project:PRJ0000016","quantity":17,"unitPrice":66,"totalPrice":1122,"usage":"项目物资","inventoryAge":"1-3年","warehouseLevel":2,"provinceCode":"P03","bureauCode":"B0314"},
+    {"id":"urn:kacp:mock:stock:INV000000017","warehouse":"urn:kacp:mock:warehouse:WH0005332","material":"urn:kacp:mock:material:MAT000018","supplier":"urn:kacp:mock:supplier:V00018","project":"urn:kacp:mock:project:PRJ0000017","quantity":18,"unitPrice":67,"totalPrice":1206,"usage":"项目物资","inventoryAge":"3-5年","warehouseLevel":4,"provinceCode":"P31","bureauCode":"B3107"},
+    {"id":"urn:kacp:mock:stock:INV000000018","warehouse":"urn:kacp:mock:warehouse:WH0005181","material":"urn:kacp:mock:material:MAT000019","supplier":"urn:kacp:mock:supplier:V00019","project":null,"quantity":19,"unitPrice":68,"totalPrice":1292,"usage":"闲置物资","inventoryAge":"5-10年","warehouseLevel":4,"provinceCode":"P04","bureauCode":"B0403"},
+    {"id":"urn:kacp:mock:stock:INV000000019","warehouse":"urn:kacp:mock:warehouse:WH0005942","material":"urn:kacp:mock:material:MAT000020","supplier":"urn:kacp:mock:supplier:V00020","project":null,"quantity":20,"unitPrice":69,"totalPrice":1380,"usage":"战略储备物资","inventoryAge":"10年以上","warehouseLevel":1,"provinceCode":"P21","bureauCode":"B2112"}
+  ]
+}

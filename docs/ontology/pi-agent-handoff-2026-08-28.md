@@ -1,0 +1,146 @@
+# Pi Agent 交接：DM8 电力物资中文知识图谱
+
+交接时间：2026-08-28（Asia/Shanghai）；**数据版本已升级至 v0.2**（同日重建，逻辑自洽）
+当前分支：`dev`
+交接状态：可关闭当前会话；本文件是 Pi agent 的入口说明。
+
+## 一句话结论
+
+DM8 本地模拟库已重建为带公开设备类别校准的电力物资数据，并已升级到 **v0.2（字段逻辑自洽：库龄与入库日期强一致、金额跨数量级、无未知档）**；独立 Neo4j 模拟实例已导入中文节点和中文关系；固定 HTML 是「电力调度驾驶舱」渲染器（淡蓝科技风，图谱/表格双视图，表格自适应数据类型），后续查询只需替换 JSON，不修改 HTML。
+
+## 已完成
+
+### DM8 数据库
+
+- 容器：`dm8-mock`
+- 地址：`127.0.0.1`
+- 端口：`5236`
+- 服务名：`DMSERVER`
+- 模式：`MOCK_APP`
+- 用户：`MOCK_APP`
+- 密码：`MockApp2026`
+- 管理员：`SYSDBA`
+- 管理员密码：`SYSDBA2026`
+- 旧库备份：`data/dm8-mock-backup-20260828/`
+
+凭证核对：已在本机通过 DM8 `disql` 使用 `MOCK_APP/MockApp2026` 连接并查询库存表，密码末尾没有 `#`。连接验证查询返回库存记录数 `20,000`。命令行中密码含特殊字符时请使用引号；不要把数据库凭证写入浏览器页面或前端代码。
+
+新数据规模（v0.2）：公开资料来源 9 条、设备目录 240 条、仓库 48 条、库存记录 20,000 条、库存汇总 222 条（省份×仓库等级×用途聚合）。设备类别包含变压器、开关设备、环网柜、断路器、互感器、保护装置、自动化设备、避雷器、电缆、绝缘子、电容器、储能设备、光伏设备、风电设备和充电设备。
+
+v0.2 逻辑约束（审计可对照）：库龄由入库日期强推导（五档，无未知）；报废物资只允许 5-10 年/10 年以上库龄；金额 = 数量×单价严格成立，跨 1,636 元 ~ 3 亿；同供应商同物资价差 ≤~11%；税额 13%；仓库用途汇总金额由明细严格聚合。详见 `docs/ontology/dm8-realistic-mock-v0.1.md`（含 v0.1 缺陷对照表）。
+
+### Neo4j 中文图谱
+
+- 独立容器：`k-acp-neo4j-mock`
+- Bolt：`bolt://127.0.0.1:7689`
+- 浏览器：http://127.0.0.1:7477
+- 用户：`neo4j`
+- 密码：`MockGraph2026!`
+- 原历史图谱：`k-acp-neo4j`，仍在 `bolt://127.0.0.1:7687`，未删除、未改写。
+
+中文图谱规模（v0.2）：仓库 48、库存记录 20,000、物资 240、供应商 60、项目 180、区域 19、资料来源 9。
+
+中文关系及数量：
+
+- `包含库存`：20,000
+- `对应物资`：20,000
+- `由供应商提供`：20,000
+- `归属项目`：4,035（仅“项目物资”用途挂项目）
+- `位于区域`：48
+- `校准自`：240
+
+### 固定渲染页面
+
+- 页面：`docs/ontology/dm8-graph-demo-cn.html`
+- 样例数据：`docs/ontology/sample-graph-data-cn.json`
+- 当前页面：`file:///Users/rocket/kingsware/k-acp/docs/ontology/dm8-graph-demo-cn.html?data=sample-graph-data-cn.json`
+- 设计：淡蓝科技风电力调度驾驶舱，左侧摘要、中间 ECharts 图谱（细线 0.6/细字重 300）、右侧节点属性；顶部可切换图谱/表格双视图。
+- 表格视图自适应数据类型：有库存记录时显示库存明细表（11 列可排序），否则按主要实体类型自动生成通用表（列从属性推导）。
+- 界面标签全部中文，无英文 label；URN 不进入展示层（仅存 JSON trace 字段），属性面板 ID 显示短码。
+- 所有实体类型、关系名称和属性显示名为中文；业务编码（型号/局编码等数据值）原样保留。
+- 注意：修复过「重置布局后图谱消失」的 bug（原 restore action 会破坏 option），重置=用当前数据完整重渲染；切回图谱时会自检并自愈。
+
+HTML 的数据加载优先级：
+
+1. URL 参数 `?data=<JSON 地址>`；
+2. 调用方注入 `window.__GRAPH_DATA__`；
+3. 页面内置离线示例。
+
+公开函数：
+
+```js
+window.renderGraph(data)
+window.loadGraphData(url)
+```
+
+### 查询导出器
+
+脚本：`tools/ontology/export_neo4j_graph.py`
+
+示例：
+
+```bash
+python3 tools/ontology/export_neo4j_graph.py \
+  --warehouse-id urn:kacp:mock:warehouse:WH0000004 \
+  --limit 24 \
+  --uri bolt://127.0.0.1:7689 \
+  --user neo4j \
+  --password 'MockGraph2026!' \
+  --output docs/ontology/sample-graph-data-cn.json
+```
+
+导出后打开固定 HTML 并追加 `?data=sample-graph-data-cn.json`，页面会自动渲染新查询结果。
+
+## 验证结果
+
+- Python 导出器：`py_compile` 通过。
+- HTML 内嵌 JavaScript：`node --check` 通过。
+- JSON 契约：节点数、关系数、悬空边校验通过；当前样例 56 个节点、78 条关系。
+- Neo4j 完整性：20,000 条库存均有物资关系和供应商关系。
+- 金额一致性：`abs(数量 × 单价 - 金额) <= 0.01` 的异常数为 0。
+- HTTP 静态服务：HTML 和 JSON 均返回 200。
+- 项目 pytest 未执行：当前 Python 环境没有安装 `pytest`。
+
+## 关闭会话前的版本与工作区边界
+
+- 当前已保存的图谱交付提交为 `f8e8fae6 docs: preserve DM8 graph artifacts and Pi handoff`，其父提交为 `7a5d5848` 和 `1dfcb8f2`。
+- 图谱相关文件已纳入 Git；后续只修改查询导出的 JSON，不改固定 HTML 渲染器。
+- 当前工作区还存在其他任务的修改和未跟踪文件（主要在 `docker/`、`ui/`、`data/`、`output/` 和 `outputs/`）。这些内容不属于本次图谱交付，Pi agent 不得擅自清理、回滚、暂存或提交；接手时先运行 `git status --short` 再决定自己的变更范围。
+- 本次交接不包含远程推送；远程分支状态需由后续操作者明确确认后再处理。
+
+## 已提交提交
+
+- `1dfcb8f2 docs: define reusable DM8 graph dashboard design`
+- `7a5d5848 feat: add reusable DM8 graph dashboard renderer`
+
+本次提交包含 HTML、JSON 样例、Neo4j 导出器、设计说明、实现计划和 DM8 重建记录。
+
+## 还需要做什么
+
+1. 如果要让页面在严格 `file://` 环境加载外部 JSON，建议通过本地静态服务器打开，例如在 `docs/ontology` 目录执行 `python3 -m http.server 8765`，再访问 `http://127.0.0.1:8765/dm8-graph-demo-cn.html?data=sample-graph-data-cn.json`。
+2. 将现有自然语言查询服务接到导出器：查询服务生成 `GraphData` JSON 后直接调用 `window.renderGraph(data)`，不要修改 HTML。
+3. 如需全库图谱，先增加分页或采样策略；不要把 20,000 条库存一次性绘制到浏览器。
+4. 可补充自动化浏览器测试（页面加载、节点点击、空图和错误回退）；当前环境缺少 pytest，且 Browser 对 `file://` 页面有安全限制。
+5. 工作区仍有其他未相关改动和未跟踪文件，Pi agent 不要擅自清理、回滚或提交它们。
+
+## Pi agent 接手顺序
+
+1. 阅读本文件、`dm8-realistic-mock-v0.1.md`、设计说明和实现计划。
+2. 检查容器状态：`docker ps --format '{{.Names}}\t{{.Ports}}' | grep -E 'dm8|neo4j'`。
+3. 用导出器生成一个小子图 JSON，确认节点、关系均为中文且无悬空边。
+4. 通过本地静态服务器打开固定 HTML，验证节点点击、属性面板、标签开关和空图回退。
+5. 只有在用户明确要求继续开发时，才把自然语言查询服务接入 `window.renderGraph(data)`；不要重写 HTML，也不要一次性渲染 20,000 条库存记录。
+
+## 关键文件
+
+- `docs/ontology/dm8-graph-demo-cn.html`
+- `docs/ontology/sample-graph-data-cn.json`
+- `tools/ontology/export_neo4j_graph.py`
+- `tools/ontology/build_mock_v0_2.py`（v0.2 数据生成器，种子固定，自带一致性校验）
+- `tools/ontology/LoadMockV02.java`（v0.2 DM8 JDBC 导入器，自动备份 v0.1）
+- `tools/ontology/rebuild_neo4j_v0_2.py`（v0.2 Neo4j 重建器）
+- `docs/ontology/deep-queries-cn-v0.1.cypher`
+- `docs/ontology/dm8-realistic-mock-v0.1.md`（v0.2 记录 + v0.1 缺陷对照）
+- `docs/superpowers/specs/2026-08-28-dm8-graph-dashboard-design.md`
+- `docs/superpowers/plans/2026-08-28-dm8-graph-dashboard.md`
+- `data/dm8-mock-v0.2/`（v0.2 CSV 源数据）

@@ -2,7 +2,10 @@
 import ChatInput from './ChatInput.vue'
 import { computed, ref } from 'vue'
 import DiyWelcome from './DiyWelcome.vue'
-import type { DiyOutputFormat, DiyPageConfig } from '@/types'
+import AgentRunActivity from './AgentRunActivity.vue'
+import AgentRunWaiting from './AgentRunWaiting.vue'
+import type { ChatAttachmentPolicy } from '@/composables/chat/useChatAttachments'
+import type { DiyOutputFormat, DiyPageConfig, RunActivity, UploadedFileItem } from '@/types'
 
 const props = defineProps<{
   messageSize: number
@@ -12,6 +15,12 @@ const props = defineProps<{
   description?: string
   uploadedFiles?: import('@/types').UploadedFileItem[]
   isRunning?: boolean
+  runActivities?: RunActivity[]
+  showRunActivity?: boolean
+  showRunWaiting?: boolean
+  runStartedAt?: number | null
+  showInput?: boolean
+  isDiyChat?: boolean
   memoryActive?: boolean
   planActive?: boolean
   enableMemory?: boolean
@@ -19,10 +28,15 @@ const props = defineProps<{
   toolProcessActive?: boolean
   showToolProcess?: boolean
   allowUploadFileType?: string[]
+  attachmentPolicy?: ChatAttachmentPolicy
+  attachmentDropEnabled?: boolean
+  onUploadComplete?: (file: UploadedFileItem) => void
+  onAttachmentRemoved?: (file: UploadedFileItem) => void
   sessionId?: string | null
   mentionAllowed?: boolean
   hasCodeExecutionConfig?: boolean
   diyConfig?: DiyPageConfig | null
+  showGraphExplorer?: boolean
 }>()
 
 const needInit = computed(() => {
@@ -37,12 +51,21 @@ defineEmits<{
   (e: 'plan', value: boolean): void
   (e: 'toolProcess', value: boolean): void
   (e: 'newSession'): void
+  (e: 'abort'): void
   (e: 'quickSend', payload: { text: string; outputFormat: DiyOutputFormat }): void
+  (e: 'graphExplorer'): void
 }>()
 
 const diyFormActive = ref(false)
+const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const resolvedHeadline = computed(() => props.diyConfig?.headline || props.headline)
 const resolvedDescription = computed(() => props.diyConfig?.description || props.description)
+
+const requestAttachmentPicker = (options?: { replace?: boolean }) => {
+  chatInputRef.value?.requestAttachmentPicker(options)
+}
+
+defineExpose({ requestAttachmentPicker })
 </script>
 
 <template>
@@ -50,20 +73,34 @@ const resolvedDescription = computed(() => props.diyConfig?.description || props
     class="chat-welcome"
     :class="{
       'has-diy-form': diyFormActive,
+      'is-diy-chat': isDiyChat,
       'is-diy-welcome': Boolean(diyConfig),
     }"
   >
     <h2 class="chat-welcome-title" :title="resolvedHeadline">{{ resolvedHeadline }}</h2>
     <p v-if="resolvedDescription && !diyConfig" class="chat-welcome-desc" :title="resolvedDescription">{{ resolvedDescription }}</p>
+    <AgentRunActivity
+      v-if="showRunActivity"
+      :activities="runActivities || []"
+      :started-at="runStartedAt"
+      :is-running="true"
+      @abort="$emit('abort')"
+    />
+    <AgentRunWaiting
+      v-else-if="showRunWaiting"
+      :started-at="runStartedAt"
+      @abort="$emit('abort')"
+    />
     <DiyWelcome
-      v-if="diyConfig"
+      v-else-if="diyConfig"
       :config="diyConfig"
       :is-running="isRunning"
       @confirm="$emit('quickSend', $event)"
       @form-active="diyFormActive = $event"
     />
-    <div v-if="!diyFormActive" class="chat-input-outer chat-welcome-input">
+    <div v-if="!diyFormActive && showInput !== false" class="chat-input-outer chat-welcome-input">
       <ChatInput
+        ref="chatInputRef"
         :model-value="inputValue"
         :agent-id="agentId"
         :uploaded-files="uploadedFiles"
@@ -74,11 +111,16 @@ const resolvedDescription = computed(() => props.diyConfig?.description || props
         :enable-memory="enableMemory"
         :enable-planning="enablePlanning"
         :allow-upload-file-type="allowUploadFileType"
+        :attachment-policy="attachmentPolicy"
+        :attachment-drop-enabled="attachmentDropEnabled"
+        :on-upload-complete="onUploadComplete"
+        :on-attachment-removed="onAttachmentRemoved"
         :show-tool-process="showToolProcess"
         :tool-process-active="toolProcessActive"
         :session-id="sessionId"
         :mention-allowed="mentionAllowed"
         :need-init="needInit"
+        :show-graph-explorer="showGraphExplorer"
         @update:model-value="$emit('update:inputValue', $event)"
         @update:uploaded-files="$emit('update:uploadedFiles', $event)"
         @memory="$emit('memory', $event)"
@@ -86,6 +128,7 @@ const resolvedDescription = computed(() => props.diyConfig?.description || props
         @toolProcess="$emit('toolProcess', $event)"
         @send="$emit('send')"
         @new-session="$emit('newSession')"
+        @graph-explorer="$emit('graphExplorer')"
       />
     </div>
   </div>

@@ -2,9 +2,11 @@
 import { Background } from '@vue-flow/background'
 import { MiniMap } from '@vue-flow/minimap'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { message } from 'ant-design-vue'
 import { VueFlow, useVueFlow, type Connection, type GraphNode } from '@vue-flow/core'
 import WorkflowGraphEdge from '@/components/workflow/edge/WorkflowGraphEdge.vue'
 import WorkflowGraphNode from '@/components/workflow/node/WorkflowGraphNode.vue'
+import { validateOutputEdge } from '@/utils/workflow/edgeRules'
 import type { WorkflowFlowEdge, WorkflowFlowNode } from '@/types/workflow'
 
 import '@vue-flow/core/dist/style.css'
@@ -24,9 +26,12 @@ const emit = defineEmits<{
   paneClick: []
   showLibrary: [payload: { sourceNodeId: string; sourceHandle: string; x: number; y: number }]
   showLibraryFromEdge: [payload: { edgeId: string; x: number; y: number }]
+  deleteNodes: [nodeIds: string[]]
+  deleteEdges: [edgeIds: string[]]
 }>()
 
 const flow = useVueFlow()
+const { getSelectedNodes, getSelectedEdges } = flow
 const { viewport } = flow
 
 // ========== 对齐辅助线 ==========
@@ -155,6 +160,11 @@ function deduplicateGuides(guides: AlignGuide[]): AlignGuide[] {
   })
 }
 
+function onNodeDragStart() {
+  // if (props.readonly) return
+  // emit('selectNode', node.id)
+}
+
 function onNodeDrag({ node }: { node: GraphNode }) {
   if (props.readonly) return
   const { guides, snapX, snapY } = computeAlignment(node)
@@ -183,13 +193,31 @@ function clearGuides() {
 }
 
 // 全局安全网：捕获阶段监听，确保在 VueFlow stopPropagation 之前拦截
+function onKeyDown(event: KeyboardEvent) {
+  if (event.key !== 'Backspace' && event.key !== 'Delete') return
+  if (props.readonly) return
+  // 焦点在输入类控件时不响应，避免与文本编辑冲突
+  const active = document.activeElement as HTMLElement | null
+  const tag = active?.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || active?.isContentEditable) return
+  // 从 VueFlow 内部 store 读取真实选中状态（v-model 数组不一定同步 selected）
+  const selectedNodeIds = getSelectedNodes.value.map((n) => n.id)
+  const selectedEdgeIds = getSelectedEdges.value.map((e) => e.id)
+  if (!selectedNodeIds.length && !selectedEdgeIds.length) return
+  event.preventDefault()
+  if (selectedNodeIds.length) emit('deleteNodes', selectedNodeIds)
+  if (selectedEdgeIds.length) emit('deleteEdges', selectedEdgeIds)
+}
+
 onMounted(() => {
+  window.addEventListener('keydown', onKeyDown, true)
   window.addEventListener('mouseup', clearGuides, true)
   window.addEventListener('pointerup', clearGuides, true)
   window.addEventListener('blur', clearGuides)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', onKeyDown, true)
   window.removeEventListener('mouseup', clearGuides, true)
   window.removeEventListener('pointerup', clearGuides, true)
   window.removeEventListener('blur', clearGuides)
@@ -216,7 +244,17 @@ function onConnect(connection: Connection) {
       (edge.sourceHandle || 'output') === sourceHandle &&
       (edge.targetHandle || 'input') === targetHandle,
   )
-  if (edgeExists) return
+  if (edgeExists) {
+    message.warning('这两个节点之间已存在相同连线')
+    return
+  }
+  // 单输出节点的输出点已有连线时拒绝新增，并告知用户原因
+  const sourceNode = nodes.value.find((item) => item.id === connection.source)
+  const rule = validateOutputEdge(sourceNode, edges.value, sourceHandle)
+  if (!rule.ok) {
+    message.warning(rule.reason)
+    return
+  }
   flow.addEdges([
     {
       id: `edge-${connection.source}-${sourceHandle}-${connection.target}-${Date.now()}`,
@@ -290,11 +328,22 @@ function getViewport() {
   return { ...viewport.value }
 }
 
+/** 返回各节点渲染后的真实尺寸，供自动布局按实际卡片高度对齐连接点 */
+function getNodeDimensions() {
+  const map: Record<string, { width: number; height: number }> = {}
+  flow.getNodes.value.forEach((node) => {
+    if (node.dimensions.width > 0 && node.dimensions.height > 0) {
+      map[node.id] = { width: node.dimensions.width, height: node.dimensions.height }
+    }
+  })
+  return map
+}
+
 function restoreViewport(vp: { x: number; y: number; zoom: number }) {
   flow.setViewport(vp, { duration: 0 })
 }
 
-defineExpose({ addAtCenter, fitAll, zoomInCanvas, zoomOutCanvas, resetZoom, fitNode, getViewport, restoreViewport })
+defineExpose({ addAtCenter, fitAll, zoomInCanvas, zoomOutCanvas, resetZoom, fitNode, getViewport, restoreViewport, getNodeDimensions })
 </script>
 
 <template>
@@ -306,12 +355,13 @@ defineExpose({ addAtCenter, fitAll, zoomInCanvas, zoomOutCanvas, resetZoom, fitN
       :nodes-draggable="!readonly"
       :nodes-connectable="!readonly"
       :edges-updatable="!readonly"
-      :delete-key-code="['Backspace', 'Delete']"
+      :delete-key-code="[]"
       :default-edge-options="{ animated: false, type: 'workflow' }"
       @connect="onConnect"
       @node-click="onNodeClick"
       @node-context-menu="onNodeContextMenu"
       @pane-click="onPaneClick"
+      @node-drag-start="onNodeDragStart"
       @node-drag="onNodeDrag"
       @node-drag-stop="onNodeDragStop"
     >

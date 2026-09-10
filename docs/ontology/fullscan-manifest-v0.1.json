@@ -1,0 +1,88 @@
+{
+  "version": "0.1.0",
+  "status": "exported_to_temp_jsonl",
+  "source": {
+    "database": "dm8-mock",
+    "schema": "MOCK_APP",
+    "tables": {
+      "stock": "MM_SD_ZNCK_WAREHOUSE_DISTR_M",
+      "warehouse": "MM_SD_ZNCK_WAREHOUSE_INFO_M",
+      "summary": "MM_SD_ZTFX_WAR_MONEY_K"
+    }
+  },
+  "rowCounts": {
+    "stock": 436673,
+    "warehouse": 7127,
+    "summary": 41077
+  },
+  "entityCounts": {
+    "warehouse": 7127,
+    "stockRecord": 436673,
+    "material": 2400,
+    "supplier": 500,
+    "project": 50619
+  },
+  "qualityGate": {
+    "passed": true,
+    "duplicateStockIds": 0,
+    "duplicateWarehouseIds": 0,
+    "orphanWarehouseReferences": 0,
+    "invalidEnums": 0,
+    "negativeMeasures": 0,
+    "priceMismatches": 0,
+    "projectRelationshipViolations": 0
+  },
+  "batchPlan": {
+    "orderingKey": "warehouse_distr_id",
+    "batchSize": 10000,
+    "stockBatches": 44,
+    "checkpoint": "last_successful_warehouse_distr_id",
+    "idempotencyKey": "sourceTable + warehouse_distr_id",
+    "onConflict": "upsert_after_review",
+    "deadLetterPolicy": "write_invalid_record_and_continue"
+  },
+  "exportResult": {
+    "format": "jsonl.gz",
+    "path": "/tmp/stock_full.jsonl.gz",
+    "rows": 436673,
+    "uniqueIds": 436673,
+    "parseErrors": 0,
+    "businessRuleViolations": 0,
+    "firstId": "urn:kacp:mock:stock:INV000000000",
+    "lastId": "urn:kacp:mock:stock:INV000436672",
+    "sha256": "f83a16d807a862cd29c88b4900ea6ced6a646476198104d98481e67c86c91b4d",
+    "compressedBytes": 12415857
+  },
+  "neo4jImport": {
+    "status": "completed",
+    "targetContainer": "k-acp-neo4j",
+    "bolt": "bolt://127.0.0.1:7687",
+    "database": "neo4j",
+    "nodes": {
+      "Warehouse": 7127,
+      "StockRecord": 436673,
+      "Material": 2400,
+      "Supplier": 500,
+      "Project": 50619,
+      "Region": 465
+    },
+    "relationships": {
+      "CONTAINS_STOCK": 436673,
+      "REFERS_TO_MATERIAL": 436673,
+      "SUPPLIED_BY": 436673,
+      "ASSIGNED_TO_PROJECT": 73109,
+      "LOCATED_IN": 7127
+    },
+    "verification": {
+      "negativeMeasureViolations": 0,
+      "projectRelationshipViolations": 0
+    }
+  },
+  "reviewPolicy": {
+    "autoApprove": ["exact_business_id_match", "quality_gate_pass"],
+    "manualReview": ["entity_name_collision", "missing_optional_reference", "source_schema_conflict"],
+    "sampleReviewRows": 20,
+    "sampleReviewStatus": "pending"
+  },
+  "nextAction": "export_stock_batches_to_jsonl_then_load_to_target_graph"
+}

@@ -1,8 +1,8 @@
 package com.hxh.apboa.engine.formatter;
 
-import io.agentscope.core.formatter.openai.OpenAIMultiAgentFormatter;
-import io.agentscope.core.formatter.openai.dto.OpenAIMessage;
 import io.agentscope.core.message.ContentBlock;
+import io.agentscope.extensions.model.openai.dto.OpenAIMessage;
+import io.agentscope.extensions.model.openai.formatter.OpenAIMultiAgentFormatter;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.ThinkingBlock;

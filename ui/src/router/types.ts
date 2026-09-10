@@ -32,6 +32,11 @@ export interface RouteMeta {
   roles?: Role[]
 
   /**
+   * 是否仅允许租户管理员及所有者访问
+   */
+  tenantAdminOnly?: boolean
+
+  /**
    * 是否在菜单中隐藏
    */
   hidden?: boolean

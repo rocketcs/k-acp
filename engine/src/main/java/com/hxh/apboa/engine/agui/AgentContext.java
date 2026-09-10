@@ -26,6 +26,7 @@ public class AgentContext {
     private String runId;
     private boolean memoryActive;
     private boolean planActive;
+    private boolean toolProcessActive;
     private List<String> fileIds;
     private AccountVO userInfo;
     private AgentDefinition agentDefinition;
@@ -45,6 +46,9 @@ public class AgentContext {
                 ? (Boolean) input.getForwardedProp("memoryActive")
                 : false;
         agentContext.setMemoryActive(memoryActive);
+
+        agentContext.setToolProcessActive(
+                Boolean.TRUE.equals(input.getForwardedProp("toolProcessActive")));
 
         agentContext.setPlanActive(
                 input.getForwardedProp("planActive") != null

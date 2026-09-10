@@ -343,6 +343,32 @@ $small-mobile-breakpoint: 375px;
   transition: opacity $chat-transition;
 }
 
+.chat-sidebar-logout {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: #ff4d4f;
+    background-color: #ffe3e2;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $chat-primary;
+    outline-offset: 1px;
+  }
+}
+
 .chat-sidebar-doc-btn {
   flex-shrink: 0;
   width: 28px;
@@ -780,20 +806,24 @@ $small-mobile-breakpoint: 375px;
 
 .chat-welcome.is-diy-welcome {
   justify-content: flex-start;
-  padding-top: clamp(64px, 9vh, 112px);
-  padding-bottom: 48px;
+  width: 100%;
+  /* Keep the welcome content visually grouped on tall screens while leaving
+     enough room for the composer on short laptops. */
+  padding: clamp(28px, 4.5vh, 64px) clamp(16px, 3.5vw, 72px) clamp(24px, 4vh, 48px);
 
   .chat-welcome-title {
-    margin-bottom: 40px;
+    margin-bottom: clamp(18px, 3vh, 32px);
+    font-size: clamp(22px, 1.6vw, 28px);
+    letter-spacing: -0.02em;
   }
 
   .chat-welcome-input {
-    max-width: 1280px;
-    margin-top: 36px;
+    max-width: 1100px;
+    margin-top: clamp(18px, 3vh, 32px);
   }
 
   &.has-diy-form {
-    padding-top: 64px;
+    padding-top: clamp(24px, 5vh, 64px);
   }
 
   @media (max-width: $mobile-breakpoint) {
@@ -806,6 +836,41 @@ $small-mobile-breakpoint: 375px;
 
     .chat-welcome-input {
       margin-top: var(--spacing-md);
+    }
+  }
+
+  @media (max-height: 700px) and (min-width: #{$mobile-breakpoint + 1}) {
+    padding-top: 20px;
+    padding-bottom: 20px;
+
+    .chat-welcome-title {
+      margin-bottom: 16px;
+    }
+
+    .chat-welcome-input {
+      margin-top: 18px;
+    }
+  }
+}
+
+/* DIY 空会话的输入框固定在内容区底部，避免配置加载前后在页面中部跳动。 */
+.chat-welcome.is-diy-chat {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 100%;
+  justify-content: flex-start;
+
+  .chat-welcome-input {
+    margin-top: auto;
+    margin-bottom: 0;
+  }
+
+  /* 在 DIY 配置尚未加载时仍保持合理的上下留白。 */
+  &:not(.is-diy-welcome) {
+    padding: clamp(32px, 8vh, 96px) clamp(16px, 3.5vw, 72px) clamp(24px, 4vh, 48px);
+
+    @media (max-width: $mobile-breakpoint) {
+      padding: var(--spacing-xl) var(--spacing-md) var(--spacing-lg);
     }
   }
 }
@@ -1195,6 +1260,85 @@ $small-mobile-breakpoint: 375px;
   }
 }
 
+/* 智能医生的知识图谱入口：使用浅蓝底和边框，让它在白色标题栏中明确可见。 */
+.chat-semantic-explore-btn {
+  position: absolute;
+  right: var(--spacing-sm);
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba($chat-primary, 0.28);
+  border-radius: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba($chat-primary, 0.08);
+  color: $chat-primary;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba($chat-primary, 0.12);
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  z-index: 10;
+
+  &:hover {
+    color: $chat-primary;
+    background-color: rgba($chat-primary, 0.14);
+    border-color: rgba($chat-primary, 0.48);
+    box-shadow: 0 2px 7px rgba($chat-primary, 0.18);
+  }
+
+  &:active {
+    transform: translateY(-50%) scale(0.96);
+  }
+
+  &:focus-visible {
+    outline: 2px solid $chat-primary;
+    outline-offset: 2px;
+  }
+}
+
+.chat-main-header:has(.chat-semantic-explore-btn) .chat-main-title {
+  max-width: calc(100% - 180px);
+}
+
+.chat-main-header:has(.chat-semantic-explore-btn) .chat-workspace-btn {
+  right: calc(var(--spacing-sm) + 164px);
+}
+
+@media (max-width: $mobile-breakpoint) {
+  .chat-semantic-explore-btn {
+    width: 36px;
+    padding: 0;
+    border-color: transparent;
+    box-shadow: none;
+
+    span {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  }
+
+  .chat-main-header:has(.chat-semantic-explore-btn) .chat-main-title {
+    max-width: calc(100% - 120px);
+  }
+
+  .chat-main-header:has(.chat-semantic-explore-btn) .chat-workspace-btn {
+    right: calc(var(--spacing-sm) + 44px);
+  }
+}
+
 /**
  * 工具内容样式
  */
@@ -1433,4 +1577,71 @@ $small-mobile-breakpoint: 375px;
   color: #555;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+
+/**
+ * 行为聚合面板
+ * 将连续的思考过程+工具调用消息折叠为一个聚合块
+ */
+.chat-aggregate-panel {
+  overflow: hidden;
+  //border-left: 2px solid #eef0f3;
+  padding-left: 12px;
+}
+
+.chat-aggregate-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+}
+
+.chat-aggregate-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #7B7E80;
+  flex-shrink: 0;
+}
+
+.chat-aggregate-title {
+  font-size: 12px;
+  color: #7B7E80;
+  &:hover {
+    color: #454748;
+  }
+}
+
+.chat-aggregate-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  font-size: 9px;
+  color: #9aa5b5;
+  transition: transform 0.25s ease;
+  flex-shrink: 0;
+
+  &.expanded {
+    transform: rotate(180deg);
+  }
+}
+
+.chat-aggregate-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              padding-top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.is-expanded {
+    max-height: 2000px;
+    padding-top: var(--spacing-sm);
+  }
 }

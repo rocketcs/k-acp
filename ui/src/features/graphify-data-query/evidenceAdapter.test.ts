@@ -1,0 +1,144 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { displayGraphifyLabel, displayGraphifyNodeLabel, parseGraphifyEvidence, parseGraphifyGraphReference, parseGraphifyToolOutcome, parseNeo4jReadCypherGraph } from './evidenceAdapter.ts'
+
+const evidence = {
+  status: 'executed', trace_id: 'trace-1', dataset_id: 'medical_catalog', question: '覆膜气管支架',
+  result: { columns: ['catalog_code'], rows: [{ catalog_code: 'C0101010011303807555' }], truncated: false },
+  semantic_context: { graph_version: 'v1', recommended_models: ['medical_catalog'], recommended_columns: [], rules: [], provenance: {} },
+  evidence: { source_record_ids: ['consumable:main_catalog:C0101010011303807555:6:2'], nodes: [], edges: [] },
+}
+
+test('accepts an executed medical-catalog evidence envelope', () => {
+  assert.equal(parseGraphifyEvidence('query', JSON.stringify(evidence))?.trace_id, 'trace-1')
+})
+
+test('accepts an executed envelope when trace_id/question are empty (direct query tool)', () => {
+  const bare = { ...evidence, trace_id: '', question: '' }
+  const parsed = parseGraphifyEvidence('query', JSON.stringify(bare))
+  assert.equal(parsed?.trace_id, '')
+  assert.equal(parsed?.question, '')
+  assert.equal(parsed?.result.rows.length, 1)
+})
+
+test('rejects legacy bare results', () => {
+  assert.equal(parseGraphifyEvidence('query', '{"catalog_code":"x"}'), null)
+})
+
+test('accepts a complete evidence envelope when the runtime reports an unexpected tool name', () => {
+  assert.equal(parseGraphifyEvidence('runtime-tool-lookup-fallback', JSON.stringify(evidence))?.trace_id, 'trace-1')
+})
+
+test('keeps evidence from separate tool results independently parseable', () => {
+  const second = { ...evidence, trace_id: 'trace-2', question: '医保支付类别' }
+  assert.equal(parseGraphifyEvidence('query', JSON.stringify(evidence))?.question, '覆膜气管支架')
+  assert.equal(parseGraphifyEvidence('query', JSON.stringify(second))?.question, '医保支付类别')
+})
+
+test('accepts a blocked preflight outcome without treating it as evidence', () => {
+  const result = parseGraphifyToolOutcome('query_preflight', JSON.stringify({
+    status: 'blocked', trace_id: 'trace-blocked', findings: [{ message: 'Only SELECT statements are allowed.' }],
+  }))
+  assert.deepEqual(result, { status: 'blocked', trace_id: 'trace-blocked', reason: 'Only SELECT statements are allowed.' })
+})
+
+test('parses the compact evidence graph reference returned to the model', () => {
+  assert.deepEqual(parseGraphifyGraphReference(JSON.stringify({
+    status: 'executed', trace_id: 'trace-1', dataset_id: 'medical_catalog', graph_ref: 'trace-1',
+    node_count: 4406, edge_count: 4727, source_record_count: 272,
+  })), {
+    status: 'executed', trace_id: 'trace-1', dataset_id: 'medical_catalog', graph_ref: 'trace-1',
+    node_count: 4406, edge_count: 4727, source_record_count: 272,
+  })
+})
+
+test('projects official Neo4j read-cypher relationship rows into bounded graph nodes and edges', () => {
+  const graph = parseNeo4jReadCypherGraph(JSON.stringify([
+    {
+      source_id: '4:product:1', source_labels: ['DrugProduct'], source_properties: { generic_name: '阿莫西林胶囊', drug_code: 'D001' },
+      relation_type: 'MANUFACTURED_BY',
+      target_id: '4:organization:1', target_labels: ['Organization'], target_properties: { name: '示例制药有限公司' },
+    },
+    {
+      source_id: '4:product:1', source_labels: ['DrugProduct'], source_properties: { generic_name: '阿莫西林胶囊', drug_code: 'D001' },
+      relation_type: 'REGISTERED_AS',
+      target_id: '4:registration:1', target_labels: ['RegistrationIdentifier'], target_properties: { registration_no: '国药准字H00001' },
+    },
+  ]))
+
+  assert.ok(graph)
+  assert.deepEqual(graph.nodes, [
+    { id: 'neo4j:4:product:1', label: '阿莫西林胶囊', kind: 'product', domain: 'DRUG' },
+    { id: 'neo4j:4:organization:1', label: '示例制药有限公司', kind: 'organization' },
+    { id: 'neo4j:4:registration:1', label: '国药准字H00001', kind: 'registration' },
+  ])
+  assert.deepEqual(graph.edges, [
+    { id: 'neo4j:4:product:1:MANUFACTURED_BY:neo4j:4:organization:1', source: 'neo4j:4:product:1', target: 'neo4j:4:organization:1', label: '生产企业', kind: 'business' },
+    { id: 'neo4j:4:product:1:REGISTERED_AS:neo4j:4:registration:1', source: 'neo4j:4:product:1', target: 'neo4j:4:registration:1', label: '注册备案', kind: 'business' },
+  ])
+})
+
+test('projects official Neo4j organizations that expose normalized_name', () => {
+  const graph = parseNeo4jReadCypherGraph(JSON.stringify([{
+    source_id: '4:product:real', source_labels: ['DrugProduct'], source_properties: { generic_name: '复方氢氧化铝片' },
+    relation_type: 'MANUFACTURED_BY',
+    target_id: '4:organization:real', target_labels: ['Organization'],
+    target_properties: { normalized_name: '鸿祥(黑龙江)制药有限公司' },
+  }]))
+
+  assert.deepEqual(graph, {
+    nodes: [
+      { id: 'neo4j:4:product:real', label: '复方氢氧化铝片', kind: 'product', domain: 'DRUG' },
+      { id: 'neo4j:4:organization:real', label: '鸿祥(黑龙江)制药有限公司', kind: 'organization' },
+    ],
+    edges: [{
+      id: 'neo4j:4:product:real:MANUFACTURED_BY:neo4j:4:organization:real',
+      source: 'neo4j:4:product:real',
+      target: 'neo4j:4:organization:real',
+      label: '生产企业',
+      kind: 'business',
+    }],
+  })
+})
+
+test('projects real record-scoped catalog attributes with their field name and value', () => {
+  const graph = parseNeo4jReadCypherGraph(JSON.stringify([{
+    source_id: '4:record:1', source_labels: ['CatalogRecord'], source_properties: { source_row: 7 },
+    relation_type: 'HAS_ATTRIBUTE',
+    target_id: '4:attribute:1', target_labels: ['CatalogAttributeValue'],
+    target_properties: { field_label: '医保支付类别', value: '甲类' },
+  }]))
+
+  assert.deepEqual(graph, {
+    nodes: [
+      { id: 'neo4j:4:record:1', label: '原始目录记录', kind: 'catalog_record' },
+      { id: 'neo4j:4:attribute:1', label: '医保支付类别：甲类', kind: 'attribute' },
+    ],
+    edges: [{
+      id: 'neo4j:4:record:1:HAS_ATTRIBUTE:neo4j:4:attribute:1',
+      source: 'neo4j:4:record:1', target: 'neo4j:4:attribute:1', label: '记录字段', kind: 'provenance',
+    }],
+  })
+})
+
+test('accepts an empty official Neo4j result as an empty graph instead of reusing a synthetic graph', () => {
+  assert.deepEqual(parseNeo4jReadCypherGraph('[]'), { nodes: [], edges: [] })
+  assert.equal(parseNeo4jReadCypherGraph('{"unexpected":true}'), null)
+})
+
+test('uses Chinese labels for user-visible fields and graph evidence', () => {
+  assert.equal(displayGraphifyLabel('catalog_code'), '目录编码')
+  assert.equal(displayGraphifyLabel('model-node'), '业务模型')
+  assert.equal(displayGraphifyLabel('payment_category'), '医保支付类别')
+  assert.equal(displayGraphifyLabel('max_limit_text'), '最高限额')
+  // 详情字段集（详情 query 完整投影）的中文映射
+  assert.equal(displayGraphifyLabel('material'), '材质')
+  assert.equal(displayGraphifyLabel('feature'), '特征')
+  assert.equal(displayGraphifyLabel('policy_no'), '政策号')
+  assert.equal(displayGraphifyLabel('spec_model_count'), '规格型号数')
+  assert.equal(displayGraphifyLabel('registrant_name'), '注册备案人')
+  assert.equal(displayGraphifyLabel('medical_generic_name'), '医保通用名')
+  // 未映射键回显原值，绝不显示"业务字段"这类误导性占位表头
+  assert.equal(displayGraphifyLabel('unknown_field'), 'unknown_field')
+  assert.equal(displayGraphifyNodeLabel({ id: 'model:medical_catalog', label: 'medical_catalog', kind: 'model' }), '医保目录')
+})

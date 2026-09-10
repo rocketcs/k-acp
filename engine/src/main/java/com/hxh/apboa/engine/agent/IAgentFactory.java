@@ -6,7 +6,7 @@ import com.hxh.apboa.common.entity.AgentDefinition;
 import com.hxh.apboa.common.entity.Tenant;
 import com.hxh.apboa.common.util.TenantUtils;
 import com.hxh.apboa.engine.agui.AgentContext;
-import io.agentscope.core.ReActAgent;
+import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.core.a2a.agent.A2aAgent;
 import io.agentscope.core.agent.Agent;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
 public class IAgentFactory {
     private final TenantService tenantService;
     private final A2aAgentHelper a2aAgentHelper;
-    private final ReActAgentHelper reActAgentHelper;
+    private final HarnessAgentHelper harnessAgentHelper;
     private final AgentDefinitionService agentDefinitionService;
 
     /**
@@ -38,7 +38,7 @@ public class IAgentFactory {
             validAgentDefinition(definition);
 
             return switch (definition.getAgentType()) {
-                case CUSTOM -> getReActAgent(definition);
+                case CUSTOM -> getHarnessAgent(definition);
                 case A2A -> getA2aAgent(definition);
                 default -> throw new IllegalArgumentException("未知的智能体类型");
             };
@@ -64,12 +64,70 @@ public class IAgentFactory {
     }
 
     /**
-     * 根据Agent定义获取ReActAgent
+     * 根据Agent定义获取HarnessAgent
      * @param definition Agent 定义
      */
-    private ReActAgent getReActAgent(AgentDefinition definition) {
+    private HarnessAgent getHarnessAgent(AgentDefinition definition) {
         try {
-            return reActAgentHelper.getReActAgent(definition);
+            return harnessAgentHelper.getHarnessAgent(definition);
+        } catch (Exception e) {
+            AgentContext.clean();
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    /**
+     * 根据Agent定义ID获取Agent Builder
+     *
+     * @param agentId Agent定义ID
+     * @param tenantId 租户ID
+     */
+    public AgentBuilderWrapper getAgentBuilder(Long agentId, Long tenantId) {
+        try {
+            setTenantInfo(tenantId);
+            AgentDefinition definition = agentDefinitionService.getById(agentId);
+            validAgentDefinition(definition);
+
+            return switch (definition.getAgentType()) {
+                case CUSTOM -> AgentBuilderWrapper.builder()
+                        .definition(definition)
+                        .harnessAgentBuilder(getHarnessAgentBuilder(definition))
+                        .build();
+                case A2A -> AgentBuilderWrapper.builder()
+                        .definition(definition)
+                        .a2aAgentBuilder(getA2aAgentBuilder(definition))
+                        .build();
+                default -> throw new IllegalArgumentException("未知的智能体类型");
+            };
+        } catch (Exception e) {
+            AgentContext.clean();
+            throw new RuntimeException(e);
+        } finally {
+            TenantUtils.clear();
+        }
+    }
+
+    /**
+     * 根据Agent定义获取A2aAgent
+     * @param definition Agent 定义
+     */
+    private A2aAgent.Builder getA2aAgentBuilder(AgentDefinition definition) {
+        try {
+            return a2aAgentHelper.getA2aAgentBuilder(definition);
+        } catch (Exception e) {
+            AgentContext.clean();
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * 根据Agent定义获取HarnessAgent Builder
+     * @param definition Agent 定义
+     */
+    private HarnessAgent.Builder getHarnessAgentBuilder(AgentDefinition definition) {
+        try {
+            return harnessAgentHelper.getHarnessAgentBuilder(definition);
         } catch (Exception e) {
             AgentContext.clean();
             throw new RuntimeException(e);

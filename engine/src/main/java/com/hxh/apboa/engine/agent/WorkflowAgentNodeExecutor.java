@@ -7,22 +7,23 @@ import com.hxh.apboa.common.util.TenantUtils;
 import com.hxh.apboa.engine.agui.AgentContext;
 import com.hxh.apboa.engine.mcp.McpClientFactory;
 import com.hxh.apboa.engine.model.ChatModelFactory;
-import com.hxh.apboa.engine.skill.SkillBoxFactory;
+import com.hxh.apboa.engine.skill.SkillRepositoryFactory;
 import com.hxh.apboa.engine.tool.ToolkitFactory;
 import com.hxh.apboa.node.agent.AgentNodeExecutor;
 import com.hxh.apboa.node.agent.AgentNodeRequest;
 import com.hxh.apboa.node.agent.AgentNodeResult;
-import io.agentscope.core.ReActAgent;
 import io.agentscope.core.message.ContentBlock;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
+import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.model.StructuredOutputReminder;
-import io.agentscope.core.skill.SkillBox;
+import io.agentscope.core.skill.repository.AgentSkillRepository;
 import io.agentscope.core.tool.AgentTool;
 import io.agentscope.core.tool.ToolExecutionContext;
 import io.agentscope.core.tool.Toolkit;
+import io.agentscope.harness.agent.HarnessAgent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -39,7 +40,7 @@ import java.util.Map;
 public class WorkflowAgentNodeExecutor implements AgentNodeExecutor {
     private final ChatModelFactory chatModelFactory;
     private final ToolkitFactory toolkitFactory;
-    private final SkillBoxFactory skillBoxFactory;
+    private final SkillRepositoryFactory skillRepositoryFactory;
     private final McpClientFactory mcpClientFactory;
 
     @Override
@@ -49,16 +50,14 @@ public class WorkflowAgentNodeExecutor implements AgentNodeExecutor {
         Model model = chatModelFactory.getModel(definition);
         Toolkit toolkit = toolkitFactory.getToolkit(request.getToolIds());
         registerMcpTools(toolkit, request);
-        SkillBox skillBox = skillBoxFactory.getSkillBox(request.getSkillPackageIds(), toolkit);
 
         AgentContext oldContext = AgentContext.getIfExists().orElse(null);
         AgentContext agentContext = buildAgentContext(request, definition);
         AgentContext.init(agentContext);
         try {
-            ReActAgent agent = buildAgent(request, definition, model, toolkit, skillBox, agentContext);
-            Msg userMsg = Msg.builder()
+            HarnessAgent agent = buildAgent(request, definition, model, toolkit, agentContext);
+            Msg userMsg = UserMessage.builder()
                     .name("user")
-                    .role(MsgRole.USER)
                     .textContent(request.getUserPrompt())
                     .build();
 
@@ -119,30 +118,37 @@ public class WorkflowAgentNodeExecutor implements AgentNodeExecutor {
     }
 
     /**
-     * 构建无记忆、无代码执行的ReActAgent。
+     * 构建无记忆、无代码执行的HarnessAgent。
      */
-    private ReActAgent buildAgent(AgentNodeRequest request,
+    private HarnessAgent buildAgent(AgentNodeRequest request,
                                   AgentDefinition definition,
                                   Model model,
                                   Toolkit toolkit,
-                                  SkillBox skillBox,
                                   AgentContext agentContext) {
-        ReActAgent.Builder builder = ReActAgent.builder()
+        AgentSkillRepository skillRepository = skillRepositoryFactory.getSkillRepository(
+                request.getSkillPackageIds(), toolkit);
+        return HarnessAgent.builder()
                 .name(definition.getAgentCode())
                 .description(definition.getDescription())
                 .maxIters(request.getMaxIterations())
                 .model(model)
                 .sysPrompt(request.getSystemPrompt())
                 .toolkit(toolkit)
-                .skillBox(skillBox)
+                .skillRepository(skillRepository)
+                .disableFilesystemTools()
+                .disableShellTool()
+                .disableMemoryTools()
+                .disableMemoryHooks()
+                .disableWorkspaceContext()
+                .disableAtPathExpansion()
+                .disableSubagents()
+                .disableDefaultWorkspaceSkills()
+                .disableCompaction()
+                .disableToolResultEviction()
                 .toolExecutionContext(ToolExecutionContext.builder()
                         .register(agentContext)
-                        .build());
-
-        if (request.isStructuredOutputEnabled()) {
-            builder.structuredOutputReminder(StructuredOutputReminder.PROMPT);
-        }
-        return builder.build();
+                        .build())
+                .build();
     }
 
     /**

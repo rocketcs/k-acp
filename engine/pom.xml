@@ -102,11 +102,23 @@
             <artifactId>tika-parsers-standard-package</artifactId>
             <version>2.9.2</version>
         </dependency>
-        <!-- PostgreSQL 驱动 -->
+        <!-- 文档导出：Word/Excel -->
         <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.4.1</version>
+        </dependency>
+        <!-- POI 5.4.x 需要包含 BoundedInputStream.Builder 的 commons-io 版本 -->
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.18.0</version>
+        </dependency>
+        <!-- 文档导出：PDF -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.5</version>
         </dependency>
         <!--qdrant-->
         <dependency>
@@ -149,6 +161,18 @@
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit.ssh.apache</artifactId>
             <version>7.3.0.202506031305-r</version>
+        </dependency>
+        <!-- HITL V0 验证用：仅 test scope，版本由父 dependencyManagement 统一管理 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- HITL V0 阶段2：暂停态落 MySQL（v2 AgentStateStore 扩展） -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-mysql</artifactId>
+            <version>${agentscope.version}</version>
         </dependency>
     </dependencies>
 </project>

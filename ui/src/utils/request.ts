@@ -91,6 +91,10 @@ instance.interceptors.response.use(
       window.location.href = '/#/login';
       window.location.reload();
       return Promise.reject(msg);
+    } else if (code === 510) {
+      console.error(msg)
+      AMessage.error(msg).then(() => {})
+      return Promise.reject(msg);
     } else {
       console.error('接口请求失败：', msg)
       AMessage.error(msg).then(() => {})

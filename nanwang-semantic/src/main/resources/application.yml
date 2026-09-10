@@ -1,0 +1,23 @@
+server:
+  port: 8767
+spring:
+  application:
+    name: nanwang-semantic
+  main:
+    web-application-type: servlet
+nanwang:
+  dm:
+    url: jdbc:dm://127.0.0.1:5236?compatibleMode=mysql
+    username: NANWANG_RO
+    password: ${NANWANG_DM_PASSWORD:NwRo@2026Query}
+  meta:
+    url: jdbc:mysql://127.0.0.1:23306/apboa_next?useSSL=false&characterEncoding=utf-8&allowPublicKeyRetrieval=true
+    username: ${NANWANG_META_USERNAME:root}
+    password: ${NANWANG_META_PASSWORD:}
+  neo4j:
+    uri: bolt://127.0.0.1:7689
+    username: neo4j
+    password: ${NANWANG_NEO4J_PASSWORD:MockGraph2026!}
+logging:
+  level:
+    root: INFO

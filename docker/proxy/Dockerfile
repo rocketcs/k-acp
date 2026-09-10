@@ -1,5 +1,6 @@
-ARG MAVEN_IMAGE=maven:3.9-eclipse-temurin-21
-ARG JRE_IMAGE=eclipse-temurin:21-jre
+ARG MAVEN_IMAGE=docker.m.daocloud.io/library/maven:3.9-eclipse-temurin-21
+ARG JRE_IMAGE=docker.m.daocloud.io/library/eclipse-temurin:21-jre
+ARG NODE_IMAGE=docker.m.daocloud.io/library/node:22-bookworm-slim
 # ============================================================
 # 阶段一：Maven 构建
 # ============================================================
@@ -17,6 +18,7 @@ COPY common-base/pom.xml ./common-base/
 COPY common/pom.xml ./common/
 COPY heartbeat/pom.xml ./heartbeat/
 COPY engine/pom.xml ./engine/
+COPY gateway/pom.xml ./gateway/
 COPY scheduler/pom.xml ./scheduler/
 COPY workflow/pom.xml ./workflow/
 COPY runner-console/pom.xml ./runner-console/
@@ -41,20 +43,28 @@ COPY biz/biz-sk/pom.xml ./biz/biz-sk/
 COPY biz/biz-skill/pom.xml ./biz/biz-skill/
 COPY biz/biz-studio/pom.xml ./biz/biz-studio/
 COPY biz/biz-tool/pom.xml ./biz/biz-tool/
-COPY biz/biz-cache/pom.xml ./biz/biz-cache/
-COPY biz/biz-mq/pom.xml ./biz/biz-mq/
-COPY biz/biz-datasource/pom.xml ./biz/biz-datasource/
 COPY biz/biz-workflow/pom.xml ./biz/biz-workflow/
+COPY biz/biz-cache/pom.xml ./biz/biz-cache/
+COPY biz/biz-datasource/pom.xml ./biz/biz-datasource/
+COPY biz/biz-gateway/pom.xml ./biz/biz-gateway/
+COPY biz/biz-mq/pom.xml ./biz/biz-mq/
+COPY biz/biz-channel/pom.xml ./biz/biz-channel/
+COPY biz/biz-dashboard/pom.xml ./biz/biz-dashboard/
 
 # 复制 Maven 私有仓库配置
 COPY docker/maven/settings.xml /root/.m2/settings.xml
 
-# 预下载依赖
-RUN mvn dependency:go-offline -pl runner-proxy -am -DskipTests -q
+# 预下载依赖。缓存仓库内容而非整个 .m2，避免遮蔽上面的 settings.xml。
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mvn -B -ntp dependency:go-offline -pl runner-proxy -am -DskipTests -q
 
 # 复制源码并构建
 COPY . .
-RUN mvn package -pl runner-proxy -am -DskipTests -q
+RUN --mount=type=cache,target=/root/.m2/repository \
+    mvn -B -ntp package -pl runner-proxy -am -DskipTests -q
+
+# 国内 Node.js 运行时，避免运行镜像访问 NodeSource
+FROM ${NODE_IMAGE} AS node-runtime
 
 # ============================================================
 # 阶段二：运行镜像（JRE + Python + Node.js）
@@ -64,6 +74,14 @@ FROM ${JRE_IMAGE}
 
 WORKDIR /app
 
+# 仅复制 Node.js、npm 及其运行库，不在运行镜像中执行 NodeSource 安装脚本
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-runtime /usr/local/bin/npm /usr/local/bin/npm
+COPY --from=node-runtime /usr/local/bin/npx /usr/local/bin/npx
+COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sfn /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
+    ln -sfn /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+
 # 以非root运行可缩小内核攻击面，配合cap_drop=ALL和no-new-privileges，阻断容器→宿主机逃逸路径
 RUN groupadd -r shellproxy -g 1002 && \
     useradd -r -g shellproxy -u 1002 -m -s /sbin/nologin -d /app shellproxy && \
@@ -71,7 +89,18 @@ RUN groupadd -r shellproxy -g 1002 && \
 
 # ---------- 安装运行环境依赖 ----------
 # Python 3 + Node.js 22 + gosu（容器降权启动工具）
-RUN sed -i 's|http://ports.ubuntu.com/ubuntu-ports|https://mirrors.aliyun.com/ubuntu-ports|g' /etc/apt/sources.list.d/ubuntu.sources && \
+RUN set -eux; \
+    for source_file in /etc/apt/sources.list /etc/apt/sources.list.d/*; do \
+        if [ -f "$source_file" ]; then \
+            sed -i \
+                -e 's|deb.debian.org|mirrors.aliyun.com|g' \
+                -e 's|security.debian.org|mirrors.aliyun.com|g' \
+                -e 's|ports.ubuntu.com/ubuntu-ports|mirrors.aliyun.com/ubuntu-ports|g' \
+                -e 's|archive.ubuntu.com/ubuntu|mirrors.aliyun.com/ubuntu|g' \
+                -e 's|security.ubuntu.com/ubuntu|mirrors.aliyun.com/ubuntu|g' \
+                "$source_file"; \
+        fi; \
+    done; \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         python3 \
@@ -81,9 +110,8 @@ RUN sed -i 's|http://ports.ubuntu.com/ubuntu-ports|https://mirrors.aliyun.com/ub
         curl \
         ca-certificates \
     && ln -sf /usr/bin/python3 /usr/bin/python \
-    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # 验证运行时
 RUN python --version && node --version && npm --version && gosu --version
@@ -98,6 +126,8 @@ RUN mkdir -p /app/logs && \
 EXPOSE 3062
 
 ENV TZ=Asia/Shanghai
+# 追加 npm-global bin 到 PATH（不覆盖基础镜像的 Java 路径）
+ENV PATH="/opt/tools/npm-global/bin:${PATH}"
 # ---------- 启动脚本 ----------
 # 复制 entrypoint.sh（动态 JVM 堆计算 + 权限修复 + gosu 降权启动）
 COPY docker/proxy/entrypoint.sh /app/entrypoint.sh

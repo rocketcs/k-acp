@@ -46,6 +46,11 @@ spring:
       time-between-eviction-runs-millis: 60000
       min-evictable-idle-time-millis: 300000
 
+# 文档导出配置（PDF 中文字体）
+document-export:
+  # PDFBox 需要 TrueType（glyf）字体；NotoSansCJK-Regular.ttc 是 CFF/OTF 字体，不能用于嵌入。
+  pdf-font-path: ${DOCUMENT_EXPORT_PDF_FONT_PATH:/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf}
+
 jwt:
   secret: ${JWT_SECRET:ZJr8c2xF0y5b7yM+1H9v9cGZq6nZ5e0k5r3Cw7H8vJQ=}
 
@@ -116,3 +121,19 @@ heartbeat:
   console-url: http://${CONSOLE_HOST:apboa-console}:3060
   service-type: RUNTIME
   port: ${server.port}
+
+# Actuator 健康检查端点（Docker healthcheck 使用）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    # engine 模块引入 elasticsearch-rest-client，但部署栈不包含 ES，
+    # 禁用其健康指标，避免健康检查误报 DOWN（连接被拒）。
+    elasticsearch:
+      enabled: false

@@ -38,3 +38,14 @@ heartbeat:
   enabled: true
   console-url: http://${CONSOLE_HOST:apboa-console}:3060
   interval-seconds: 30
+
+# Actuator 健康检查端点（Docker healthcheck 使用）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true

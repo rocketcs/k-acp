@@ -1,0 +1,6 @@
+services:
+  apboa-runtime:
+    environment:
+      BIAOSHU_BAILIAN_APP_KEY_FILE: /run/secrets/biaoshu_bailian_app_key
+    volumes:
+      - /Users/rocket/.local/share/k-acp/secrets/biaoshu-bailian/app_key:/run/secrets/biaoshu_bailian_app_key:ro

@@ -18,7 +18,7 @@ const docHtmlSource = readFileSync(resolve(here, '../../../doc.html'), 'utf8')
 
 test('production menu icons are bundled instead of pointing at /src assets', () => {
   assert.doesNotMatch(sideMenuSource, /['"]\/src\/assets\//)
-  assert.match(sideMenuSource, /import\s+homeAvatar\s+from\s+['"]@\/assets\/avatar\/home\.png['"]/) 
+  assert.match(sideMenuSource, /import\s+homeAvatar\s+from\s+['"]@\/assets\/avatar\/home\.png['"]/)
 })
 
 test('dashboard renders usable navigation instead of permanent skeleton placeholders', () => {

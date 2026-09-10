@@ -17,6 +17,16 @@
     </properties>
 
     <dependencies>
+        <!-- Actuator 健康检查：Docker healthcheck 依赖 /actuator/health -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.hxh.apboa.next</groupId>
             <artifactId>biz-account</artifactId>
@@ -33,11 +43,32 @@
             <groupId>com.hxh.apboa.next</groupId>
             <artifactId>biz-workflow</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.hxh.apboa.next</groupId>
+            <artifactId>biz-dashboard</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.hxh.apboa.next</groupId>
+            <artifactId>biz-channel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.hxh.apboa.next</groupId>
+            <artifactId>biz-gateway</artifactId>
+        </dependency>
         <!-- 心跳模块：仅使用 HeartbeatPayload DTO，optional 避免传递依赖 -->
         <dependency>
             <groupId>com.hxh.apboa.next</groupId>
             <artifactId>heartbeat</artifactId>
             <optional>true</optional>
+        </dependency>
+        <!-- Flyway 数据库迁移：首次初始化由 sql/db_init.sql 完成，后续表结构变更统一走 classpath:db/migration 下的 V2__xxx.sql 增量脚本 -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
         </dependency>
     </dependencies>
 

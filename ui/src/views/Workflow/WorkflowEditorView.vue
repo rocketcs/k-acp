@@ -24,6 +24,7 @@ import {
   getWorkflowNodeSchema,
 } from '@/config/workflow/nodeSchemas'
 import { createDefaultWorkflowDefinition, ensureWorkflowDefinition } from '@/utils/workflow/defaultDefinition'
+import { validateOutputEdge } from '@/utils/workflow/edgeRules'
 import type {
   Workflow,
   WorkflowDefinition,
@@ -35,6 +36,7 @@ import type {
   WorkflowRunRequest,
   WorkflowValidationResult,
   WorkflowVariable,
+  WorkflowVersion,
 } from '@/types/workflow'
 import { useAccountStore } from '@/stores'
 import { getToken } from '@/utils/auth'
@@ -77,7 +79,7 @@ const leaveConfirmOpen = ref(false)
 const leavingAfterSave = ref(false)
 const runInput = ref('{\n  "params": [],\n  "variables": {}\n}')
 const canvasRef = ref<CanvasRef | null>(null)
-const resources = ref<WorkflowResourceMaps>({ caches: [], datasources: [], mqs: [] })
+const resources = ref<WorkflowResourceMaps>({ caches: [], datasources: [], mqs: [], channels: [] })
 const history = ref<WorkflowDefinition[]>([])
 const future = ref<WorkflowDefinition[]>([])
 const contextMenu = ref({ open: false, nodeId: '', x: 0, y: 0 })
@@ -205,15 +207,17 @@ watch(draftSignature, (signature) => {
 })
 
 async function loadResources() {
-  const [caches, datasources, mqs] = await Promise.all([
+  const [caches, datasources, mqs, channels] = await Promise.all([
     workflowApi.enabledCaches(),
     workflowApi.enabledDatasources(),
     workflowApi.enabledMqs(),
+    workflowApi.enabledChannels(),
   ])
   resources.value = {
     caches: caches.data.data || [],
     datasources: datasources.data.data || [],
     mqs: mqs.data.data || [],
+    channels: channels.data.data || [],
   }
 }
 
@@ -302,7 +306,7 @@ async function refreshWorkflowDetail(reloadCanvas = false) {
 function loadDefinition(definition: WorkflowDefinition) {
   const safeDefinition = ensureWorkflowDefinition(definition)
   nodes.value = (safeDefinition.nodes || []).map(toFlowNode)
-  edges.value = (safeDefinition.edges || []).map(toFlowEdge)
+  edges.value = migrateFlowEdges(safeDefinition)
   customVariables.value = (safeDefinition.variables || []).filter((v) => v.source === 'custom')
   history.value = []
   future.value = []
@@ -311,7 +315,21 @@ function loadDefinition(definition: WorkflowDefinition) {
 function restoreDefinition(definition: WorkflowDefinition) {
   const safeDefinition = ensureWorkflowDefinition(definition)
   nodes.value = (safeDefinition.nodes || []).map(toFlowNode)
-  edges.value = (safeDefinition.edges || []).map(toFlowEdge)
+  edges.value = migrateFlowEdges(safeDefinition)
+}
+
+// 旧版条件分支边迁移：true/false handle 已移除，统一改写为单输出点，避免旧连线无法渲染
+function migrateFlowEdges(definition: WorkflowDefinition): WorkflowFlowEdge[] {
+  const ifElseIds = new Set(
+    (definition.nodes || []).filter((node) => node.type === 'IF_ELSE').map((node) => node.id),
+  )
+  return (definition.edges || []).map((edge) => {
+    const flowEdge = toFlowEdge(edge)
+    if (ifElseIds.has(edge.source) && (edge.sourceHandle === 'true' || edge.sourceHandle === 'false')) {
+      flowEdge.sourceHandle = 'output'
+    }
+    return flowEdge
+  })
 }
 
 function toFlowNode(node: WorkflowNodeDefinition): WorkflowFlowNode {
@@ -391,6 +409,21 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
 }
 
+// 避免新节点与已有节点重叠：若目标位置附近已有节点，按阶梯偏移逐步错开
+function resolveNodePosition(base: { x: number; y: number }) {
+  const OFFSET = 40
+  const position = { ...base }
+  const isOccupied = (pos: { x: number; y: number }) =>
+    nodes.value.some(
+      (n) => Math.abs(n.position.x - pos.x) < OFFSET && Math.abs(n.position.y - pos.y) < OFFSET,
+    )
+  while (isOccupied(position)) {
+    position.x += OFFSET
+    position.y += OFFSET
+  }
+  return position
+}
+
 function addNode(schema: WorkflowNodeSchema) {
   if (readonly.value) {
     message.warning('当前工作流为只读模式，无法添加节点')
@@ -400,14 +433,25 @@ function addNode(schema: WorkflowNodeSchema) {
     insertNodeOnEdge(schema, pendingEdgeId.value)
     return
   }
-  snapshot()
-  const id = `${schema.type.toLowerCase()}-${Date.now()}`
   const sourceId = pendingSourceNodeId.value
   const sourceHandle = pendingSourceHandle.value || 'output'
   const sourceNode = sourceId ? nodes.value.find((n) => n.id === sourceId) : null
-  const position = sourceNode
-    ? { x: sourceNode.position.x + 320, y: sourceNode.position.y }
-    : canvasRef.value?.addAtCenter() || { x: 240, y: 240 }
+  // 兜底校验：弹出节点库期间源节点输出点可能已被占用，单输出节点不允许再建连线
+  if (sourceNode) {
+    const rule = validateOutputEdge(sourceNode, edges.value, sourceHandle)
+    if (!rule.ok) {
+      message.warning(rule.reason)
+      closeLibrary()
+      return
+    }
+  }
+  snapshot()
+  const id = `${schema.type.toLowerCase()}-${Date.now()}`
+  const position = resolveNodePosition(
+    sourceNode
+      ? { x: sourceNode.position.x + 320, y: sourceNode.position.y }
+      : canvasRef.value?.addAtCenter() || { x: 240, y: 240 },
+  )
   nodes.value.push(toFlowNode(createDefinitionNode(id, schema, position)))
   if (sourceId) {
     edges.value.push({
@@ -467,17 +511,24 @@ function insertNodeOnEdge(schema: WorkflowNodeSchema, edgeId: string) {
   }
   snapshot()
   const id = `${schema.type.toLowerCase()}-${Date.now()}`
-  const shiftX = 320
+  // 容纳一个节点及两侧间距所需的最小水平距离
+  const requiredGap = 640
+  const gap = targetNode.position.x - sourceNode.position.x
+  // 间距不足时才推动下游，且只推补足差值，尽量不破坏用户手动布局
+  const shiftX = Math.max(0, requiredGap - gap)
   const downstreamIds = collectDownstreamNodeIds(originalEdge.target)
+  // 新节点放在推动后源、目标节点的中点，斜线连接时视觉上也居中
   const position = {
-    x: sourceNode.position.x + shiftX,
-    y: targetNode.position.y,
+    x: sourceNode.position.x + (gap + shiftX) / 2,
+    y: (sourceNode.position.y + targetNode.position.y) / 2,
   }
-  nodes.value = nodes.value.map((node) =>
-    downstreamIds.has(node.id)
-      ? { ...node, position: { x: node.position.x + shiftX, y: node.position.y } }
-      : node,
-  )
+  if (shiftX > 0) {
+    nodes.value = nodes.value.map((node) =>
+      downstreamIds.has(node.id)
+        ? { ...node, position: { x: node.position.x + shiftX, y: node.position.y } }
+        : node,
+    )
+  }
   nodes.value.push(toFlowNode(createDefinitionNode(id, schema, position)))
   edges.value = edges.value.filter((edge) => edge.id !== originalEdge.id)
   edges.value.push(
@@ -500,6 +551,8 @@ function insertNodeOnEdge(schema: WorkflowNodeSchema, edgeId: string) {
   )
   selectedNodeId.value = id
   clearPendingAdd()
+  // 确保新插入的节点在视野内
+  nextTick(() => canvasRef.value?.fitNode(id))
 }
 
 function updateNode(node: WorkflowFlowNode) {
@@ -512,15 +565,34 @@ function updateNode(node: WorkflowFlowNode) {
 }
 
 function deleteNode(nodeId: string) {
+  deleteSelectedNodes([nodeId])
+}
+
+/** 统一删除方法：只读模式下忽略，snapshot 统一记录一次 */
+function deleteSelectedNodes(nodeIds: string[]) {
   if (readonly.value) {
     message.warning('当前工作流为只读模式，无法删除节点')
     return
   }
+  if (!nodeIds.length) return
   snapshot()
-  nodes.value = nodes.value.filter((node) => node.id !== nodeId)
-  edges.value = edges.value.filter((edge) => edge.source !== nodeId && edge.target !== nodeId)
-  if (selectedNodeId.value === nodeId) selectedNodeId.value = null
+  const ids = new Set(nodeIds)
+  nodes.value = nodes.value.filter((node) => !ids.has(node.id))
+  edges.value = edges.value.filter((edge) => !ids.has(edge.source) && !ids.has(edge.target))
+  if (selectedNodeId.value && ids.has(selectedNodeId.value)) selectedNodeId.value = null
   closeContextMenu()
+}
+
+/** 删除选中的连线：只读模式下忽略，snapshot 统一记录一次 */
+function deleteSelectedEdges(edgeIds: string[]) {
+  if (readonly.value) {
+    message.warning('当前工作流为只读模式，无法删除连线')
+    return
+  }
+  if (!edgeIds.length) return
+  snapshot()
+  const ids = new Set(edgeIds)
+  edges.value = edges.value.filter((edge) => !ids.has(edge.id))
 }
 
 function copyNode(nodeId: string) {
@@ -551,13 +623,22 @@ function getLayoutEdgeWeight(edge: WorkflowFlowEdge) {
   return branchHandles.length && edge.sourceHandle ? 1 : 2
 }
 
+/** 边在源节点分支 handle 中的序号，用于让布局后分支目标的上下排列与卡片上的分支顺序一致 */
+function getBranchHandleIndex(edge: WorkflowFlowEdge) {
+  const sourceNode = nodes.value.find((node) => node.id === edge.source)
+  const branchHandles = sourceNode?.data.schema?.branchHandles || []
+  const index = branchHandles.findIndex((handle) => handle.id === edge.sourceHandle)
+  return index === -1 ? 0 : index
+}
+
 function autoLayout() {
   if (!nodes.value.length || readonly.value) return
   snapshot()
+  // 取渲染后的真实卡片尺寸：连接点在卡片垂直中心，dagre 按真实中心对齐后连线才能拉直
+  const dimensions = canvasRef.value?.getNodeDimensions() || {}
   const graph = new Graph({ multigraph: true, compound: false })
   graph.setGraph({
     rankdir: 'LR',
-    align: 'UL',
     ranker: 'network-simplex',
     nodesep: 96,
     ranksep: 160,
@@ -567,13 +648,18 @@ function autoLayout() {
   })
   graph.setDefaultEdgeLabel(() => ({}))
   nodes.value.forEach((node) => {
+    const size = dimensions[node.id]
     graph.setNode(node.id, {
-      width: 236,
-      height: 124,
+      width: size?.width || 236,
+      height: size?.height || 124,
       rank: node.data.type === 'START' ? 'min' : node.data.type === 'END' ? 'max' : undefined,
     })
   })
-  edges.value.forEach((edge) => {
+  // 分支边按卡片上 handle 的上下顺序喂入 dagre，避免分支目标布局后上下颠倒造成连线交叉
+  const sortedEdges = [...edges.value].sort((a, b) =>
+    a.source === b.source ? getBranchHandleIndex(a) - getBranchHandleIndex(b) : 0,
+  )
+  sortedEdges.forEach((edge) => {
     graph.setEdge(edge.source, edge.target, {
       id: edge.id,
       weight: getLayoutEdgeWeight(edge),
@@ -584,7 +670,7 @@ function autoLayout() {
   dagreLayout(graph)
   nodes.value = nodes.value.map((node) => {
     const layoutNode = graph.node(node.id) as { x?: number; y?: number; width?: number; height?: number } | undefined
-    if (!layoutNode?.x || !layoutNode?.y) return node
+    if (layoutNode?.x == null || layoutNode?.y == null) return node
     return {
       ...node,
       position: {
@@ -680,7 +766,12 @@ async function validateWorkflow() {
 
 async function publishWorkflow() {
   const valid = await validateWorkflow()
-  if (!valid || !workflow.value.id) return
+  if (!valid) {
+    // 提示用户这是发布的前置校验，避免误以为点错了校验按钮
+    message.warning('发布前自动校验未通过，请先修复校验问题后再调试')
+    return
+  }
+  if (!workflow.value.id) return
   publishModalOpen.value = true
 }
 
@@ -704,6 +795,18 @@ async function submitPublish(remark?: string) {
 function openDebugPanel() {
   runDockOpen.value = true
   validationPanelOpen.value = false
+}
+
+// 调试前先校验，校验通过才打开调试面板（与发布流程一致）
+async function debugWorkflow() {
+  const valid = await validateWorkflow()
+  if (!valid) {
+    // 提示用户这是调试的前置校验，避免误以为点错了校验按钮
+    message.warning('调试前自动校验未通过，请先修复校验问题后再调试')
+    return
+  }
+  if (!workflow.value.id) return
+  openDebugPanel()
 }
 
 async function debugRun() {
@@ -792,15 +895,16 @@ function showVersions() {
   versionModalOpen.value = true
 }
 
-async function handleVersionLoaded(nextWorkflow: Workflow) {
-  workflow.value = nextWorkflow
-  workflow.value.config = ensureWorkflowDefinition(workflow.value.config)
+// 载入历史版本仅替换当前编辑区画布，不请求后端、不改变工作流状态，需手动保存才会生效
+async function handleVersionLoaded(version: WorkflowVersion) {
+  if (readonly.value) {
+    message.warning('当前工作流为只读模式，无法载入历史版本')
+    return
+  }
+  workflow.value.config = ensureWorkflowDefinition(version.config)
   loadDefinition(workflow.value.config)
-  captureSavedDraft('idle')
   await nextTick()
   canvasRef.value?.fitAll()
-  store.upsertWorkflow(workflow.value)
-  store.markListDirty()
 }
 
 function openContextMenu(payload: { nodeId: string; x: number; y: number }) {
@@ -837,6 +941,13 @@ function toggleLibrary() {
 
 function openLibraryFromNode(payload: { sourceNodeId: string; sourceHandle: string; x: number; y: number }) {
   if (readonly.value) return
+  // 单输出节点的输出点已有连线时，直接拒绝唤起节点库并提示原因
+  const sourceNode = nodes.value.find((n) => n.id === payload.sourceNodeId)
+  const rule = validateOutputEdge(sourceNode, edges.value, payload.sourceHandle || 'output')
+  if (!rule.ok) {
+    message.warning(rule.reason)
+    return
+  }
   pendingSourceNodeId.value = payload.sourceNodeId
   pendingSourceHandle.value = payload.sourceHandle || 'output'
   pendingEdgeId.value = null
@@ -942,6 +1053,15 @@ function clearAllPanels() {
   closeContextMenu()
   publishModalOpen.value = false
   versionModalOpen.value = false
+}
+
+/** 清空画布上所有节点和连线 */
+function clearAllNodes() {
+  if (!nodes.value.length) return
+  snapshot()
+  nodes.value = []
+  edges.value = []
+  clearAllPanels()
 }
 
 /** 进入子流程编辑模式：保存父工作流快照，将 Loop 节点的 subNodes/subEdges 加载到画布 */
@@ -1087,6 +1207,8 @@ function computeParentUpstreamNodes(startNodeId: string): WorkflowFlowNode[] {
       @pane-click="closeContextMenu"
       @show-library="openLibraryFromNode"
       @show-library-from-edge="openLibraryFromEdge"
+      @delete-nodes="deleteSelectedNodes"
+      @delete-edges="deleteSelectedEdges"
     />
 
     <WorkflowTopLeft
@@ -1116,7 +1238,7 @@ function computeParentUpstreamNodes(startNodeId: string): WorkflowFlowNode[] {
       @save="saveWorkflow"
       @validate="validateWorkflow"
       @publish="publishWorkflow"
-      @debug="openDebugPanel"
+      @debug="debugWorkflow"
       @versions="showVersions"
     />
 
@@ -1139,6 +1261,7 @@ function computeParentUpstreamNodes(startNodeId: string): WorkflowFlowNode[] {
       @redo="redo"
       @layout="autoLayout"
       @clear-selection="clearAllPanels"
+      @clear-all-nodes="clearAllNodes"
     />
 
     <NodeLibraryPopover

@@ -56,6 +56,12 @@
 
 适用于快速体验平台功能，不推荐生产使用。所有服务部署在同一台服务器上。
 
+本地构建、重建、重启和日志命令详见 [`QUICK-HELP.md`](QUICK-HELP.md)，帮助命令为：
+
+```bash
+kacp help
+```
+
 ```bash
 cd docker
 
@@ -81,6 +87,39 @@ docker compose -f docker-compose-simple.yml up -d --build
 - frontend（Nginx 前端）
 
 **不包含** runner-file（单机模式无需文件同步）
+
+## 本地 Langfuse 观测（可选）
+
+Langfuse 是本地 AgentScope/OpenTelemetry 观测扩展，不属于 K-ACP 上游基础服务。项目中用独立 overlay 文件 `docker-compose-langfuse.yml` 接入，避免把第三方观测栈直接混进 `docker-compose-simple.yml` 或 `docker-compose-kacp-local.yml`。
+
+集成启动方式：
+
+```bash
+cd docker
+
+docker compose \
+  --project-name k-acp-local \
+  --env-file .env.kacp \
+  -f docker-compose-simple.yml \
+  -f docker-compose-kacp-local.yml \
+  -f docker-compose-langfuse.yml \
+  up -d --build
+```
+
+加载 `docker-compose-langfuse.yml` 后会额外启动：
+
+- `langfuse-web`：Langfuse UI，默认 `http://localhost:3000`
+- `langfuse-worker`：Langfuse 后台任务
+- `langfuse-postgres` / `langfuse-clickhouse` / `langfuse-redis` / `langfuse-minio`：Langfuse 自己的数据依赖
+
+overlay 会覆盖 `apboa-runtime` 的追踪地址为 `http://langfuse-web:3000/api/public/otel/v1/traces`，让 runtime 通过 Compose 内部网络写入 Langfuse。项目 ID、API key 和本地初始化账号写在 `.env.kacp` 的 Langfuse 段；不加载 overlay 时，现有 `AGENTSCOPE_TRACING_ENDPOINT` 仍可继续指向外部/独立启动的 Langfuse。
+
+升级影响：
+
+- 上游更新 `docker-compose-simple.yml`、`docker-compose-kacp-local.yml` 时，优先合并上游文件，继续把 `docker-compose-langfuse.yml` 作为最后一个 `-f` overlay 加载。
+- 正常情况下，上游 compose 更新不会影响 Langfuse 数据卷；不要执行 `docker compose down -v`，否则会删除 Langfuse 的 Postgres、ClickHouse、Redis、MinIO 数据。
+- 只有当上游改名 `apboa-runtime`、改名 `apboa_simple` 网络，或移除 `AGENTSCOPE_TRACING_*` / `LANGFUSE_*` 环境变量入口时，才需要同步调整 overlay。
+- 如果机器上已经单独启动过 Langfuse 并占用 `3000`，先停止独立 Langfuse，或在 `.env.kacp` 中修改 `LANGFUSE_WEB_PORT`。
 
 ## 生产部署（多服务器）
 
@@ -108,6 +147,7 @@ cd docker
 
 # 使用管理脚本（推荐）
 bash start-console.sh build      # 构建并启动
+bash start-console.sh update     # 测试环境：拉取 dev、构建并重建服务
 bash start-console.sh status     # 查看状态
 
 # 或手动启动
@@ -160,7 +200,7 @@ docker compose -f docker-compose-execute.yml up -d --build
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `DOCKER_REGISTRY` | Docker 镜像私有仓库前缀 | 空（使用 Docker Hub） |
+| `DOCKER_REGISTRY` | 兼容保留字段；当前 Compose 镜像统一固定为国内 DaoCloud 源 | `docker.m.daocloud.io/` |
 | `JWT_SECRET` | JWT 签名密钥 | 内置默认值（生产务必修改） |
 | `MYSQL_HOST` | MySQL 地址 | `apboa-mysql` |
 | `MYSQL_PORT` | MySQL 端口 | `3306` |
@@ -239,6 +279,8 @@ docker/
 ├── maven/                      # Maven 私有仓库配置
 ├── npm/                        # NPM 私有仓库配置
 ├── docker-compose-simple.yml   # 单机体验版
+├── docker-compose-kacp-local.yml # 本地隔离端口和运行时覆盖配置
+├── docker-compose-langfuse.yml # 本地 Langfuse 观测 overlay（可选）
 ├── docker-compose-console.yml  # 生产-控制台节点
 ├── docker-compose-execute.yml  # 生产-执行节点
 ├── docker-compose-middleware.yml # 生产-中间件
@@ -246,72 +288,8 @@ docker/
 ├── start-console.sh            # 控制台节点管理脚本
 ├── start-execute.sh            # 执行节点管理脚本
 ├── start-middleware.sh         # 中间件管理脚本
-├── package-x86.sh              # 当前环境一键生成 Ubuntu x86_64 发布包
-├── tests/package-x86-test.sh   # 打包脚本自动化测试
 ├── .env.simple                 # 单机环境变量
 ├── .env.console                # 控制台环境变量
 ├── .env.execute                # 执行节点环境变量
 └── .env.middleware             # 中间件环境变量
-```
-
-## 生成 x86_64 服务器发布包
-
-默认目标地址为 `192.168.8.81`，发布物生成在仓库同级的 `releases/`，不会写入 Git 仓库：
-
-```bash
-./docker/package-x86.sh
-```
-
-常用方式：
-
-```bash
-# 先检查参数、容器和输出路径，不修改任何状态
-./docker/package-x86.sh --dry-run
-
-# 指定目标服务器和发布标签
-./docker/package-x86.sh --host-ip 192.168.8.81 --tag 20260717
-
-# 已经存在同标签的 linux/amd64 镜像时跳过构建
-./docker/package-x86.sh --tag 20260717 --skip-build
-
-# 手工指定 Buildx builder；默认会优先使用 apboa-next-dns
-KACP_BUILDX_BUILDER=apboa-next-dns ./docker/package-x86.sh --tag 20260717
-
-# 保留压缩前的发布目录，便于检查
-./docker/package-x86.sh --keep-workdir
-```
-
-脚本会短暂停止当前 `k-acp-local` 的五个应用容器，备份 MySQL、pgvector、Redis 和 `.apboa` 后立即恢复；数据库容器不会停止。构建或打包失败时也会自动恢复原本运行的应用服务。脚本不会操作 `apboa-next` 等其他 Docker 项目。
-
-运行自动化测试：
-
-```bash
-bash docker/tests/package-x86-test.sh
-```
-
-### 保留服务器数据升级
-
-服务器已经安装过 K-ACP，并且需要保留现有数据库和 `.env` 时，不要再次运行发布包中的 `install.sh`。在旧部署目录解压，进入新发布目录后直接执行包内升级脚本：
-
-```bash
-cd /opt/k-acp
-tar -xzf /tmp/k-acp-x86_64-202607173.tar.gz
-cd k-acp-x86_64-202607173
-sudo ./upgrade-k-acp-x86.sh
-```
-
-脚本以当前目录作为新版本目录，自动以上一级目录作为旧部署目录。仓库脚本仍兼容显式参数：
-
-```bash
-./docker/upgrade-x86.sh \
-  --package /tmp/k-acp-x86_64-202607173.tar.gz \
-  --install-dir /opt/k-acp
-```
-
-升级脚本只执行以下操作：校验发布包、导入五个应用镜像、备份旧 `compose.yml`、替换五个应用镜像标签并重建应用容器。它不会覆盖 `.env`、`data/`、MySQL、Redis、pgvector 或 `.apboa`。如果新应用启动失败，脚本会自动恢复旧 Compose 和旧应用镜像。
-
-运行升级脚本测试：
-
-```bash
-bash docker/tests/upgrade-x86-test.sh
 ```

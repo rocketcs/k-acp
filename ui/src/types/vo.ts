@@ -232,6 +232,7 @@ export interface McpToolVO {
   inputSchema: Record<string, unknown> | null
   outputSchema: Record<string, unknown> | null
   enabled: boolean
+  needConfirm: boolean
   missing: boolean
   sort: number
   lastDiscoveredAt: string | null
@@ -384,6 +385,23 @@ export interface SkillImportResult {
   skippedCount: number
   totalCount: number
   hintMessage?: string | null
+}
+
+/**
+ * SkillHub 技能市场VO
+ */
+export interface SkillsHubVO {
+  category: string
+  slug: string
+  description: string
+  createdAt: string
+  updatedAt: string
+  version: string
+  name: string
+  downloads: string
+  homepage: string
+  iconUrl: string
+  requiresApiKey: string
 }
 
 /**

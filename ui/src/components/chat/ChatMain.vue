@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import {ref, watch, onMounted} from 'vue'
+import {computed, ref, watch, onMounted} from 'vue'
 import {
   MenuOutlined,
+  DatabaseOutlined,
+  ApartmentOutlined,
   FolderOutlined,
   FolderOpenOutlined,
   LoadingOutlined
@@ -11,10 +13,13 @@ import MessageNavigator from './MessageNavigator.vue'
 import ChatInput from './ChatInput.vue'
 import Welcome from './Welcome.vue'
 import PlanPanel from './PlanPanel.vue'
-import type { DisplayMessage, UploadedFileItem, PlanInfo, DiyOutputFormat, DiyPageConfig } from '@/types'
+import type { DisplayMessage, UploadedFileItem, PlanInfo, DiyOutputFormat, DiyPageConfig, RunActivity } from '@/types'
+import type { ChatAttachmentPolicy } from '@/composables/chat/useChatAttachments'
 import type {FlatFileItem} from "@/composables/chat/useWorkspaceFiles.ts";
 import type { InteractionSubmitPayload } from '@/components/markdown/uip/types'
 import WorkspaceFilePreview from "@/components/workspace/WorkspaceFilePreview.vue";
+import SemanticaExploreModal from './SemanticaExploreModal.vue'
+import { shouldShowChatInput, shouldShowRunActivity, shouldShowRunWaiting } from '@/utils/chat/runActivity'
 
 const props = defineProps<{
   title: string
@@ -23,9 +28,18 @@ const props = defineProps<{
   welcomeDesc?: string
   messages: DisplayMessage[]
   toolCalls: any[]
+  runActivities: RunActivity[]
+  completedRunActivities?: readonly RunActivity[]
+  runActivityPlacement?: 'tail' | 'after-latest-user'
+  forceRunActivity?: boolean
+  retainFinishedRunActivity?: boolean
+  isDiyChat: boolean
+  hasVisibleAnswer: boolean
+  runStartedAt: number | null
   inputValue: string
   uploadedFiles?: UploadedFileItem[]
   isRunning: boolean
+  isSubmitting?: boolean
   agentId: string
   memoryActive?: boolean
   planActive?: boolean
@@ -34,6 +48,10 @@ const props = defineProps<{
   toolProcessActive?: boolean
   showToolProcess?: boolean
   allowUploadFileType?: string[]
+  attachmentPolicy?: ChatAttachmentPolicy
+  attachmentDropEnabled?: boolean
+  onUploadComplete?: (file: UploadedFileItem) => void
+  onAttachmentRemoved?: (file: UploadedFileItem) => void
   agentHasResult?: boolean
   workspacePanelOpen?: boolean
   hasCodeExecutionConfig?: boolean
@@ -46,6 +64,9 @@ const props = defineProps<{
   /** 当前计划信息 */
   currentPlan?: PlanInfo | null
   diyConfig?: DiyPageConfig | null
+  showGraphExplorer?: boolean
+  /** 智能医生专属入口：打开本机 Semantica 知识图谱。 */
+  showSemanticaExplore?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -69,6 +90,7 @@ const emit = defineEmits<{
   (e: 'uipRetry', uipCode: string): void
   (e: 'vepRetry', vepCode: string): void
   (e: 'quickSend', payload: { text: string; outputFormat: DiyOutputFormat }): void
+  (e: 'graphExplorer'): void
 }>()
 
 // 滚动容器 ref
@@ -83,6 +105,16 @@ const savedScrollTop = ref(0)
 
 const workspaceFilePreviewVisible = ref(false)
 const workspaceFilePreviewNode = ref<FlatFileItem | null>(null)
+const semanticaExploreOpen = ref(false)
+const welcomeRef = ref<InstanceType<typeof Welcome> | null>(null)
+const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
+const showRunActivity = computed(() =>
+  props.forceRunActivity || !props.isDiyChat ? props.isRunning : shouldShowRunActivity(props.isDiyChat, props.isRunning, props.hasVisibleAnswer),
+)
+const showRunWaiting = computed(() =>
+  props.isDiyChat && !props.forceRunActivity && shouldShowRunWaiting(props.isDiyChat, props.isRunning, props.hasVisibleAnswer),
+)
+const showInput = computed(() => shouldShowChatInput(props.isDiyChat, props.isRunning))
 
 // 标志位：区分程序化滚动与用户手动滚动，防止 scrollToBottom 触发的 scroll 事件错误更新 shouldAutoScroll
 let programmaticScrolling = false
@@ -225,9 +257,15 @@ onMounted(() => {
 })
 
 // 暴露方法给父组件（如果需要）
-defineExpose({
-  scrollToBottom
-})
+const requestAttachmentPicker = (options?: { replace?: boolean }) => {
+  if (props.messageSize <= 1) {
+    welcomeRef.value?.requestAttachmentPicker(options)
+  } else {
+    chatInputRef.value?.requestAttachmentPicker(options)
+  }
+}
+
+defineExpose({ scrollToBottom, requestAttachmentPicker })
 </script>
 
 <template>
@@ -243,6 +281,32 @@ defineExpose({
         <MenuOutlined />
       </button>
       <h1 class="chat-main-title" :title="title">{{ title }}</h1>
+      <!-- 页面级数据管理入口：始终固定在标题栏右侧，避免与输入区争夺注意力。 -->
+      <ATooltip v-if="showGraphExplorer" placement="left" title="打开数据管理">
+        <button
+          type="button"
+          class="chat-data-management-btn"
+          title="打开数据管理"
+          aria-label="打开数据管理"
+          @click="$emit('graphExplorer')"
+        >
+          <DatabaseOutlined />
+          <span>数据管理</span>
+        </button>
+      </ATooltip>
+      <!-- 智能医生知识图谱入口：不离开当前对话，打开完整知识图谱。 -->
+      <ATooltip v-if="showSemanticaExplore" placement="left" title="打开知识图谱">
+        <button
+          type="button"
+          class="chat-semantic-explore-btn"
+          title="打开知识图谱"
+          aria-label="打开知识图谱"
+          @click="semanticaExploreOpen = true"
+        >
+          <ApartmentOutlined />
+          <span>知识图谱</span>
+        </button>
+      </ATooltip>
       <!-- 工作空间入口按钮（与左侧菜单按钮对称） -->
       <ATooltip placement="left" title="工作空间">
         <button
@@ -259,8 +323,17 @@ defineExpose({
 
     </header>
 
+    <SemanticaExploreModal
+      v-if="showSemanticaExplore"
+      v-model:open="semanticaExploreOpen"
+    />
+
+    <div v-if="isSubmitting && !isRunning" role="status" class="chat-submitting">
+      <LoadingOutlined spin /> 正在发送消息
+    </div>
     <div v-if="messageSize <= 1" class="chat-welcome-container">
       <Welcome
+        ref="welcomeRef"
         :message-size="messageSize"
         :headline="welcomeHeadline"
         :input-value="inputValue"
@@ -268,11 +341,21 @@ defineExpose({
         :description="welcomeDesc"
         :uploaded-files="uploadedFiles"
         :isRunning="isRunning"
+        :run-activities="runActivities"
+        :show-run-activity="showRunActivity"
+        :show-run-waiting="showRunWaiting"
+        :run-started-at="runStartedAt"
+        :show-input="showInput"
+        :is-diy-chat="isDiyChat"
         :memory-active="memoryActive"
         :plan-active="planActive"
         :enable-memory="enableMemory"
         :enable-planning="enablePlanning"
         :allow-upload-file-type="allowUploadFileType"
+        :attachment-policy="attachmentPolicy"
+        :attachment-drop-enabled="attachmentDropEnabled"
+        :on-upload-complete="onUploadComplete"
+        :on-attachment-removed="onAttachmentRemoved"
         :show-tool-process="showToolProcess"
         :tool-process-active="toolProcessActive"
         :session-id="sessionId"
@@ -285,6 +368,7 @@ defineExpose({
         @plan="$emit('plan', $event)"
         @toolProcess="$emit('toolProcess', $event)"
         @send="handleSend"
+        @abort="$emit('abort')"
         @new-session="$emit('newSession')"
         @quick-send="$emit('quickSend', $event)"
       />
@@ -315,8 +399,17 @@ defineExpose({
           />
           <MessageList
             :agent-has-result="agentHasResult"
-            :messages="messages"
+            :messages="props.messages"
             :tool-calls="toolCalls"
+            :run-activities="runActivities"
+            :completed-run-activities="completedRunActivities"
+            :is-diy-chat="isDiyChat"
+            :run-activity-placement="runActivityPlacement"
+            :show-run-activity="showRunActivity"
+            :retain-finished-run-activity="retainFinishedRunActivity"
+            :show-run-waiting="showRunWaiting"
+            :run-started-at="runStartedAt"
+            @abort="$emit('abort')"
             @inputTagPreview="inputTagPreviewHandle"
             @toolContent="(content: any) => $emit('toolContent', content)"
             @interaction-submit="$emit('interactionSubmit', $event)"
@@ -329,9 +422,10 @@ defineExpose({
           :scroll-container="messagesScrollRef"
         />
       </div>
-      <div class="chat-main-input-wrap" v-if="!sessionMessageTable">
+      <div class="chat-main-input-wrap" v-if="!sessionMessageTable && showInput">
         <div class="chat-input-outer">
           <ChatInput
+            ref="chatInputRef"
             :model-value="inputValue"
             :agent-id="agentId"
             :uploaded-files="uploadedFiles"
@@ -341,6 +435,10 @@ defineExpose({
             :enable-memory="enableMemory"
             :enable-planning="enablePlanning"
             :allow-upload-file-type="allowUploadFileType"
+            :attachment-policy="attachmentPolicy"
+            :attachment-drop-enabled="attachmentDropEnabled"
+            :on-upload-complete="onUploadComplete"
+            :on-attachment-removed="onAttachmentRemoved"
             :show-tool-process="showToolProcess"
             :tool-process-active="toolProcessActive"
             :session-id="sessionId"
@@ -369,6 +467,12 @@ defineExpose({
 
 <style scoped lang="scss">
 @use '@/styles/chat/index.scss' as *;
+
+.chat-submitting {
+  padding: 10px 16px;
+  color: #59718d;
+  font-size: 13px;
+}
 
 .chat-welcome-container {
   display: flex;

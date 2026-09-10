@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F7FBFF"/>
+      <stop offset="1" stop-color="#EEF5FC"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1E74CE"/>
+      <stop offset="1" stop-color="#15529A"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#4A6F97" flood-opacity=".15"/>
+    </filter>
+    <style>
+      .title { font-family: 'PingFang SC','Microsoft YaHei',Arial,sans-serif; font-size: 34px; font-weight: 700; fill: #173A5E; }
+      .subtitle { font-family: 'PingFang SC','Microsoft YaHei',Arial,sans-serif; font-size: 17px; fill: #617A93; }
+      .node { font-family: 'PingFang SC','Microsoft YaHei',Arial,sans-serif; font-size: 22px; font-weight: 700; fill: #183754; text-anchor: middle; dominant-baseline: middle; }
+      .mini { font-family: 'PingFang SC','Microsoft YaHei',Arial,sans-serif; font-size: 15px; fill: #637B93; text-anchor: middle; }
+      .edge { font-family: 'PingFang SC','Microsoft YaHei',Arial,sans-serif; font-size: 15px; fill: #5E7893; text-anchor: middle; }
+      .cardTitle { font-family: 'PingFang SC','Microsoft YaHei',Arial,sans-serif; font-size: 20px; font-weight: 700; fill: #294B6C; }
+      .cardText { font-family: 'PingFang SC','Microsoft YaHei',Arial,sans-serif; font-size: 15px; fill: #657C94; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#B6CAE0"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" rx="28" fill="url(#bg)"/>
+  <rect x="55" y="46" width="10" height="65" rx="5" fill="#21A17D"/>
+  <text x="84" y="76" class="title">MDL 语义知识图谱</text>
+  <text x="84" y="104" class="subtitle">以运营分析主题为例：实体、指标、规则与权限在同一语义网络中关联</text>
+
+  <g fill="none" stroke="#B6CAE0" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)">
+    <path d="M720 394 C630 338, 550 290, 458 276"/>
+    <path d="M855 392 C940 332, 1017 285, 1125 272"/>
+    <path d="M696 463 C610 478, 535 512, 465 553"/>
+    <path d="M877 465 C978 478, 1050 514, 1135 556"/>
+    <path d="M750 554 C690 630, 627 678, 560 705"/>
+    <path d="M828 554 C900 632, 970 680, 1055 706"/>
+    <path d="M787 388 C788 318, 787 256, 787 197"/>
+  </g>
+  <g fill="none" stroke="#D1DDEA" stroke-width="2" stroke-dasharray="7 8" stroke-linecap="round">
+    <path d="M390 276 C405 395, 405 458, 420 555"/>
+    <path d="M1160 272 C1145 398, 1148 478, 1160 556"/>
+    <path d="M494 718 C660 775, 915 776, 1088 715"/>
+  </g>
+  <text x="587" y="306" class="edge">签订 / 服务</text>
+  <text x="1001" y="307" class="edge">归属 / 关联</text>
+  <text x="583" y="500" class="edge">执行</text>
+  <text x="1000" y="502" class="edge">发生</text>
+  <text x="659" y="645" class="edge">统计</text>
+  <text x="922" y="646" class="edge">授权</text>
+  <text x="823" y="292" class="edge">主题归属</text>
+
+  <g filter="url(#shadow)">
+    <rect x="260" y="198" width="200" height="112" rx="24" fill="#FFFFFF" stroke="#9AC6F2" stroke-width="2"/>
+    <rect x="270" y="208" width="8" height="92" rx="4" fill="#3B8FE7"/>
+    <text x="365" y="250" class="node">客户</text>
+    <text x="365" y="282" class="mini">客户主体 · 分级标签</text>
+
+    <rect x="1120" y="194" width="200" height="112" rx="24" fill="#FFFFFF" stroke="#A4D9CB" stroke-width="2"/>
+    <rect x="1130" y="204" width="8" height="92" rx="4" fill="#24A681"/>
+    <text x="1225" y="246" class="node">合同</text>
+    <text x="1225" y="278" class="mini">金额 · 周期 · 状态</text>
+
+    <rect x="260" y="500" width="210" height="112" rx="24" fill="#FFFFFF" stroke="#F3C477" stroke-width="2"/>
+    <rect x="270" y="510" width="8" height="92" rx="4" fill="#EC9F2E"/>
+    <text x="370" y="552" class="node">项目</text>
+    <text x="370" y="584" class="mini">阶段 · 里程碑 · 负责人</text>
+
+    <rect x="1125" y="504" width="200" height="112" rx="24" fill="#FFFFFF" stroke="#C9B6ED" stroke-width="2"/>
+    <rect x="1135" y="514" width="8" height="92" rx="4" fill="#8867C9"/>
+    <text x="1230" y="556" class="node">费用</text>
+    <text x="1230" y="588" class="mini">预算 · 科目 · 发生额</text>
+
+    <rect x="402" y="670" width="210" height="112" rx="24" fill="#FFFFFF" stroke="#F4A7A2" stroke-width="2"/>
+    <rect x="412" y="680" width="8" height="92" rx="4" fill="#DE716C"/>
+    <text x="507" y="722" class="node">工单</text>
+    <text x="507" y="754" class="mini">工时 · 状态 · 服务记录</text>
+
+    <rect x="1018" y="672" width="220" height="112" rx="24" fill="#FFFFFF" stroke="#9DC5D4" stroke-width="2"/>
+    <rect x="1028" y="682" width="8" height="92" rx="4" fill="#4087A1"/>
+    <text x="1128" y="724" class="node">组织</text>
+    <text x="1128" y="756" class="mini">部门 · 岗位 · 数据权限</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="788" cy="460" r="125" fill="url(#core)"/>
+    <circle cx="788" cy="460" r="105" fill="none" stroke="#78B5EF" stroke-width="2" opacity=".65"/>
+    <text x="788" y="446" font-family="'PingFang SC','Microsoft YaHei',Arial,sans-serif" font-size="29" font-weight="700" fill="#FFFFFF" text-anchor="middle">运营分析主题</text>
+    <text x="788" y="480" font-family="'PingFang SC','Microsoft YaHei',Arial,sans-serif" font-size="17" fill="#DCEEFF" text-anchor="middle">实体关系 · 指标口径 · 业务规则</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="651" y="128" width="274" height="72" rx="18" fill="#FFFFFF" stroke="#B4D8EF" stroke-width="2"/>
+    <circle cx="687" cy="164" r="14" fill="#24A681"/>
+    <text x="716" y="157" class="cardTitle">业务规则</text>
+    <text x="716" y="180" class="cardText">时间口径 · 约束条件</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="76" y="700" width="254" height="113" rx="22" fill="#FFFFFF" stroke="#C4D7EA" stroke-width="2"/>
+    <text x="104" y="738" class="cardTitle">指标与字段</text>
+    <text x="104" y="766" class="cardText">收入 · 成本 · 工时 · 完成率</text>
+    <text x="104" y="791" class="cardText">语义别名 · 计算公式 · 标签</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="1270" y="696" width="254" height="117" rx="22" fill="#FFFFFF" stroke="#C4D7EA" stroke-width="2"/>
+    <text x="1298" y="735" class="cardTitle">治理策略</text>
+    <text x="1298" y="763" class="cardText">行列权限 · 数据分级 · 审计</text>
+    <text x="1298" y="788" class="cardText">规则版本 · 血缘追踪 · 可解释</text>
+  </g>
+
+  <rect x="80" y="850" width="1440" height="1" fill="#D6E3EF"/>
+  <circle cx="92" cy="875" r="7" fill="#1D75D0"/><text x="108" y="881" class="cardText">业务实体</text>
+  <circle cx="232" cy="875" r="7" fill="#24A681"/><text x="248" y="881" class="cardText">规则与指标</text>
+  <path d="M390 875 H430" stroke="#B6CAE0" stroke-width="3" marker-end="url(#arrow)"/><text x="448" y="881" class="cardText">可推理关系路径</text>
+  <text x="1515" y="881" font-family="'PingFang SC','Microsoft YaHei',Arial,sans-serif" font-size="14" fill="#71889F" text-anchor="end">按需召回 · 受控执行 · 全程可追溯</text>
+</svg>

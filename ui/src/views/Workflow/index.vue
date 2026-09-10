@@ -39,9 +39,11 @@ const resourceSummary = ref<WorkflowResourceSummary>({
   datasourceTotal: 0,
   cacheTotal: 0,
   mqTotal: 0,
+  channelTotal: 0,
   datasourceEnabled: 0,
   cacheEnabled: 0,
   mqEnabled: 0,
+  channelEnabled: 0,
 })
 
 /** 用于强制重建 InfiniteLoading 组件的 key */
@@ -181,7 +183,7 @@ async function removeWorkflow(record: Workflow) {
     okText: '删除',
     cancelText: '取消',
     onOk: async () => {
-      await workflowApi.workflowRemove([record.id!], 0)
+      await workflowApi.workflowRemove([record.id!], 1)
       message.success('删除成功')
       store.markListDirty()
       await refreshListFromServer()

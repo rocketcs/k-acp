@@ -16,6 +16,42 @@ const commonRoutes: AppRouteRecordRaw[] = [
     redirect: RoutePaths.DASHBOARD,
   },
   {
+    path: RoutePaths.LARGE_SCREEN_IMAGE_CHAT,
+    name: RouteNames.LARGE_SCREEN_IMAGE_CHAT,
+    component: () => import('@/views/LargeScreenImageChat/index.vue'),
+    meta: {
+      title: '大屏生图',
+      hidden: true,
+    },
+  },
+  {
+    path: RoutePaths.BIAOSHU_INTERPRETER_CHAT,
+    name: RouteNames.BIAOSHU_INTERPRETER_CHAT,
+    component: () => import('@/features/biaoshu-interpreter/BiaoshuInterpreterChat.vue'),
+    meta: {
+      title: '标书智能解读助手',
+      hidden: true,
+    },
+  },
+  {
+    path: RoutePaths.GRAPHIFY_DATA_QUERY_CHAT,
+    name: RouteNames.GRAPHIFY_DATA_QUERY_CHAT,
+    component: () => import('@/features/graphify-data-query/GraphifyDataQueryChat.vue'),
+    meta: {
+      title: '医保问数助手',
+      hidden: true,
+    },
+  },
+  {
+    path: RoutePaths.NANWANG_DATA_QUERY_CHAT,
+    name: RouteNames.NANWANG_DATA_QUERY_CHAT,
+    component: () => import('@/features/nanwang-data-query/GraphifyDataQueryChat.vue'),
+    meta: {
+      title: '南网问数助手',
+      hidden: true,
+    },
+  },
+  {
     path: `${RoutePaths.CHAT_DIY}/:agentId`,
     name: RouteNames.CHAT_DIY,
     component: () => import('@/views/Chat/index.vue'),
@@ -52,6 +88,15 @@ const commonRoutes: AppRouteRecordRaw[] = [
     },
   },
   // 文档页面已迁移至 doc 子应用（doc.html）
+  {
+    path: RoutePaths.FORBIDDEN,
+    name: RouteNames.FORBIDDEN,
+    component: () => import('@/pages/Forbidden.vue'),
+    meta: {
+      title: '无访问权限',
+      hidden: true,
+    },
+  },
   {
     path: RoutePaths.NOT_FOUND,
     name: RouteNames.NOT_FOUND,

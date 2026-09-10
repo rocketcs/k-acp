@@ -6,9 +6,9 @@
 <script setup lang="ts">
 /* eslint-disable vue/multi-word-component-names */
 import { onMounted, ref, computed, h, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { Modal } from 'ant-design-vue'
-import {SearchOutlined, AppstoreOutlined} from '@ant-design/icons-vue'
+import {SearchOutlined, AppstoreOutlined, ShopOutlined} from '@ant-design/icons-vue'
 import { useSkillStore } from '@/stores'
 import { storeToRefs } from 'pinia'
 import * as skillApi from '@/api/skill'
@@ -24,6 +24,7 @@ import { displaySkillName } from '@/utils/skillDisplayName'
 
 const store = useSkillStore()
 const router = useRouter()
+const route = useRoute()
 const { list, categories, selectedCategory, keyword, loading, hasMore } = storeToRefs(store)
 
 const importLocalVisible = ref(false)
@@ -74,6 +75,13 @@ function handleImportGit() {
  */
 function handleImportUpload() {
   importUploadVisible.value = true
+}
+
+/**
+ * 跳转到 SkillHub 技能市场
+ */
+function handleGoToSkillHub() {
+  router.push({ name: 'SkillHub' })
 }
 
 /**
@@ -276,6 +284,18 @@ onMounted(() => {
   store.fetchCategories()
   store.resetAndFetch()
 })
+
+/**
+ * 监听路由 query 参数变化，从 SkillHub 返回时刷新列表
+ */
+watch(() => route.query.refresh, (val) => {
+  if (val) {
+    store.fetchCategories()
+    resetListAndRebuild()
+    // 清除 query 参数，避免重复刷新
+    router.replace({ query: {} })
+  }
+})
 </script>
 
 <template>
@@ -293,18 +313,24 @@ onMounted(() => {
         :options="categoryOptions"
       />
 
-      <AInput
-        v-model:value="keyword"
-        placeholder="搜索技能包名称"
-        style="width: 300px;"
-        @pressEnter="handleSearch"
-      >
-        <template #suffix>
-          <AButton type="text" size="small" @click="handleSearch">
-            <SearchOutlined />
-          </AButton>
-        </template>
-      </AInput>
+      <div class="filter-right flex items-center gap-sm">
+        <AButton type="primary" @click="handleGoToSkillHub">
+          <ShopOutlined />
+          技能市场
+        </AButton>
+        <AInput
+          v-model:value="keyword"
+          placeholder="搜索技能包名称"
+          style="width: 300px;"
+          @pressEnter="handleSearch"
+        >
+          <template #suffix>
+            <AButton type="text" size="small" @click="handleSearch">
+              <SearchOutlined />
+            </AButton>
+          </template>
+        </AInput>
+      </div>
     </section>
 
     <section class="card-section">
@@ -353,7 +379,6 @@ onMounted(() => {
       :default-category="selectedCategory"
       @success="handleImportSuccess"
     />
-
     <SkillToolLinkModal
       v-model:visible="toolLinkVisible"
       :skill-id="toolLinkSkillId"

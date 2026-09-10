@@ -128,6 +128,15 @@ const bizRoutes: AppRouteRecordRaw[] = [
         },
       },
       {
+        path: RoutePaths.SKILL_HUB,
+        name: RouteNames.SKILL_HUB,
+        component: () => import('@/views/Skill/SkillHub.vue'),
+        meta: {
+          title: 'SkillHub 技能市场',
+          hidden: true,
+        },
+      },
+      {
         path: RoutePaths.MCP,
         name: RouteNames.MCP,
         component: () => import('@/views/Mcp/index.vue'),
@@ -156,12 +165,102 @@ const bizRoutes: AppRouteRecordRaw[] = [
       },
       // 工作台
       {
-        path: 'dashboard',
+        path: RoutePaths.DASHBOARD,
         name: RouteNames.DASHBOARD,
         component: () => import('@/views/Dashboard/index.vue'),
         meta: {
           title: '工作台',
           hidden: false
+        },
+      },
+      {
+        path: RoutePaths.CHAT_CLUSTER,
+        name: RouteNames.CHAT_CLUSTER,
+        component: () => import('@/views/ChatCluster/index.vue'),
+        meta: {
+          title: '对话广场',
+          hidden: false
+        },
+      },
+      {
+        path: RoutePaths.AUTOMATION,
+        name: RouteNames.AUTOMATION,
+        component: () => import('@/views/Automation/index.vue'),
+        meta: {
+          title: '自动化',
+          hidden: false
+        },
+      },
+      {
+        path: '/automation/new',
+        name: 'AutomationNew',
+        component: () => import('@/views/Automation/Editor.vue'),
+        meta: {
+          title: '新增自动化任务',
+          hidden: true
+        },
+      },
+      {
+        path: '/automation/:id/edit',
+        name: 'AutomationEdit',
+        component: () => import('@/views/Automation/Editor.vue'),
+        meta: {
+          title: '编辑自动化任务',
+          hidden: true
+        },
+      },
+      {
+        path: '/automation/:id/records',
+        name: 'AutomationRecords',
+        component: () => import('@/views/Automation/Records.vue'),
+        meta: {
+          title: '执行记录',
+          hidden: true
+        },
+      },
+      {
+        path: RoutePaths.API_SERVICE,
+        name: RouteNames.API_SERVICE,
+        component: () => import('@/views/ApiService/index.vue'),
+        meta: {
+          title: 'API服务',
+          hidden: false
+        },
+      },
+      {
+        path: '/api-service/logs',
+        name: 'ApiServiceLogs',
+        component: () => import('@/views/ApiService/Logs.vue'),
+        meta: {
+          title: 'API访问日志',
+          hidden: true
+        },
+      },
+      {
+        path: '/api-service/new',
+        name: 'ApiServiceNew',
+        component: () => import('@/views/ApiService/Editor.vue'),
+        meta: {
+          title: '新增API',
+          hidden: true
+        },
+      },
+      {
+        path: '/api-service/:id/edit',
+        name: 'ApiServiceEdit',
+        component: () => import('@/views/ApiService/Editor.vue'),
+        meta: {
+          title: '编辑API',
+          hidden: true
+        },
+      },
+      {
+        path: '/api-service/apps',
+        name: 'ApiServiceApps',
+        component: () => import('@/views/ApiService/Apps.vue'),
+        meta: {
+          title: '网关应用',
+          hidden: true
         },
       },
       // 设置管理
@@ -260,6 +359,16 @@ const bizRoutes: AppRouteRecordRaw[] = [
     ],
   },
   {
+    path: `/${RoutePaths.OPS_SESSION_TRACING}`,
+    name: RouteNames.OPS_SESSION_TRACING,
+    component: () => import('@/views/Ops/SessionTracing.vue'),
+    meta: {
+      title: '用户对话复盘',
+      hidden: true,
+      tenantAdminOnly: true,
+    },
+  },
+  {
     path: RoutePaths.WORKFLOW_NEW,
     name: RouteNames.WORKFLOW_NEW,
     component: () => import('@/views/Workflow/WorkflowEditorView.vue'),
@@ -275,6 +384,26 @@ const bizRoutes: AppRouteRecordRaw[] = [
     component: () => import('@/views/Workflow/WorkflowEditorView.vue'),
     meta: {
       title: '编辑工作流',
+      hidden: true,
+      hideFooter: true,
+    },
+  },
+  {
+    path: RoutePaths.DASHBOARD_DESIGN,
+    name: RouteNames.DASHBOARD_DESIGN,
+    component: () => import('@/views/Dashboard/DashboardDesigner.vue'),
+    meta: {
+      title: '工作台设计器',
+      hidden: true,
+      hideFooter: true,
+    },
+  },
+  {
+    path: RoutePaths.DASHBOARD_DATASET,
+    name: RouteNames.DASHBOARD_DATASET,
+    component: () => import('@/views/Dashboard/DatasetManage.vue'),
+    meta: {
+      title: '数据集管理',
       hidden: true,
       hideFooter: true,
     },

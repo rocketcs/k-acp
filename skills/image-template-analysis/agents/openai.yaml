@@ -1,0 +1,4 @@
+interface:
+  display_name: "大屏参考图模板识别"
+  short_description: "从参考图提炼可编辑的大屏视觉模板"
+  default_prompt: "Use $image-template-analysis to analyze the attached reference image into a large-screen template."

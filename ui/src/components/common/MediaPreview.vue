@@ -15,6 +15,8 @@ import {
   RotateRightOutlined
 } from '@ant-design/icons-vue'
 import { download } from '@/api/attach'
+import MediaThumbnail from './MediaThumbnail.vue'
+import { getMediaMimeType, isImageExtension } from '@/utils/chat/media'
 
 /**
  * 媒体类型
@@ -72,6 +74,7 @@ const dragStartTranslateY = ref(0)
 const imageRef = ref<HTMLImageElement | null>(null)
 // 图片容器引用
 const imageWrapperRef = ref<HTMLDivElement | null>(null)
+let loadSequence = 0
 
 // 当前媒体项
 const currentItem = computed(() => props.items[currentIdx.value])
@@ -89,6 +92,7 @@ watch(() => props.visible, (val) => {
     resetImageTransform()
     loadMedia()
   } else {
+    loadSequence++
     // 清理URL对象
     if (mediaUrl.value && mediaUrl.value.startsWith('blob:')) {
       URL.revokeObjectURL(mediaUrl.value)
@@ -103,8 +107,7 @@ const mediaType = computed((): MediaType => {
   const ext = currentItem.value.extension.toLowerCase()
 
   // 图片格式
-  const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico']
-  if (imageExts.includes(ext)) return 'image'
+  if (isImageExtension(ext)) return 'image'
 
   // 音频格式
   const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma', 'mpeg']
@@ -153,8 +156,12 @@ watch(currentIdx, async () => {
  * 加载媒体文件
  */
 async function loadMedia() {
-  if (!currentItem.value) return
+  const item = currentItem.value
+  const sequence = ++loadSequence
+  if (!item) return
 
+  if (mediaUrl.value.startsWith('blob:')) URL.revokeObjectURL(mediaUrl.value)
+  mediaUrl.value = ''
   loading.value = true
   try {
     // 文档类型不加载预览，直接引导用户下载
@@ -162,19 +169,23 @@ async function loadMedia() {
       return
     }
 
-    const res = await download(currentItem.value.id)
-    const blob = new Blob([res.data])
+    const res = await download(item.id)
+    if (sequence !== loadSequence) return
+    const serverMimeType = res.headers?.['content-type']?.split(';', 1)[0]
+    const blob = new Blob([res.data], {
+      type: serverMimeType || getMediaMimeType(item.extension) || 'application/octet-stream',
+    })
     mediaUrl.value = URL.createObjectURL(blob)
 
     // 等待图片加载完成后重置拖拽位置
     await nextTick()
-    if (isImage.value && imageRef.value) {
+    if (sequence === loadSequence && isImage.value && imageRef.value) {
       imageRef.value.addEventListener('load', () => {
         resetImageTransform()
       })
     }
   } catch (error) {
-    console.error('加载媒体失败:', error)
+    if (sequence === loadSequence) console.error('加载媒体失败:', error)
   } finally {
     loading.value = false
   }

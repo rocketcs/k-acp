@@ -3,7 +3,9 @@ import { message } from 'ant-design-vue'
 import { useAgentClient } from '@/composables/useAgentClient'
 import { usePlanTracking } from '@/composables/chat/usePlanTracking'
 import { buildToolCallsContent } from '@/utils/chat/format'
-import type {ChatMessageVO, RawEvent} from '@/types'
+import { composeTenderResponse, needsTenderFallback, normalizeUIPContent } from '@/utils/chat/uip'
+import { toAguiRuntimeMessages, type RuntimeChatMessage } from '@/utils/chat/runtimeMessages'
+import type {ChatMessageVO, RawEvent, RunActivity} from '@/types'
 import { useAccountStore } from '@/stores'
 import { stopRun } from '@/api/agui'
 
@@ -28,7 +30,14 @@ export function useChatStream(
   memoryActive?: import('vue').Ref<boolean>,
   planActive?: import('vue').Ref<boolean>,
   toolProcessActive?: import('vue').Ref<boolean>,
-  onMessageSaved?: (chatMsg: ChatMessageVO) => void) {
+  onMessageSaved?: (chatMsg: ChatMessageVO) => void,
+  options?: {
+    onToolResult?: (event: { toolCallId: string; toolName: string; args: string; content: string; messageId: string }) => void
+    /** 特定路由用：以业务标签驱动「干净的查询流程摘要」，替代原始工具调用条。 */
+    onToolCallActivity?: (t: { toolName: string; status: 'running' | 'completed' | 'failed'; content?: string }) => void
+    /** 特定路由用：助手开始输出最终正文时更新业务阶段。 */
+    onAssistantTextActivity?: (content: string) => void
+  }) {
 
   const { userInfo } = useAccountStore()
 
@@ -57,25 +66,142 @@ export function useChatStream(
   const streamingMessageId = ref<string | null>(null)
   const streamingRole = ref<'user' | 'assistant' | 'system' | 'tool' | 'thinking'>('system')
   const streamingContent = ref('')
-  // 高召回工作流已经生成可直接渲染的业务答案和 UIP 卡片。外层 Agent 的
-  // 文本重写可能丢失卡片，因此在本次运行结束时优先展示该工具的原始答案。
+  // 一旦本轮回答已有可见正文，执行卡应立刻退出，避免占据正文下方的位置。
+  const hasVisibleAnswer = ref(false)
+  const runStartedAt = ref<number | null>(null)
+  // 高召回工作流提供确定性事实正文；外层策展 Skill 提供唯一的后续卡片。
   const pendingHighRecallAnswer = ref<string | null>(null)
   // 任何商业标书回答都应保留后续操作；不只限于高召回检索，也包括筛选和分析。
   const runHasAssistantAnswer = ref(false)
   const runHasTenderFollowups = ref(false)
   const fallbackFollowupSaved = ref(false)
 
+  const isTenderAgent = () => agentDetail.value?.agentCode === 'default-tender'
+
+  function saveNormalizedAssistantContent(
+    rawContent: string,
+    messageId: string | null,
+    role: ChatMessageVO['role'],
+  ) {
+    const normalized = normalizeUIPContent(rawContent, isTenderAgent() ? 'tenderStrict' : 'default')
+    const displayText = normalized.content
+
+    if (displayText || (isTenderAgent() && needsTenderFallback(normalized))) {
+      runHasAssistantAnswer.value = true
+      if (isTenderAgent() && normalized.validBlocks.length > 0) {
+        runHasTenderFollowups.value = true
+      }
+    }
+
+    if (displayText) {
+      const sid = currentSessionId.value
+      if (sid) {
+        onMessageSaved?.({
+          id: messageId,
+          sessionId: sid,
+          role,
+          content: displayText,
+          parentId: '',
+          path: '',
+          depth: 0,
+          createdAt: ''
+        } as ChatMessageVO)
+      }
+    }
+  }
+
+  function clearStreamingMessage() {
+    streamingMessageId.value = null
+    streamingContent.value = ''
+    streamingRole.value = 'system'
+    pendingHighRecallAnswer.value = null
+  }
+
+  function finalizeStreamingMessage(finalText = streamingContent.value) {
+    const displayText = isTenderAgent() && pendingHighRecallAnswer.value
+      ? composeTenderResponse(pendingHighRecallAnswer.value, finalText)
+      : finalText
+    if (displayText) {
+      saveNormalizedAssistantContent(displayText, streamingMessageId.value, streamingRole.value)
+    }
+    clearStreamingMessage()
+  }
+
+  function appendTenderFallbackIfNeeded() {
+    if (!isTenderAgent()) return
+    const sid = currentSessionId.value
+    if (!sid || !runHasAssistantAnswer.value || runHasTenderFollowups.value || fallbackFollowupSaved.value) {
+      return
+    }
+
+    fallbackFollowupSaved.value = true
+    onMessageSaved?.({
+      id: nextIdBig(),
+      sessionId: sid,
+      role: 'assistant',
+      content: TENDER_FOLLOW_UP_CARD,
+      parentId: '',
+      path: '',
+      depth: 0,
+      createdAt: ''
+    } as ChatMessageVO)
+  }
+
   // 工具调用进度
   const toolCallsInProgress = ref<
     Array<{ id: string; name: string; args: string; result?: string; startTime: number; elapsed?: number, needConfirm?: boolean }>
   >([])
+  // 与工具调用的持久化记录分开：此列表只服务于当前一轮的实时执行轨迹。
+  // 即使工具已返回，也保留它直到本轮结束，避免用户在模型继续整理答案时看到空白。
+  const runActivities = ref<RunActivity[]>([])
+
+  // toolCallId → 工具名。start 与 result 事件可能乱序抵达或因会话恢复丢失，
+  // result 反查 toolCallsInProgress 失败时以此兜底，避免完成事件因 toolName 为空
+  // 被业务步骤映射（onToolCallActivity 消费方）静默丢弃，步骤卡在 loading。
+  const toolNameById = new Map<string, string>()
+
+  // HITL：逐工具确认决策（toolUseId → 状态），所有项决策完即调 /agui/resume
+  const pendingConfirms = ref<Record<string, 'pending' | 'approved' | 'rejected'>>({})
+
+  /**
+   * HITL：根据待确认列表重建确认 UI（标记/新建工具项 + 建立逐工具决策态）。两条来源共用：
+   * - 实时 TOOL_CONFIRM_REQUIRED 事件：工具项已由 ToolCallStart 建立，只需标记 needConfirm；
+   * - 刷新/重进会话（GET /agui/pending 恢复）：toolCallsInProgress 已被清空，须按 input 新建工具项，
+   *   否则没有任何工具项承载「允许/禁止」按钮，暂停态卡死无法续点。
+   * @param pending 待确认工具 [{toolUseId,name,input}]
+   */
+  const restorePending = (
+    pending: Array<{ toolUseId: string; name: string; input?: Record<string, unknown> }>
+  ) => {
+    if (!pending || pending.length === 0) return
+    const ids = new Set(pending.map(p => p.toolUseId))
+    // 已存在的标记 needConfirm
+    const arr = toolCallsInProgress.value.map(t => (ids.has(t.id) ? { ...t, needConfirm: true } : t))
+    // 缺失的新建（刷新场景）
+    const existing = new Set(arr.map(t => t.id))
+    pending.forEach(p => {
+      if (!existing.has(p.toolUseId)) {
+        const args = p.input && Object.keys(p.input).length ? JSON.stringify(p.input) : '{}'
+        arr.push({ id: p.toolUseId, name: p.name, args, needConfirm: true, startTime: Date.now() })
+      }
+    })
+    toolCallsInProgress.value = arr
+    arr.forEach((t) => toolNameById.set(t.id, t.name))
+    const next: Record<string, 'pending' | 'approved' | 'rejected'> = { ...pendingConfirms.value }
+    pending.forEach(p => { next[p.toolUseId] = 'pending' })
+    pendingConfirms.value = next
+  }
 
   // 使用原有的 useAgentClient
-  const { messages, isRunning, isReplaying, run, abort, disconnect, reconnect, addUserMessage, client } = useAgentClient({
+  const { messages, isRunning, isReplaying, run, abort, disconnect, reconnect, resume, addUserMessage, client } = useAgentClient({
     handlers: {
       onRunStarted: () => {
         toolCallsInProgress.value = []
+        toolNameById.clear()
+        runActivities.value = []
+        runStartedAt.value = Date.now()
         streamingContent.value = ''
+        hasVisibleAnswer.value = false
         streamingMessageId.value = null
         pendingHighRecallAnswer.value = null
         runHasAssistantAnswer.value = false
@@ -90,34 +216,14 @@ export function useChatStream(
       onTextMessageContent: (_e, currentText) => {
         agentHasResult.value = true
         streamingContent.value = currentText
+        if (currentText.trim()) {
+          hasVisibleAnswer.value = true
+          options?.onAssistantTextActivity?.(currentText)
+        }
       },
       onTextMessageEnd: (_e, finalText) => {
-        const displayText = pendingHighRecallAnswer.value || finalText
-        const sid = currentSessionId.value
-        if (displayText) {
-          runHasAssistantAnswer.value = true
-          if (displayText.includes('```uip')) {
-            runHasTenderFollowups.value = true
-          }
-        }
-        if (sid && displayText) {
-          // 纯文本保存，不再与推理打包，通过队列保证写入顺序
-          onMessageSaved?.({
-            id: streamingMessageId.value,
-            sessionId: sid,
-            role: streamingRole.value,  // 这里必须使用 streamingRole.value，不能写死 assistant
-            content: displayText,
-            parentId: '',
-            path: '',
-            depth: 0,
-            createdAt: ''
-          } as ChatMessageVO)
-        }
-        // 无论是否回放，都清除流式状态
-        streamingMessageId.value = null
-        streamingContent.value = ''
-        streamingRole.value = 'system'
-        pendingHighRecallAnswer.value = null
+        if (finalText.trim()) options?.onAssistantTextActivity?.(finalText)
+        finalizeStreamingMessage(finalText)
       },
       onReasoningMessageStart: (_e) => {
         // Internal reasoning is not business-facing content. Ignore it instead of
@@ -133,27 +239,44 @@ export function useChatStream(
         // 计划追踪：记录工具调用名称
         onPlanToolStart(e.toolCallId, e.toolCallName)
 
+        options?.onToolCallActivity?.({ toolName: e.toolCallName, status: 'running' })
+
         agentHasResult.value = true
+        toolNameById.set(e.toolCallId, e.toolCallName)
+        runActivities.value = [
+          ...runActivities.value.filter((activity) => activity.id !== `tool:${e.toolCallId}`),
+          { id: `tool:${e.toolCallId}`, name: e.toolCallName, status: 'running', startTime: Date.now() },
+        ]
         toolCallsInProgress.value = [
           ...toolCallsInProgress.value,
           { id: e.toolCallId, name: e.toolCallName, args: '', startTime: Date.now() }
         ]
-
-        const sid = currentSessionId.value
         // Reasoning is not user-visible and is intentionally not persisted here.
       },
       onToolCallArgs: (_e, partialArgs) => {
         // 计划追踪：累积工具参数
         onPlanToolArgs(_e.toolCallId, partialArgs)
+        runActivities.value = runActivities.value.map((activity) =>
+          activity.id === `tool:${_e.toolCallId}` ? { ...activity, args: partialArgs } : activity,
+        )
 
-        const arr = [...toolCallsInProgress.value]
-        const last = arr[arr.length - 1]
-        if (last) last.args = partialArgs
-        toolCallsInProgress.value = arr
+        toolCallsInProgress.value = toolCallsInProgress.value.map((toolCall) =>
+          toolCall.id === _e.toolCallId ? { ...toolCall, args: partialArgs } : toolCall,
+        )
       },
       onToolCallResult: (e) => {
         // 计划追踪：处理工具结果
         onPlanToolResult(e.toolCallId)
+        const activeTool = toolCallsInProgress.value.find((item) => item.id === e.toolCallId)
+        // 反查失败（乱序/恢复丢失）时按 id 从兜底映射取工具名，不能发空串。
+        const completedToolName = activeTool?.name ?? toolNameById.get(e.toolCallId) ?? ''
+        runActivities.value = runActivities.value.map((activity) =>
+          activity.id === `tool:${e.toolCallId}`
+            ? { ...activity, status: 'completed', elapsed: Date.now() - activity.startTime }
+            : activity,
+        )
+
+        options?.onToolCallActivity?.({ toolName: completedToolName, status: 'completed', content: e.content })
 
         try {
           if (agentDetail.value?.agentCode === 'default-tender') {
@@ -180,7 +303,8 @@ export function useChatStream(
             }
           }
 
-          // 判断是否开启了显示工具调用
+          // 判断是否开启了显示工具调用。实时执行轨迹不受此设置影响：
+          // 它只展示面向业务用户的进度，不展示工具的原始参数与结果。
           if (!(toolProcessActive?.value ?? true)) {
             return
           }
@@ -192,7 +316,7 @@ export function useChatStream(
           // // 保存工具调用消息，通过队列保证写入顺序
           const sid = currentSessionId.value
           if (sid) {
-            const contentToSave = buildToolCallsContent(toolCallsInProgress.value)
+            const contentToSave = buildToolCallsContent(toolCallsInProgress.value.filter((tool) => tool.id === e.toolCallId))
             if (contentToSave) {
               onMessageSaved?.({
                 id: nextIdBig(),
@@ -207,40 +331,29 @@ export function useChatStream(
             }
           }
         } finally {
-          // 清空进行中的工具调用（可根据需要保留，此处清空）
-          toolCallsInProgress.value = []
+          options?.onToolResult?.({
+            toolCallId: e.toolCallId,
+            toolName: activeTool?.name ?? '',
+            args: activeTool?.args ?? '',
+            content: e.content,
+            messageId: e.messageId,
+          })
+          // 并行工具的结果独立返回，不能清除其他尚未完成的工具。
+          toolCallsInProgress.value = toolCallsInProgress.value.filter((tool) => tool.id !== e.toolCallId)
         }
       },
       onRunFinished: (_e) => {
         agentHasResult.value = true
+        finalizeStreamingMessage()
         // 商业标书智能体的高召回入口已明确配置为无需人工确认。
         // UIP 卡片点击后应立即继续查询；不要把未完成的工具状态误渲染成“允许/禁止”。
-        if (agentDetail.value?.agentCode === 'default-tender') {
-          const sid = currentSessionId.value
-          if (
-            sid &&
-            runHasAssistantAnswer.value &&
-            !runHasTenderFollowups.value &&
-            !fallbackFollowupSaved.value
-          ) {
-            fallbackFollowupSaved.value = true
-            onMessageSaved?.({
-              id: nextIdBig(),
-              sessionId: sid,
-              role: 'assistant',
-              content: TENDER_FOLLOW_UP_CARD,
-              parentId: '',
-              path: '',
-              depth: 0,
-              createdAt: ''
-            } as ChatMessageVO)
-          }
+        if (isTenderAgent()) {
+          appendTenderFallbackIfNeeded()
           toolCallsInProgress.value = []
           return
         }
-        if (toolCallsInProgress.value.length > 0) {
-          toolCallsInProgress.value.forEach(item => item.needConfirm = true)
-        }
+        // 不再全标记 needConfirm（旧 Bug1/MCP 假象根源）；
+        // 确认改由 onCustom 的 TOOL_CONFIRM_REQUIRED 事件精确驱动
       },
       onRaw: (event) => {
         const e = event as RawEvent
@@ -267,44 +380,88 @@ export function useChatStream(
             streamingRole.value = 'system'
           }
         }
-     }
+      },
+      onCustom: (event) => {
+        // HITL：收到 TOOL_CONFIRM_REQUIRED 时，精确标记需确认的工具（不再全标记）
+        if (event.name === 'TOOL_CONFIRM_REQUIRED') {
+          const pending = (((event.value as any)?.pending) ?? []) as Array<{ toolUseId: string; name: string; input?: Record<string, unknown> }>
+          restorePending(pending)
+          return
+        }
+        if (event.name === 'WORKFLOW_NODE_PROGRESS') {
+          const progress = (event.value ?? {}) as {
+            nodeId?: string
+            nodeName?: string
+            status?: RunActivity['status']
+            startTime?: number
+            endTime?: number
+          }
+          if (!progress.nodeId || !progress.nodeName || !progress.status) return
+          const startTime = progress.startTime ?? Date.now()
+          runActivities.value = [
+            ...runActivities.value.filter((activity) => activity.id !== progress.nodeId),
+            {
+              id: progress.nodeId,
+              name: progress.nodeName,
+              status: progress.status,
+              startTime,
+              elapsed: progress.endTime ? Math.max(0, progress.endTime - startTime) : undefined,
+            },
+          ]
+        }
+      },
+      onRunError: (event) => {
+        message.error(event.message || '请求处理失败，请稍后重试')
+        agentHasResult.value = true
+        finalizeStreamingMessage()
+        appendTenderFallbackIfNeeded()
+        const failedTool = toolCallsInProgress.value[toolCallsInProgress.value.length - 1]
+        const failedToolName = failedTool?.name ?? (failedTool ? toolNameById.get(failedTool.id) ?? '' : '')
+        options?.onToolCallActivity?.({ toolName: failedToolName, status: 'failed' })
+        runActivities.value = runActivities.value.map((activity) =>
+          activity.status === 'running'
+            ? { ...activity, status: 'failed', elapsed: Date.now() - activity.startTime }
+            : activity,
+        )
+        toolCallsInProgress.value = []
+      }
     }
   })
 
-  // 发送消息
-  const sendToolContent = async (value: any) => {
-    const {id, name, args, result, content } = value
-    client.messages = [{
-      id,
-      role: 'tool',
-      content: JSON.stringify(content),
-      toolCallId: content[0].id,
-    }]
-
-    // 判断是否开启了显示工具调用
-    if ((toolProcessActive?.value ?? true)) {
-      const sid = currentSessionId.value as string
-      // 保存历史，通过队列保证写入顺序
-      const contentToSave = buildToolCallsContent([{ id, name, args, result, elapsed: 0 }])
-      if (contentToSave) {
-        onMessageSaved?.({
-          id: nextIdBig(),
-          sessionId: sid,
-          role: 'tool',
-          content: contentToSave,
-          parentId: '',
-          path: '',
-          depth: 0,
-          createdAt: ''
-        } as ChatMessageVO)
-      }
+  /**
+   * HITL：记录单个工具的确认决策（替代旧的「前端代执行/塞文本 + run 重开一轮」）。
+   * 所有待确认工具都决策后，调用 /agui/resume 由后端从暂停点续跑。
+   * @param toolUseId 工具调用 id（= TOOL_CONFIRM_REQUIRED 的 toolUseId）
+   * @param approved true=允许，false=拒绝
+   */
+  const decideConfirm = (toolUseId: string, approved: boolean) => {
+    if (pendingConfirms.value[toolUseId] === undefined) return
+    pendingConfirms.value = {
+      ...pendingConfirms.value,
+      [toolUseId]: approved ? 'approved' : 'rejected'
     }
+    // 该工具按钮收起（已决策）
+    toolCallsInProgress.value = toolCallsInProgress.value.map(t =>
+      t.id === toolUseId ? { ...t, needConfirm: false } : t
+    )
+    // 所有待确认工具都已决策 → 提交 resume
+    const states = Object.values(pendingConfirms.value)
+    if (states.length > 0 && states.every(s => s !== 'pending')) {
+      void submitResume()
+    }
+  }
 
-    await run({
-      threadId: currentSessionId.value || undefined,
-      runId: `run_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
-      forwardedProps: getForwardedProps()
+  /** 汇总逐工具决策并调用后端 resume，续接 SSE 流。 */
+  const submitResume = async () => {
+    const sid = currentSessionId.value
+    if (!sid) return
+    const decisions = Object.entries(pendingConfirms.value).map(([toolUseId, s]) => {
+      const t = toolCallsInProgress.value.find(x => x.id === toolUseId)
+      return { toolUseId, name: t?.name ?? '', approved: s === 'approved' }
     })
+    pendingConfirms.value = {}
+    agentHasResult.value = false
+    await resume(sid, decisions, memoryActive?.value ?? false)
   }
 
   // 中止运行
@@ -319,6 +476,8 @@ export function useChatStream(
 
     // 重置计划状态
     resetPlan()
+
+    finalizeStreamingMessage()
 
     if (sid) {
       // 保存工具调用消息，通过队列保证写入顺序
@@ -337,36 +496,18 @@ export function useChatStream(
           } as ChatMessageVO)
         }
       }
-      // 保存AI回复消息
-      else {
-        if (streamingContent.value) {
-          onMessageSaved?.({
-            id: streamingMessageId.value,
-            sessionId: sid,
-            role: streamingRole.value,
-            content: streamingContent.value,
-            parentId: '',
-            path: '',
-            depth: 0,
-            createdAt: ''
-          } as ChatMessageVO)
-        }
-      }
-
       toolCallsInProgress.value = []
-      streamingMessageId.value = null
-      streamingContent.value = ''
-      streamingRole.value = 'system'
       isRunning.value = false
-
     }
+
+    appendTenderFallbackIfNeeded()
 
   }
 
   // 发送消息（可选传入 fileIds 覆盖，用于发送时已清空输入框的场景）
   const sendMessage = async (
     inputText: string,
-    messagesList: ChatMessageVO[],
+    messagesList: RuntimeChatMessage[],
     overrideFileIds?: string[]
   ) => {
     const effectiveFileIds = overrideFileIds ?? fileIds?.value ?? []
@@ -379,19 +520,15 @@ export function useChatStream(
     }
 
     // 构建 client 需要的消息格式
-    client.messages = messagesList
-      .filter((m) => !['system', 'tool'].includes(m.role))
-      .map((m) => ({
-        id: String(m.id),
-        role: m.role as any,
-        content: (m.content || '') as string
-      }))
+    client.messages = toAguiRuntimeMessages(messagesList)
 
     const forwardedProps = getForwardedProps()
     if (overrideFileIds !== undefined) {
       forwardedProps.fileIds = overrideFileIds
     }
 
+    resetStreamingState()
+    runStartedAt.value = Date.now()
     agentHasResult.value = false
     await run({
       threadId: currentSessionId.value || undefined,
@@ -408,6 +545,11 @@ export function useChatStream(
     streamingContent.value = ''
     streamingRole.value = 'system'
     toolCallsInProgress.value = []
+    toolNameById.clear()
+    runActivities.value = []
+    hasVisibleAnswer.value = false
+    pendingHighRecallAnswer.value = null
+    runStartedAt.value = null
     agentHasResult.value = true
     currentPlan.value = null
   }
@@ -415,16 +557,21 @@ export function useChatStream(
   return {
     agentHasResult,
     streamingContent,
+    hasVisibleAnswer,
+    runStartedAt,
     streamingMessageId,
     streamingRole,
     toolCallsInProgress,
+    runActivities,
     isRunning,
     isReplaying,
     currentPlan,
     hasPlan,
     abortRun,
     sendMessage,
-    sendToolContent,
+    decideConfirm,
+    pendingConfirms,
+    restorePending,
     reconnect,
     disconnect,
     resetStreamingState,
