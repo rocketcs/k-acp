@@ -51,6 +51,8 @@ logs
 
 # Local k-acp runtime secrets and generated Graphify artifacts
 docker/.env.kacp
+docker/.env.kylin
+docker/.env.kylin.core-dm8
 graphify-out/
 
 # Codex environment connection credentials. Commit only the accompanying
