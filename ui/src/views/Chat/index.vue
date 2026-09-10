@@ -29,6 +29,7 @@ import { buildOutputInstruction } from '@/utils/diy/questionTemplate'
 import { prependChatAttachmentContent, splitChatAttachmentContent } from '@/utils/chat/messageContent'
 import { createRuntimeUserMessage } from '@/utils/chat/runtimeMessages'
 import { shouldDisplayChatMessage } from '@/utils/chat/messageVisibility'
+import { isSemanticaAgent, resolveSemanticaAgentCodes } from '@/utils/chat/semanticaEntry'
 import { RoutePaths } from '@/router/constants'
 
 type ChatSubmissionInput = {
@@ -126,10 +127,6 @@ const handleLogout = () => {
 
 const agentId = computed(() => (props.chatAgentId || route.params.agentId) as string || '')
 
-// 智能医生固定使用这个 Agent 页面；入口只在该对话中展示，避免污染其他智能体。
-const SEMANTICA_DOCTOR_AGENT_ID = '2096644338200215554'
-const showSemanticaExplore = computed(() => agentId.value === SEMANTICA_DOCTOR_AGENT_ID)
-
 const isDiyRoute = computed(() => route.name === RouteNames.CHAT_DIY)
 const shouldLoadDiyConfig = computed(() => isDiyRoute.value || props.forceDiyConfig === true)
 const diyConfig = ref<DiyPageConfig | null>(null)
@@ -146,6 +143,11 @@ const displayDiyConfig = computed(() => {
 
 // 智能体详情
 const { agentDetail, allowFileType } = useAgentDetail(agentId)
+
+// 智能医生的知识图谱入口只在医疗类智能体对话中展示，避免污染其他智能体。
+// Agent ID 各环境不同（本地 default-doctor、测试环境 default-hospital），按 agent_code 判断。
+const semanticaAgentCodes = resolveSemanticaAgentCodes(import.meta.env.VITE_SEMANTICA_DOCTOR_AGENT_CODES)
+const showSemanticaExplore = computed(() => isSemanticaAgent(agentDetail.value?.agentCode, semanticaAgentCodes))
 
 // 记忆/规划是否可用（由 agentDetail 决定）
 const accountId = computed(() => accountStore.userInfo?.id)
